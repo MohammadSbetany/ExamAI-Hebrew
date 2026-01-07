@@ -1,0 +1,159 @@
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 30% 97%;
+    --foreground: 220 40% 13%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 40% 13%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 40% 13%;
+
+    --primary: 217 71% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 40 30% 92%;
+    --secondary-foreground: 220 40% 13%;
+
+    --muted: 40 20% 94%;
+    --muted-foreground: 220 15% 45%;
+
+    --accent: 217 60% 94%;
+    --accent-foreground: 217 71% 35%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 220 20% 88%;
+    --input: 220 20% 88%;
+    --ring: 217 71% 45%;
+
+    --radius: 0.75rem;
+
+    /* Custom tokens */
+    --upload-bg: 217 60% 97%;
+    --upload-border: 217 50% 80%;
+    --upload-border-active: 217 71% 55%;
+    --question-bg: 40 40% 99%;
+    --question-border: 40 30% 88%;
+    --question-number: 217 71% 45%;
+  }
+
+  .dark {
+    --background: 220 40% 10%;
+    --foreground: 40 20% 95%;
+
+    --card: 220 35% 14%;
+    --card-foreground: 40 20% 95%;
+
+    --popover: 220 35% 14%;
+    --popover-foreground: 40 20% 95%;
+
+    --primary: 217 71% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 30% 20%;
+    --secondary-foreground: 40 20% 95%;
+
+    --muted: 220 25% 18%;
+    --muted-foreground: 220 15% 60%;
+
+    --accent: 217 50% 25%;
+    --accent-foreground: 217 60% 85%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 25% 22%;
+    --input: 220 25% 22%;
+    --ring: 217 71% 55%;
+
+    --upload-bg: 220 35% 16%;
+    --upload-border: 220 30% 30%;
+    --upload-border-active: 217 71% 55%;
+    --question-bg: 220 35% 12%;
+    --question-border: 220 30% 25%;
+    --question-number: 217 71% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    direction: rtl;
+  }
+
+  body {
+    @apply bg-background text-foreground font-heebo antialiased;
+  }
+}
+
+@layer utilities {
+  .upload-zone {
+    @apply bg-upload border-2 border-dashed border-upload-border rounded-xl transition-all duration-300;
+  }
+
+  .upload-zone:hover,
+  .upload-zone-active {
+    @apply border-upload-border-active bg-accent/50;
+  }
+
+  .question-item {
+    @apply bg-question border border-question-border rounded-lg p-5 transition-all duration-200;
+  }
+
+  .question-item:hover {
+    @apply shadow-md -translate-y-0.5;
+  }
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin 1.2s linear infinite;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Stagger animation for questions */
+.question-item:nth-child(1) { animation-delay: 0.05s; }
+.question-item:nth-child(2) { animation-delay: 0.1s; }
+.question-item:nth-child(3) { animation-delay: 0.15s; }
+.question-item:nth-child(4) { animation-delay: 0.2s; }
+.question-item:nth-child(5) { animation-delay: 0.25s; }
+.question-item:nth-child(6) { animation-delay: 0.3s; }
+.question-item:nth-child(7) { animation-delay: 0.35s; }
+.question-item:nth-child(8) { animation-delay: 0.4s; }
+.question-item:nth-child(9) { animation-delay: 0.45s; }
+.question-item:nth-child(10) { animation-delay: 0.5s; }
