@@ -26,24 +26,38 @@ const Index = () => {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const response = await fetch('/upload', {
+      // 1. ADDED: Initial log to verify the request starts
+      console.log("Starting upload for:", selectedFile.name);
+
+      const response = await fetch('http://localhost:8000/upload', {
         method: 'POST',
         body: formData,
       });
 
+      // 2. ADDED: Log the status code for debugging
+      console.log("Server responded with status:", response.status);
+
       if (!response.ok) {
-        throw new Error('שגיאה בהעלאת הקובץ. אנא נסה שנית.');
+        // IMPROVED: Capture the specific status code in the error message
+        throw new Error(`שגיאה בהעלאת הקובץ (קוד: ${response.status}). אנא נסה שנית.`);
       }
 
       const data = await response.json();
       
+      // 3. ADDED: Log the actual data received from DeepSeek
+      console.log("Data received from backend:", data);
+      
       // Expecting the response to have a "questions" array
-      if (data.questions && Array.isArray(data.questions)) {
+      if (data && data.questions && Array.isArray(data.questions)) {
         setQuestions(data.questions);
       } else {
-        throw new Error('תשובה לא תקינה מהשרת');
+        // 4. ADDED: Detailed error if the JSON structure is unexpected
+        console.error("Unexpected JSON structure:", data);
+        throw new Error('תשובה לא תקינה מהשרת - המבנה שהתקבל אינו תקין');
       }
     } catch (err) {
+      // 5. ADDED: Log the full error object for better troubleshooting
+      console.error("Full catch-block error:", err);
       setError(err instanceof Error ? err.message : 'אירעה שגיאה בלתי צפויה');
     } finally {
       setIsLoading(false);
