@@ -21,6 +21,7 @@ const FileUpload = ({ onFileSelect, selectedFile, disabled }: FileUploadProps) =
     if (file && file.type === 'application/pdf') {
       onFileSelect(file);
     }
+      e.target.value = '';
   };
 
   const handleDragOver = (e: React.DragEvent) => {
