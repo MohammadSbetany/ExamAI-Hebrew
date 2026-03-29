@@ -18,7 +18,8 @@ const FileUpload = ({ onFileSelect, selectedFile, disabled }: FileUploadProps) =
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    if (file && file.type === 'application/pdf') {
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
+    if (file && allowedTypes.includes(file.type)) {
       onFileSelect(file);
     }
       e.target.value = '';
@@ -42,7 +43,8 @@ const FileUpload = ({ onFileSelect, selectedFile, disabled }: FileUploadProps) =
     if (disabled) return;
 
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type === 'application/pdf') {
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
+    if (file && allowedTypes.includes(file.type)) {
       onFileSelect(file);
     }
   };
@@ -70,7 +72,7 @@ const FileUpload = ({ onFileSelect, selectedFile, disabled }: FileUploadProps) =
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,application/pdf"
+        accept=".pdf,.docx,.txt,.pptx"
         onChange={handleChange}
         className="hidden"
         disabled={disabled}
@@ -126,11 +128,11 @@ const FileUpload = ({ onFileSelect, selectedFile, disabled }: FileUploadProps) =
             </svg>
           </div>
           <div>
-            <p className="font-medium text-foreground">גרור קובץ PDF לכאן</p>
+            <p className="font-medium text-foreground">גרור את הקובץ לכאן</p>
             <p className="text-sm text-muted-foreground mt-1">או לחץ לבחירת קובץ</p>
           </div>
           <span className="text-xs text-muted-foreground bg-muted px-3 py-1.5 rounded-full">
-            PDF בלבד
+            PDF, DOCX, TXT, PPTX
           </span>
         </div>
       )}
