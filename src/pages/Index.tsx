@@ -48,10 +48,11 @@ const Index = () => {
       console.log("Data received from backend:", data);
       
       // Expecting the response to have a "questions" array
-      if (data && data.questions && Array.isArray(data.questions)) {
+      if (data && data.error) {
+        throw new Error(data.error);
+      } else if (data && data.questions && Array.isArray(data.questions)) {
         setQuestions(data.questions);
       } else {
-        // 4. ADDED: Detailed error if the JSON structure is unexpected
         console.error("Unexpected JSON structure:", data);
         throw new Error('תשובה לא תקינה מהשרת - המבנה שהתקבל אינו תקין');
       }
@@ -94,7 +95,7 @@ const Index = () => {
             מערכת לייצור שאלות פתוחות
           </h1>
           <p className="text-muted-foreground text-lg max-w-md mx-auto">
-            העלה קובץ PDF עם חומר לימוד וקבל שאלות פתוחות שנוצרות באופן אוטומטי
+            העלה קובץ עם חומר לימוד וקבל שאלות פתוחות שנוצרות באופן אוטומטי
           </p>
         </header>
 
@@ -153,11 +154,6 @@ const Index = () => {
             </div>
           )}
         </div>
-
-        {/* Footer */}
-        <footer className="mt-8 text-center text-sm text-muted-foreground">
-          <p>העלה קובץ PDF בלבד • המערכת תעבד את התוכן ותייצר שאלות פתוחות</p>
-        </footer>
       </div>
     </div>
   );

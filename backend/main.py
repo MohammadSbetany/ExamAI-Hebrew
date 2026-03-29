@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import json
-from engine import generate_questions_from_pdf
+from engine import generate_questions
 
 app = FastAPI()
 
@@ -20,13 +20,14 @@ app.add_middleware(
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
-    # Stronger validation: Check both extension and MIME type
-    if not file.filename.lower().endswith('.pdf') or file.content_type != "application/pdf":
-        raise HTTPException(status_code=400, detail="Only actual PDF files are allowed")
+    ALLOWED_EXTENSIONS = {"pdf", "docx", "txt", "pptx"}
+    ext = file.filename.lower().split(".")[-1]
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Unsupported file type. Allowed: PDF, DOCX, TXT, PPTX")
 
     try:
         content = await file.read()
-        result_json_string = generate_questions_from_pdf(content)
+        result_json_string = generate_questions(content, file.filename)
         return json.loads(result_json_string)
         
     except Exception as e:
