@@ -1,7 +1,16 @@
-# Ignore environment variables
-.env
-
-# Ignore Python cache and virtual environments
+# Python cache
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Environments
+.env
+.venv/
+env/
 venv/
-.venv
+
+# Frontend
+node_modules/
+dist/
