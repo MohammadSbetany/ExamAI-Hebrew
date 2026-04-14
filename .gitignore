@@ -18,6 +18,7 @@ backend/.env
 backend/env/
 backend/venv/
 backend/.pytest_cache/
+backend/serviceAccountKey.json
 
 # --- IDE/Tools ---
 .vscode/
