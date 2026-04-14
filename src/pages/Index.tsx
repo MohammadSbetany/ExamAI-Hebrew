@@ -3,6 +3,7 @@ import FileUpload from '@/components/FileUpload';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import QuestionsList from '@/components/QuestionsList';
 import ErrorMessage from '@/components/ErrorMessage';
+import { useAuth } from '@/context/AuthContext';
 
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -16,6 +17,7 @@ const Index = () => {
   const [answers, setAnswers] = useState<string[]>([]);
   const [isGrading, setIsGrading] = useState(false);
   const [gradeResult, setGradeResult] = useState<{ score: number; feedback: { question: string; correct: boolean; points: number; explanation: string; covered_points: string[]; missed_points: string[] }[] } | null>(null);
+  const { user } = useAuth();
   const handleFileSelect = (file: File | null) => {
     setSelectedFile(file);
     setError(null);
@@ -41,6 +43,7 @@ const Index = () => {
 
       const response = await fetch('http://localhost:8000/upload', {
         method: 'POST',
+        headers: { 'Authorization': `Bearer ${user?.token}` },
         body: formData,
       });
 
@@ -93,9 +96,41 @@ const Index = () => {
   const handleGrade = async () => {
     setIsGrading(true);
     try {
+      // Yes/No and Multiple choice: grade locally — answers already came from prompt 1, no API call needed
+      if (activeQuestionType === 'multiple' || activeQuestionType === 'yesno') {
+        const feedback = questions.map((q, i) => {
+          const studentAnswer = (answers[i] || '').trim();
+          const correctAnswer = (q.answer || '').trim();
+          const isCorrect = studentAnswer === correctAnswer;
+
+          const explanation = isCorrect
+            ? 'תשובה נכונה!'
+            : activeQuestionType === 'multiple'
+              ? `התשובה הנכונה היא: ${correctAnswer}. ${q.options?.[correctAnswer] || ''}`
+              : `התשובה הנכונה היא: ${correctAnswer}`;
+
+          return {
+            question: q.question,
+            points: isCorrect ? 1 : 0,
+            correct: isCorrect,
+            covered_points: [] as string[],
+            missed_points: [] as string[],
+            explanation,
+          };
+        });
+
+        const score = feedback.reduce((sum, f) => sum + f.points, 0);
+        setGradeResult({ score, feedback });
+        return;
+      }
+
+      // Open questions: keep original behavior, send to API
       const response = await fetch('http://localhost:8000/grade', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.token}`,
+        },
         body: JSON.stringify({
           questions,
           answers,
@@ -112,24 +147,12 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background py-12 px-4">
+    <div className="bg-background py-12 px-4">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <header className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl mb-6">
-            <svg
-              className="w-8 h-8 text-primary"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <img src="/favicon.ico" alt="ExamAI" className="w-8 h-8 object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-3">
             מערכת לייצור שאלות פתוחות

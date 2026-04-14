@@ -6,3 +6,4 @@ openai
 python-dotenv
 python-docx
 python-pptx
+firebase-admin

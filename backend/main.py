@@ -1,5 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Depends
+from firebase_auth import verify_token
 import json
 from engine import generate_questions, grade_answers
 
@@ -19,7 +21,7 @@ app.add_middleware(
 )
 
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...), question_type: str = Form("open"), question_count: int = Form(5), difficulty: str = Form("medium")):
+async def upload_pdf(file: UploadFile = File(...), question_type: str = Form("open"), question_count: int = Form(5), difficulty: str = Form("medium"), user=Depends(verify_token)):
     ALLOWED_EXTENSIONS = {"pdf", "docx", "txt", "pptx"}
     ext = file.filename.lower().split(".")[-1]
     if ext not in ALLOWED_EXTENSIONS:
@@ -37,7 +39,7 @@ async def upload_pdf(file: UploadFile = File(...), question_type: str = Form("op
         raise HTTPException(status_code=500, detail="Failed to process the file")
 
 @app.post("/grade")
-async def grade(data: dict):
+async def grade(data: dict, user=Depends(verify_token)):
     try:
         questions = data.get("questions", [])
         answers = data.get("answers", [])
