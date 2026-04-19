@@ -18,8 +18,9 @@ if not _openrouter_api_key:
 
 # Setup OpenRouter client
 client = OpenAI(
-    api_key=_openrouter_api_key,
-    base_url="https://openrouter.ai/api/v1"
+    api_key=os.environ.get("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+    timeout=90.0,
 )
 
 def extract_text_from_pdf(file_bytes: bytes):
@@ -120,6 +121,7 @@ Important: distribute the correct answers randomly across all options.
         ],
         stream=False,
         max_tokens=8192,
+        timeout=90,
         response_format={"type": "json_object"}
     )
 
@@ -175,6 +177,7 @@ def grade_answers(questions: list, answers: list, question_type: str):
         ],
         stream=False,
         max_tokens=8192,
+        timeout=90,
         response_format={"type": "json_object"}
     )
 

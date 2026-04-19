@@ -1,16 +1,12 @@
-# --- Frontend (Root) ---
-node_modules/
-dist/
-dist-ssr/
-*.local
-.env
-.env.local
-.env.*
-.DS_Store
-bun.lockb
-package-lock.json
+# --- Frontend ---
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 
-# --- Backend Folder ---
+# --- Backend ---
 backend/__pycache__/
 backend/*.pyc
 backend/*.pyo
@@ -20,6 +16,17 @@ backend/env/
 backend/venv/
 backend/.pytest_cache/
 backend/serviceAccountKey.json
+
+# --- Root ---
+.env
+.env.local
+.env.*.local
+node_modules/
+
+# --- General ---
+.DS_Store
+bun.lockb
+package-lock.json
 
 # --- IDE/Tools ---
 .vscode/

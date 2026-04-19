@@ -15,7 +15,7 @@ _initialized = False
 def _init_firebase():
     global _initialized
     if not _initialized:
-        cred_path = os.path.join(os.path.dirname(__file__), "serviceAccountKey.json")
+        cred_path = os.environ.get("FIREBASE_CREDENTIALS_PATH", os.path.join(os.path.dirname(__file__), "serviceAccountKey.json"))
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
         _initialized = True
