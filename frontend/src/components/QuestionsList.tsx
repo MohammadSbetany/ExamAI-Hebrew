@@ -1,17 +1,7 @@
-interface GradeResult {
-  score: number;
-  feedback: {
-    question: string;
-    correct: boolean;
-    points: number;
-    explanation: string;
-    covered_points: string[];
-    missed_points: string[];
-  }[];
-}
+import type { Question, GradeResult } from '@/types/questions';
 
 interface QuestionsListProps {
-  questions: any[];
+  questions: Question[];
   questionType: string;
   answers: string[];
   onAnswerChange: (index: number, answer: string) => void;
