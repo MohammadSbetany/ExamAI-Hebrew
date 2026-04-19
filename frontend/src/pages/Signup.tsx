@@ -51,8 +51,8 @@ const Signup = () => {
       await signup(email, password, name, role);
       navigate('/', { replace: true });
     } catch (err) {
-        const errorCode = (err as { code?: string })?.code ?? '';
-        setError(toHebrewError(errorCode));
+      const errorCode = (err as { code?: string })?.code ?? '';
+      setError(toHebrewError(errorCode));
     } finally {
       setLoading(false);
     }
