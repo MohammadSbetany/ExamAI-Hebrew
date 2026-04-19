@@ -9,9 +9,16 @@ import json
 
 load_dotenv()
 
+_openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
+if not _openrouter_api_key:
+    raise EnvironmentError(
+        "Missing required environment variable: OPENROUTER_API_KEY. "
+        "Ensure it is set in your .env file or environment."
+    )
+
 # Setup OpenRouter client
 client = OpenAI(
-    api_key=os.environ.get("OPENROUTER_API_KEY"),
+    api_key=_openrouter_api_key,
     base_url="https://openrouter.ai/api/v1"
 )
 
@@ -41,7 +48,7 @@ def extract_text_from_txt(file_bytes: bytes):
     return file_bytes.decode("utf-8")
 
 def generate_questions(file_bytes: bytes, filename: str, question_type: str = "open", question_count: int = 5, difficulty: str = "medium"):
-    # 1. Extract text locally since DeepSeek doesn't host files
+    # 1. Extract text from the uploaded file
     ext = filename.lower().split(".")[-1]
 
     if ext == "pdf":
@@ -104,7 +111,7 @@ Important: distribute the correct answers randomly across all options.
     {text}
     """
 
-    # 2. Use DeepSeek-V3 (deepseek-chat)
+    # 2. Use the configured OpenRouter/OpenAI chat model
     response = client.chat.completions.create(
         model="openai/gpt-5.4-mini",
         messages=[
