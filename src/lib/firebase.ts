@@ -7,12 +7,12 @@ import { getFirestore } from 'firebase/firestore';
 // Go to: Firebase Console → Your Project → Project Settings → Your Apps → SDK setup
 // ─────────────────────────────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: "AIzaSyAWt2ZQ9QSVRjkMXJ7UiXIsg4XoEKF5QMQ",
-  authDomain: "examai-hebrew.firebaseapp.com",
-  projectId: "examai-hebrew",
-  storageBucket: "examai-hebrew.firebasestorage.app",
-  messagingSenderId: "90893399593",
-  appId: "1:90893399593:web:809c0858b02af3b342ce38"
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app  = initializeApp(firebaseConfig);

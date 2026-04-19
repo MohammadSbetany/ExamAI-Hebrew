@@ -9,10 +9,10 @@ import json
 
 load_dotenv()
 
-# Setup DeepSeek client
+# Setup OpenRouter client
 client = OpenAI(
-    api_key=os.environ.get("DEEPSEEK_API_KEY"), 
-    base_url="https://api.deepseek.com"
+    api_key=os.environ.get("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1"
 )
 
 def extract_text_from_pdf(file_bytes: bytes):
@@ -106,7 +106,7 @@ Important: distribute the correct answers randomly across all options.
 
     # 2. Use DeepSeek-V3 (deepseek-chat)
     response = client.chat.completions.create(
-        model="deepseek-chat",
+        model="openai/gpt-5.4-mini",
         messages=[
             {"role": "system", "content": "You are an expert educator. You must respond with valid JSON only."},
             {"role": "user", "content": prompt},
@@ -161,7 +161,7 @@ def grade_answers(questions: list, answers: list, question_type: str):
     """
 
     response = client.chat.completions.create(
-        model="deepseek-chat",
+        model="openai/gpt-5.4-mini",
         messages=[
             {"role": "system", "content": "You are an expert educator. You must respond with valid JSON only."},
             {"role": "user", "content": prompt},
