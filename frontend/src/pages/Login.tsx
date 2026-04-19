@@ -40,8 +40,8 @@ const Login = () => {
       await login(email, password);
       navigate('/', { replace: true });
     } catch (err) {
-        const errorCode = (err as { code?: string })?.code ?? '';
-        setError(toHebrewError(errorCode));
+      const errorCode = (err as { code?: string })?.code ?? '';
+      setError(toHebrewError(errorCode));
     } finally {
       setLoading(false);
     }
