@@ -3,16 +3,38 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔧 SETUP: Replace these placeholder values with your Firebase project config.
-// Go to: Firebase Console → Your Project → Project Settings → Your Apps → SDK setup
+// 🔧 SETUP: Set the following environment variables before building the app.
+// Required VITE_FIREBASE_* keys (defined in .env or CI secrets):
+//   VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID,
+//   VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
 // ─────────────────────────────────────────────────────────────────────────────
+const envVarMap: Record<string, string | undefined> = {
+  VITE_FIREBASE_API_KEY:            import.meta.env.VITE_FIREBASE_API_KEY,
+  VITE_FIREBASE_AUTH_DOMAIN:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  VITE_FIREBASE_PROJECT_ID:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  VITE_FIREBASE_STORAGE_BUCKET:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  VITE_FIREBASE_MESSAGING_SENDER_ID: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  VITE_FIREBASE_APP_ID:             import.meta.env.VITE_FIREBASE_APP_ID,
+};
+
+const missingVars = Object.entries(envVarMap)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+if (missingVars.length > 0) {
+  throw new Error(
+    `Missing required Firebase environment variables: ${missingVars.join(', ')}. ` +
+    'Ensure these are set in your .env file or CI secrets.'
+  );
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAWt2ZQ9QSVRjkMXJ7UiXIsg4XoEKF5QMQ",
-  authDomain: "examai-hebrew.firebaseapp.com",
-  projectId: "examai-hebrew",
-  storageBucket: "examai-hebrew.firebasestorage.app",
-  messagingSenderId: "90893399593",
-  appId: "1:90893399593:web:809c0858b02af3b342ce38"
+  apiKey:            envVarMap.VITE_FIREBASE_API_KEY,
+  authDomain:        envVarMap.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         envVarMap.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     envVarMap.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: envVarMap.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             envVarMap.VITE_FIREBASE_APP_ID,
 };
 
 const app  = initializeApp(firebaseConfig);

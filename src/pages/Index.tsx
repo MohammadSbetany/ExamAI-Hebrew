@@ -155,7 +155,7 @@ const Index = () => {
             <img src="/favicon.ico" alt="ExamAI" className="w-8 h-8 object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-3">
-            מערכת לייצור שאלות פתוחות
+            מערכת לייצור שאלות 
           </h1>
           <p className="text-muted-foreground text-lg max-w-md mx-auto">
             העלה קובץ עם חומר לימוד וקבל שאלות שנוצרות באופן אוטומטי
