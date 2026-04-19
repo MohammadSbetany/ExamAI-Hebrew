@@ -39,8 +39,9 @@ const Login = () => {
     try {
       await login(email, password);
       navigate('/', { replace: true });
-    } catch (err: any) {
-      setError(toHebrewError(err?.code ?? ''));
+    } catch (err) {
+        const errorCode = (err as { code?: string })?.code ?? '';
+        setError(toHebrewError(errorCode));
     } finally {
       setLoading(false);
     }

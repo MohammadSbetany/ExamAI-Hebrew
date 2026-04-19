@@ -5,18 +5,37 @@ import QuestionsList from '@/components/QuestionsList';
 import ErrorMessage from '@/components/ErrorMessage';
 import { useAuth } from '@/context/AuthContext';
 
+interface Question {
+  question: string;
+  answer: string;
+  options?: Record<string, string>;
+  critical_points?: string[];
+}
+
+interface GradeResult {
+  score: number;
+  feedback: Array<{
+    question: string;
+    correct: boolean;
+    points: number;
+    explanation: string;
+    covered_points: string[];
+    missed_points: string[];
+  }>;
+}
+
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [questionType, setQuestionType] = useState<string>('open');
   const [activeQuestionType, setActiveQuestionType] = useState<string>('open');
   const [questionCount, setQuestionCount] = useState<number>(5);
   const [difficulty, setDifficulty] = useState<string>('medium');
   const [answers, setAnswers] = useState<string[]>([]);
   const [isGrading, setIsGrading] = useState(false);
-  const [gradeResult, setGradeResult] = useState<{ score: number; feedback: { question: string; correct: boolean; points: number; explanation: string; covered_points: string[]; missed_points: string[] }[] } | null>(null);
+  const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
   const { user } = useAuth();
   const handleFileSelect = (file: File | null) => {
     setSelectedFile(file);

@@ -11,7 +11,12 @@ interface GradeResult {
 }
 
 interface QuestionsListProps {
-  questions: any[];
+  questions: Array<{
+    question: string;
+    answer: string;
+    options?: Record<string, string>;
+    critical_points?: string[];
+  }>;
   questionType: string;
   answers: string[];
   onAnswerChange: (index: number, answer: string) => void;
