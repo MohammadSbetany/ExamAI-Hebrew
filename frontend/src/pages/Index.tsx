@@ -41,7 +41,7 @@ const Index = () => {
       formData.append('difficulty', difficulty);
       console.log("Starting upload for:", selectedFile.name);
 
-      const response = await fetch('http://localhost:8000/upload', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${user?.token}` },
         body: formData,
@@ -125,7 +125,7 @@ const Index = () => {
       }
 
       // Open questions: keep original behavior, send to API
-      const response = await fetch('http://localhost:8000/grade', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/grade`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
