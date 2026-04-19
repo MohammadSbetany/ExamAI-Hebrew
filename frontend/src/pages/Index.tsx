@@ -4,25 +4,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import QuestionsList from '@/components/QuestionsList';
 import ErrorMessage from '@/components/ErrorMessage';
 import { useAuth } from '@/context/AuthContext';
-
-interface Question {
-  question: string;
-  answer: string;
-  options?: Record<string, string>;
-  critical_points?: string[];
-}
-
-interface GradeResult {
-  score: number;
-  feedback: Array<{
-    question: string;
-    correct: boolean;
-    points: number;
-    explanation: string;
-    covered_points: string[];
-    missed_points: string[];
-  }>;
-}
+import type { Question, GradeResult } from '@/types/questions';
 
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
