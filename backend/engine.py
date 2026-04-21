@@ -14,7 +14,7 @@ load_dotenv()
 
 logger = logging.getLogger("examai.engine")
 
-MAX_QUESTION_COUNT = 50
+MAX_QUESTION_COUNT = 100
 
 _openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
 if not _openrouter_api_key:
