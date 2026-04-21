@@ -1,16 +1,18 @@
 import os
+import logging
 import fitz  # PyMuPDF
 from docx import Document
 from pptx import Presentation
 import io
 from openai import OpenAI
 from dotenv import load_dotenv
-import base64
 from PIL import Image
 import pytesseract
 import json
 
 load_dotenv()
+
+logger = logging.getLogger("examai.engine")
 
 MAX_QUESTION_COUNT = 50
 
@@ -54,8 +56,8 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
                 img_bytes = rel.target_part.blob
                 img = Image.open(io.BytesIO(img_bytes))
                 parts.append(pytesseract.image_to_string(img, lang='heb+eng'))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("DOCX image OCR failed for relation %s: %s", rel.reltype, exc)
     return "\n".join(parts)
 
 def extract_text_from_pptx(file_bytes: bytes):

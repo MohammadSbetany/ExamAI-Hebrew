@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type MouseEvent, type ChangeEvent, type DragEvent } from 'react';
 
 const MAX_FILES = 5;
 const ALLOWED_TYPES = [
@@ -47,7 +47,7 @@ const FileUpload = ({ onFilesChange, selectedFiles, disabled }: FileUploadProps)
     onFilesChange(unique);
   };
 
-  const removeFile = (index: number, e: React.MouseEvent) => {
+  const removeFile = (index: number, e: MouseEvent) => {
     e.stopPropagation();
     const updated = selectedFiles.filter((_, i) => i !== index);
     onFilesChange(updated);
@@ -58,22 +58,22 @@ const FileUpload = ({ onFilesChange, selectedFiles, disabled }: FileUploadProps)
     if (!disabled && selectedFiles.length < MAX_FILES) inputRef.current?.click();
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     addFiles(e.target.files);
     e.target.value = '';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
     if (!disabled) setIsDragOver(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = (e: DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     if (!disabled) addFiles(e.dataTransfer.files);
