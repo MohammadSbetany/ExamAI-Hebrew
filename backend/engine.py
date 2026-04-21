@@ -5,14 +5,13 @@ from pptx import Presentation
 import io
 from openai import OpenAI
 from dotenv import load_dotenv
-import base64
 from PIL import Image
 import pytesseract
 import json
 
 load_dotenv()
 
-MAX_QUESTION_COUNT = 50
+MAX_QUESTION_COUNT = 100
 
 _openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
 if not _openrouter_api_key:
