@@ -8,7 +8,8 @@ import type { Question, GradeResult } from '@/types/questions';
 import { gradeLocally } from '@/utils/gradingUtils';
 
 const Index = () => {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);  const [isLoading, setIsLoading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [questionType, setQuestionType] = useState<string>('open');
