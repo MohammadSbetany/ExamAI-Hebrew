@@ -15,7 +15,7 @@ ExamAI-Hebrew is a full-stack web application that automatically generates exam 
 - **Multi-format Upload** — PDF, DOCX, PPTX, and TXT support
 - **Three Question Types** — Open-ended, Yes/No, and Multiple Choice (א/ב/ג/ד)
 - **Three Difficulty Levels** — Easy, Medium, Hard
-- **AI-Powered Grading** — Open questions graded against critical points by GPT-4.1-mini via OpenRouter
+- **AI-Powered Grading** — Open questions graded against critical points by GPT-5.4-mini via OpenRouter
 - **Local Grading** — Yes/No and Multiple Choice graded instantly in the browser (no API call)
 - **Role-Based Access** — Student and Teacher roles with different sidebar sections
 - **Firebase Authentication** — Email/Password login and signup
