@@ -62,7 +62,13 @@ def generate_questions(file_bytes: bytes, filename: str, question_type: str = "o
         text = extract_text_from_txt(file_bytes)
     else:
         raise ValueError(f"Unsupported file type: {ext}")
+    
+    if question_count < 1:
+        question_count = 1
 
+    if question_count > 100:
+        question_count = 100
+            
     type_instructions = {
         "open": f"""generate {question_count} open-ended questions in Hebrew.
 Return a JSON object with a key "questions" containing an array of objects, each with:

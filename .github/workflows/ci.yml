@@ -10,7 +10,7 @@ jobs:
 
   # ── Job 1: Frontend ───────────────────────────────────────────────────────
   frontend:
-    name: Frontend — Install, Lint & Build
+    name: Frontend — Install, Lint, Test & Build
     runs-on: ubuntu-latest
 
     steps:
@@ -29,6 +29,10 @@ jobs:
       - name: Lint
         working-directory: frontend
         run: npm run lint
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm test
 
       - name: Build
         working-directory: frontend
@@ -50,7 +54,7 @@ jobs:
 
   # ── Job 2: Backend ────────────────────────────────────────────────────────
   backend:
-    name: Backend — Install & Lint
+    name: Backend — Install, Test & Lint
     runs-on: ubuntu-latest
 
     steps:
@@ -67,6 +71,14 @@ jobs:
       - name: Install dependencies
         working-directory: backend
         run: pip install -r requirements.txt
+
+      - name: Run tests
+        working-directory: backend
+        run: pytest
+        env:
+          OPENROUTER_API_KEY: test-key-mock
+          FIREBASE_CREDENTIALS_PATH: /tmp/fake-key.json
+          ALLOWED_ORIGINS: http://localhost:3000
 
       - name: Check for syntax errors
         working-directory: backend
