@@ -158,15 +158,15 @@ class TestGenerateQuestions:
             assert "generate 1" in prompt
 
     def test_question_count_clamped_to_maximum(self):
-        """question_count > 100 should be clamped to 100."""
-        from engine import generate_questions
+        """question_count > MAX_QUESTION_COUNT should be clamped to MAX_QUESTION_COUNT."""
+        from engine import generate_questions, MAX_QUESTION_COUNT
         expected = {"questions": []}
         with patch("engine.client") as mock_client:
             mock_client.chat.completions.create.return_value = self._mock_response(expected)
             generate_questions(b"text", "test.txt", "open", 999, "medium")
             call_args = mock_client.chat.completions.create.call_args
             prompt = call_args[1]["messages"][1]["content"]
-            assert "generate 100" in prompt
+            assert f"generate {MAX_QUESTION_COUNT}" in prompt
 
     def test_txt_file_dispatched_correctly(self):
         from engine import generate_questions

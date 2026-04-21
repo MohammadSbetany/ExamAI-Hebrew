@@ -5,6 +5,7 @@ import QuestionsList from '@/components/QuestionsList';
 import ErrorMessage from '@/components/ErrorMessage';
 import { useAuth } from '@/context/AuthContext';
 import type { Question, GradeResult } from '@/types/questions';
+import { gradeLocally } from '@/utils/gradingUtils';
 
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -99,29 +100,7 @@ const Index = () => {
     try {
       // Yes/No and Multiple choice: grade locally — answers already came from prompt 1, no API call needed
       if (activeQuestionType === 'multiple' || activeQuestionType === 'yesno') {
-        const feedback = questions.map((q, i) => {
-          const studentAnswer = (answers[i] || '').trim();
-          const correctAnswer = (q.answer || '').trim();
-          const isCorrect = studentAnswer === correctAnswer;
-
-          const explanation = isCorrect
-            ? 'תשובה נכונה!'
-            : activeQuestionType === 'multiple'
-              ? `התשובה הנכונה היא: ${correctAnswer}. ${q.options?.[correctAnswer] || ''}`
-              : `התשובה הנכונה היא: ${correctAnswer}`;
-
-          return {
-            question: q.question,
-            points: isCorrect ? 1 : 0,
-            correct: isCorrect,
-            covered_points: [] as string[],
-            missed_points: [] as string[],
-            explanation,
-          };
-        });
-
-        const score = feedback.reduce((sum, f) => sum + f.points, 0);
-        setGradeResult({ score, feedback });
+        setGradeResult(gradeLocally(questions, answers, activeQuestionType as 'multiple' | 'yesno'));
         return;
       }
 
@@ -206,7 +185,7 @@ const Index = () => {
             <input
               type="range"
               min={1}
-              max={100}
+              max={50}
               value={questionCount}
               onChange={(e) => setQuestionCount(Number(e.target.value))}
               disabled={isLoading}

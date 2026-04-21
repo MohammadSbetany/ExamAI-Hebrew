@@ -7,7 +7,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from firebase_auth import verify_token
 import json
-from engine import generate_questions, grade_answers
+from engine import generate_questions, grade_answers, MAX_QUESTION_COUNT
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -39,7 +39,6 @@ app.add_middleware(
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 MAX_UPLOAD_BYTES   = 10 * 1024 * 1024   # 10 MB
-MAX_QUESTION_COUNT = 50
 ALLOWED_EXTENSIONS = {"pdf", "docx", "txt", "pptx"}
 
 # ── Health endpoint ───────────────────────────────────────────────────────────

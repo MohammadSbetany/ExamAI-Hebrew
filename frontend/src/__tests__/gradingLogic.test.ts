@@ -1,39 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { Question, GradeResult } from '@/types/questions';
-
-// ── Pure grading logic extracted from Index.tsx handleGrade ───────────────────
-// This tests the local grading for yesno and multiple choice questions
-// without needing to render the full component.
-
-function gradeLocally(
-  questions: Question[],
-  answers: string[],
-  questionType: 'multiple' | 'yesno'
-): GradeResult {
-  const feedback = questions.map((q, i) => {
-    const studentAnswer = (answers[i] || '').trim();
-    const correctAnswer = (q.answer || '').trim();
-    const isCorrect = studentAnswer === correctAnswer;
-
-    const explanation = isCorrect
-      ? 'תשובה נכונה!'
-      : questionType === 'multiple'
-        ? `התשובה הנכונה היא: ${correctAnswer}. ${q.options?.[correctAnswer] || ''}`
-        : `התשובה הנכונה היא: ${correctAnswer}`;
-
-    return {
-      question: q.question,
-      points: isCorrect ? 1 : 0,
-      correct: isCorrect,
-      covered_points: [] as string[],
-      missed_points: [] as string[],
-      explanation,
-    };
-  });
-
-  const score = feedback.reduce((sum, f) => sum + f.points, 0);
-  return { score, feedback };
-}
+import type { Question } from '@/types/questions';
+import { gradeLocally } from '@/utils/gradingUtils';
 
 // ── Yes/No grading ────────────────────────────────────────────────────────────
 

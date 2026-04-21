@@ -8,6 +8,3 @@ python-docx
 python-pptx
 firebase-admin
 slowapi
-pytest
-httpx
-pytest-asyncio

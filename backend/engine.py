@@ -9,6 +9,8 @@ import json
 
 load_dotenv()
 
+MAX_QUESTION_COUNT = 50
+
 _openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
 if not _openrouter_api_key:
     raise EnvironmentError(
@@ -66,8 +68,8 @@ def generate_questions(file_bytes: bytes, filename: str, question_type: str = "o
     if question_count < 1:
         question_count = 1
 
-    if question_count > 100:
-        question_count = 100
+    if question_count > MAX_QUESTION_COUNT:
+        question_count = MAX_QUESTION_COUNT
             
     type_instructions = {
         "open": f"""generate {question_count} open-ended questions in Hebrew.

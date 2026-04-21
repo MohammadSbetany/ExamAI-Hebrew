@@ -4,7 +4,7 @@ All Firebase and AI calls are mocked so tests run without real credentials.
 """
 import json
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 
@@ -111,7 +111,8 @@ class TestUpload:
         assert response.status_code == 400
 
     def test_upload_file_too_large(self, client):
-        large_content = b"x" * (11 * 1024 * 1024)  # 11 MB
+        from main import MAX_UPLOAD_BYTES
+        large_content = b"x" * (MAX_UPLOAD_BYTES + 1)
         response = client.post(
             "/upload",
             files={"file": ("big.txt", large_content, "text/plain")},

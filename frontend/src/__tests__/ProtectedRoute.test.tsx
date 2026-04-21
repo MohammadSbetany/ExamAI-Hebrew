@@ -1,13 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const mockUseAuth = vi.fn();
 vi.mock('@/context/AuthContext', () => ({ useAuth: () => mockUseAuth() }));
 
-const renderWithRoute = (ui: React.ReactNode) =>
+const renderWithRoute = (ui: ReactNode) =>
   render(
     <MemoryRouter initialEntries={['/protected']}>
       <Routes>
