@@ -5,6 +5,9 @@ from pptx import Presentation
 import io
 from openai import OpenAI
 from dotenv import load_dotenv
+import base64
+from PIL import Image
+import pytesseract
 import json
 
 load_dotenv()
@@ -25,17 +28,35 @@ client = OpenAI(
     timeout=90.0,
 )
 
-def extract_text_from_pdf(file_bytes: bytes):
-    """Extracts text from PDF bytes, handling Hebrew RTL properly."""
+def extract_text_from_pdf(file_bytes: bytes) -> str:
+    """Extract text from PDF, falling back to OCR for scanned pages."""
     text = ""
     with fitz.open(stream=file_bytes, filetype="pdf") as doc:
         for page in doc:
-            text += page.get_text()
+            page_text = page.get_text()
+            if page_text.strip():
+                text += page_text
+            else:
+                # Scanned page — render to image and OCR
+                pix = page.get_pixmap(dpi=200)
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                text += pytesseract.image_to_string(img, lang='heb+eng')
     return text
 
-def extract_text_from_docx(file_bytes: bytes):
+def extract_text_from_docx(file_bytes: bytes) -> str:
+    """Extract text from DOCX including OCR on embedded images."""
     doc = Document(io.BytesIO(file_bytes))
-    return "\n".join([paragraph.text for paragraph in doc.paragraphs])
+    parts = [paragraph.text for paragraph in doc.paragraphs]
+    # OCR any inline images
+    for rel in doc.part.rels.values():
+        if "image" in rel.reltype:
+            try:
+                img_bytes = rel.target_part.blob
+                img = Image.open(io.BytesIO(img_bytes))
+                parts.append(pytesseract.image_to_string(img, lang='heb+eng'))
+            except Exception:
+                pass
+    return "\n".join(parts)
 
 def extract_text_from_pptx(file_bytes: bytes):
     prs = Presentation(io.BytesIO(file_bytes))
@@ -50,20 +71,36 @@ def extract_text_from_pptx(file_bytes: bytes):
 def extract_text_from_txt(file_bytes: bytes):
     return file_bytes.decode("utf-8")
 
-def generate_questions(file_bytes: bytes, filename: str, question_type: str = "open", question_count: int = 5, difficulty: str = "medium"):
-    # 1. Extract text from the uploaded file
-    ext = filename.lower().split(".")[-1]
+def extract_text_from_image(file_bytes: bytes) -> str:
+    """Extract text from JPG/PNG using OCR (Tesseract)."""
+    image = Image.open(io.BytesIO(file_bytes))
+    return pytesseract.image_to_string(image, lang='heb+eng')
 
+def extract_text_from_file(file_bytes: bytes, filename: str) -> str:
+    """Route a single file to the correct extractor."""
+    ext = filename.lower().split(".")[-1]
     if ext == "pdf":
-        text = extract_text_from_pdf(file_bytes)
+        return extract_text_from_pdf(file_bytes)
     elif ext == "docx":
-        text = extract_text_from_docx(file_bytes)
+        return extract_text_from_docx(file_bytes)
     elif ext == "pptx":
-        text = extract_text_from_pptx(file_bytes)
+        return extract_text_from_pptx(file_bytes)
     elif ext == "txt":
-        text = extract_text_from_txt(file_bytes)
+        return extract_text_from_txt(file_bytes)
+    elif ext in ("jpg", "jpeg", "png"):
+        return extract_text_from_image(file_bytes)
     else:
         raise ValueError(f"Unsupported file type: {ext}")
+
+
+def generate_questions(files: list[tuple[bytes, str]], question_type: str = "open", question_count: int = 5, difficulty: str = "medium"):
+    # 1. Extract and combine text from all uploaded files
+    all_texts = []
+    for file_bytes, filename in files:
+        text = extract_text_from_file(file_bytes, filename)
+        if text.strip():
+            all_texts.append(f"[קובץ: {filename}]\n{text}")
+    text = "\n\n---\n\n".join(all_texts)
     
     if question_count < 1:
         question_count = 1

@@ -53,7 +53,7 @@ class TestHealth:
 
 class TestUpload:
     def _make_file(self, content=b"sample text content", filename="test.txt"):
-        return {"file": (filename, content, "text/plain")}
+        return {"files": (filename, content, "text/plain")}
 
     def test_upload_success(self, client):
         mock_result = json.dumps({"questions": [
@@ -71,7 +71,7 @@ class TestUpload:
     def test_upload_invalid_file_type(self, client):
         response = client.post(
             "/upload",
-            files={"file": ("test.exe", b"content", "application/octet-stream")},
+            files={"files": ("test.exe", b"content", "application/octet-stream")},
             data={"question_type": "open", "question_count": 5, "difficulty": "medium"},
         )
         assert response.status_code == 400
@@ -115,7 +115,7 @@ class TestUpload:
         large_content = b"x" * (MAX_UPLOAD_BYTES + 1)
         response = client.post(
             "/upload",
-            files={"file": ("big.txt", large_content, "text/plain")},
+            files={"files": ("big.txt", large_content, "text/plain")},
             data={"question_type": "open", "question_count": 5, "difficulty": "medium"},
         )
         assert response.status_code == 413
@@ -155,7 +155,7 @@ class TestUpload:
         with patch("main.generate_questions", return_value=mock_result):
             response = client.post(
                 "/upload",
-                files={"file": ("doc.pdf", b"%PDF-1.4 fake content", "application/pdf")},
+                files={"files": ("doc.pdf", b"%PDF-1.4 fake content", "application/pdf")},
                 data={"question_type": "open", "question_count": 5, "difficulty": "medium"},
             )
         assert response.status_code == 200

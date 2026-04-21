@@ -1,13 +1,14 @@
 import os
 import logging
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
+from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from firebase_auth import verify_token
 import json
-from engine import generate_questions, grade_answers, MAX_QUESTION_COUNT
+from engine import generate_questions, grade_answers
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -38,8 +39,10 @@ app.add_middleware(
 )
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-MAX_UPLOAD_BYTES   = 10 * 1024 * 1024   # 10 MB
-ALLOWED_EXTENSIONS = {"pdf", "docx", "txt", "pptx"}
+MAX_UPLOAD_BYTES   = 10 * 1024 * 1024   # 10 MB per file
+MAX_QUESTION_COUNT = 100
+MAX_FILES          = 5
+ALLOWED_EXTENSIONS = {"pdf", "docx", "txt", "pptx", "jpg", "jpeg", "png"}
 
 # ── Health endpoint ───────────────────────────────────────────────────────────
 @app.get("/health")
@@ -51,7 +54,7 @@ def health():
 @limiter.limit("10/minute")
 async def upload_pdf(
     request: Request,
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     question_type: str = Form("open"),
     question_count: int = Form(5),
     difficulty: str = Form("medium"),
@@ -63,25 +66,29 @@ async def upload_pdf(
         raise HTTPException(status_code=400, detail=f"מספר השאלות חייב להיות בין 1 ל-{MAX_QUESTION_COUNT}")
     if difficulty not in ("easy", "medium", "hard"):
         raise HTTPException(status_code=400, detail="רמת קושי לא חוקית")
+    if len(files) > MAX_FILES:
+        raise HTTPException(status_code=400, detail=f"ניתן להעלות עד {MAX_FILES} קבצים בו-זמנית")
 
-    ext = (file.filename or "").lower().split(".")[-1]
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="סוג קובץ לא נתמך. מותר: PDF, DOCX, TXT, PPTX")
-
-    content = await file.read()
-    if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="הקובץ גדול מדי. גודל מקסימלי: 10MB")
+    file_data = []
+    for file in files:
+        ext = (file.filename or "").lower().split(".")[-1]
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(status_code=400, detail=f"סוג קובץ לא נתמך: {file.filename}. מותר: PDF, DOCX, TXT, PPTX, JPG, PNG")
+        content = await file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"הקובץ {file.filename} גדול מדי. גודל מקסימלי: 10MB")
+        file_data.append((content, file.filename))
 
     try:
-        logger.info("Generating questions | user=%s type=%s count=%d", user.get("uid"), question_type, question_count)
-        result_json_string = generate_questions(content, file.filename, question_type, question_count, difficulty)
+        logger.info("Generating questions | user=%s files=%d type=%s count=%d", user.get("uid"), len(files), question_type, question_count)
+        result_json_string = generate_questions(file_data, question_type, question_count, difficulty)
         return json.loads(result_json_string)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error("Upload error | user=%s error=%s", user.get("uid"), str(e))
         raise HTTPException(status_code=500, detail="שגיאה בעיבוד הקובץ")
-
+    
 # ── Grade ─────────────────────────────────────────────────────────────────────
 @app.post("/grade")
 @limiter.limit("20/minute")
