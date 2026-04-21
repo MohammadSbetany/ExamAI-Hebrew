@@ -74,6 +74,9 @@ jobs:
             backend/requirements.txt
             backend/requirements-dev.txt
 
+      - name: Install Tesseract
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-heb tesseract-ocr-eng      
+
       - name: Install dependencies
         working-directory: backend
         run: pip install -r requirements-dev.txt

@@ -118,14 +118,14 @@ class TestGenerateQuestions:
         with patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"}):
             from engine import generate_questions
             with pytest.raises(ValueError, match="Unsupported file type"):
-                generate_questions(b"content", "file.xyz")
+                generate_questions([(b"content", "file.xyz")])
 
     def test_generates_open_questions(self):
         from engine import generate_questions
         expected = {"questions": [{"question": "מה זה?", "answer": "תשובה", "critical_points": ["נקודה"]}]}
         with patch("engine.client") as mock_client:
             mock_client.chat.completions.create.return_value = self._mock_response(expected)
-            result = json.loads(generate_questions(b"some text", "test.txt", "open", 1, "medium"))
+            result = json.loads(generate_questions([(b"some text", "test.txt")], "open", 1, "medium"))
         assert "questions" in result
         assert len(result["questions"]) == 1
 
@@ -134,7 +134,7 @@ class TestGenerateQuestions:
         expected = {"questions": [{"question": "נכון?", "answer": "כן"}]}
         with patch("engine.client") as mock_client:
             mock_client.chat.completions.create.return_value = self._mock_response(expected)
-            result = json.loads(generate_questions(b"some text", "test.txt", "yesno", 1, "easy"))
+            result = json.loads(generate_questions([(b"some text", "test.txt")], "yesno", 1, "easy"))
         assert result["questions"][0]["answer"] in ("כן", "לא")
 
     def test_generates_multiple_choice_questions(self):
@@ -142,7 +142,7 @@ class TestGenerateQuestions:
         expected = {"questions": [{"question": "מה?", "answer": "א", "options": {"א": "א", "ב": "ב", "ג": "ג", "ד": "ד"}}]}
         with patch("engine.client") as mock_client:
             mock_client.chat.completions.create.return_value = self._mock_response(expected)
-            result = json.loads(generate_questions(b"some text", "test.txt", "multiple", 1, "hard"))
+            result = json.loads(generate_questions([(b"some text", "test.txt")], "multiple", 1, "hard"))
         assert "options" in result["questions"][0]
 
     def test_question_count_clamped_to_minimum(self):
@@ -152,7 +152,7 @@ class TestGenerateQuestions:
         with patch("engine.client") as mock_client:
             mock_client.chat.completions.create.return_value = self._mock_response(expected)
             # Should not raise even with count=0
-            generate_questions(b"text", "test.txt", "open", 0, "medium")
+            generate_questions([(b"text", "test.txt")], "open", 0, "medium")
             call_args = mock_client.chat.completions.create.call_args
             prompt = call_args[1]["messages"][1]["content"]
             assert "generate 1" in prompt
@@ -163,7 +163,7 @@ class TestGenerateQuestions:
         expected = {"questions": []}
         with patch("engine.client") as mock_client:
             mock_client.chat.completions.create.return_value = self._mock_response(expected)
-            generate_questions(b"text", "test.txt", "open", 999, "medium")
+            generate_questions([(b"text", "test.txt")], "open", 999, "medium")
             call_args = mock_client.chat.completions.create.call_args
             prompt = call_args[1]["messages"][1]["content"]
             assert f"generate {MAX_QUESTION_COUNT}" in prompt
@@ -174,7 +174,7 @@ class TestGenerateQuestions:
         with patch("engine.client") as mock_client, \
              patch("engine.extract_text_from_txt", return_value="extracted text") as mock_extract:
             mock_client.chat.completions.create.return_value = self._mock_response(expected)
-            generate_questions(b"hello", "test.txt", "open", 1, "medium")
+            generate_questions([(b"hello", "test.txt")], "open", 1, "medium")
             mock_extract.assert_called_once_with(b"hello")
 
     def test_pdf_file_dispatched_correctly(self):
@@ -183,7 +183,7 @@ class TestGenerateQuestions:
         with patch("engine.client") as mock_client, \
              patch("engine.extract_text_from_pdf", return_value="pdf text") as mock_extract:
             mock_client.chat.completions.create.return_value = self._mock_response(expected)
-            generate_questions(b"pdf bytes", "doc.pdf", "open", 1, "medium")
+            generate_questions([(b"pdf bytes", "doc.pdf")], "open", 1, "medium")
             mock_extract.assert_called_once()
 
 

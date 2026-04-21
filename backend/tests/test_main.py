@@ -53,7 +53,7 @@ class TestHealth:
 
 class TestUpload:
     def _make_file(self, content=b"sample text content", filename="test.txt"):
-        return {"file": (filename, content, "text/plain")}
+        return {"files": (filename, content, "text/plain")}
 
     def test_upload_success(self, client):
         mock_result = json.dumps({"questions": [
@@ -71,7 +71,7 @@ class TestUpload:
     def test_upload_invalid_file_type(self, client):
         response = client.post(
             "/upload",
-            files={"file": ("test.exe", b"content", "application/octet-stream")},
+            files={"files": ("test.exe", b"content", "application/octet-stream")},
             data={"question_type": "open", "question_count": 5, "difficulty": "medium"},
         )
         assert response.status_code == 400
@@ -115,7 +115,7 @@ class TestUpload:
         large_content = b"x" * (MAX_UPLOAD_BYTES + 1)
         response = client.post(
             "/upload",
-            files={"file": ("big.txt", large_content, "text/plain")},
+            files={"files": ("big.txt", large_content, "text/plain")},
             data={"question_type": "open", "question_count": 5, "difficulty": "medium"},
         )
         assert response.status_code == 413
@@ -155,10 +155,42 @@ class TestUpload:
         with patch("main.generate_questions", return_value=mock_result):
             response = client.post(
                 "/upload",
-                files={"file": ("doc.pdf", b"%PDF-1.4 fake content", "application/pdf")},
+                files={"files": ("doc.pdf", b"%PDF-1.4 fake content", "application/pdf")},
                 data={"question_type": "open", "question_count": 5, "difficulty": "medium"},
             )
         assert response.status_code == 200
+
+    def test_upload_multiple_valid_files(self, client):
+        mock_result = json.dumps({"questions": [
+            {"question": "מה זה?", "answer": "תשובה", "critical_points": ["נקודה 1"]}
+        ]})
+        files = [
+            ("files", ("file1.txt", b"content of file one", "text/plain")),
+            ("files", ("file2.txt", b"content of file two", "text/plain")),
+            ("files", ("file3.txt", b"content of file three", "text/plain")),
+        ]
+        with patch("main.generate_questions", return_value=mock_result):
+            response = client.post(
+                "/upload",
+                files=files,
+                data={"question_type": "open", "question_count": 3, "difficulty": "medium"},
+            )
+        assert response.status_code == 200
+        assert "questions" in response.json()
+
+    def test_upload_exceeds_max_files(self, client):
+        from main import MAX_FILES
+        files = [
+            ("files", (f"file{i}.txt", b"content", "text/plain"))
+            for i in range(MAX_FILES + 1)
+        ]
+        response = client.post(
+            "/upload",
+            files=files,
+            data={"question_type": "open", "question_count": 5, "difficulty": "medium"},
+        )
+        assert response.status_code == 400
+        assert str(MAX_FILES) in response.json()["detail"]
 
 
 # ── Grade endpoint ────────────────────────────────────────────────────────────

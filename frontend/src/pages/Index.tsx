@@ -8,7 +8,7 @@ import type { Question, GradeResult } from '@/types/questions';
 import { gradeLocally } from '@/utils/gradingUtils';
 
 const Index = () => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -20,14 +20,13 @@ const Index = () => {
   const [isGrading, setIsGrading] = useState(false);
   const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
   const { user } = useAuth();
-  const handleFileSelect = (file: File | null) => {
-    setSelectedFile(file);
+  const handleFilesChange = (files: File[]) => {
+    setSelectedFiles(files);
     setError(null);
   };
 
   const handleGenerate = async () => {
-    if (!selectedFile) return;
-
+    if (selectedFiles.length === 0) return;
     setIsLoading(true);
     setError(null);
     setQuestions([]);
@@ -37,11 +36,11 @@ const Index = () => {
 
     try {
       const formData = new FormData();
-      formData.append('file', selectedFile);
+      selectedFiles.forEach(file => formData.append('files', file));
       formData.append('question_type', questionType);
       formData.append('question_count', String(questionCount));
       formData.append('difficulty', difficulty);
-      console.log("Starting upload for:", selectedFile.name);
+      console.log("Starting upload for:", selectedFiles.map(f => f.name).join(', '));
 
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/upload`, {
         method: 'POST',
@@ -76,7 +75,7 @@ const Index = () => {
   };
 
   const handleReset = () => {
-    setSelectedFile(null);
+    setSelectedFiles([]);
     setQuestions([]);
     setError(null);
     setQuestionType('open');
@@ -147,8 +146,8 @@ const Index = () => {
           {/* Upload Section */}
           <section className="mb-6">
             <FileUpload
-              onFileSelect={handleFileSelect}
-              selectedFile={selectedFile}
+              onFilesChange={handleFilesChange}
+              selectedFiles={selectedFiles}
               disabled={isLoading}
             />
           </section>
@@ -229,11 +228,11 @@ const Index = () => {
           {/* Generate Button */}
           <button
             onClick={handleGenerate}
-            disabled={!selectedFile || isLoading}
+            disabled={selectedFiles.length === 0 || isLoading}
             className={`
               w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200
               ${
-                selectedFile && !isLoading
+                selectedFiles.length > 0 && !isLoading
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30'
                   : 'bg-muted text-muted-foreground cursor-not-allowed'
               }
