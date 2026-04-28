@@ -151,7 +151,7 @@ const Index = () => {
         body: JSON.stringify({
           questions,
           answers,
-          question_type: activeQuestionType === 'mixed' ? 'open' : questionType,
+          question_type: activeQuestionType === 'mixed' ? 'open' : activeQuestionType,
         }),
       });
       const data = await response.json();

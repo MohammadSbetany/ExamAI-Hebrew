@@ -244,9 +244,9 @@ def _generate_mixed_questions(
         raw = _call_model(prompt)
         try:
             batch = json.loads(raw)
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse JSON for %s batch", q_type)
-            continue
+        except json.JSONDecodeError as exc:
+            logger.warning("Failed to parse JSON for %s batch: %s", q_type, exc)
+            return json.dumps({"error": "שגיאה בעיבוד תשובת ה-AI. אנא נסה שוב."}, ensure_ascii=False)
 
         if "error" in batch:
             return raw  # propagate the first error encountered
