@@ -19,9 +19,19 @@ let fontBase64: { regular: string; bold: string } | null = null;
 
 const loadHebrewFont = async (doc: jsPDF) => {
   if (!fontBase64) {
-    const toBase64 = async (url: string) => {
-      const buf = await (await fetch(url)).arrayBuffer();
-      return btoa(new Uint8Array(buf).reduce((d, b) => d + String.fromCharCode(b), ''));
+    const toBase64 = async (url: string): Promise<string> => {
+      const blob = await (await fetch(url)).blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result;
+          if (typeof result === 'string') { resolve(result); return; }
+          reject(new Error('Failed to read font as data URL.'));
+        };
+        reader.onerror = () => reject(reader.error ?? new Error('Failed to read font.'));
+        reader.readAsDataURL(blob);
+      });
+      return dataUrl.split(',', 2)[1] ?? '';
     };
     try {
       fontBase64 = {
@@ -146,6 +156,7 @@ export const exportGradedPdf = async (questions: Question[], gradeResult: GradeR
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   await loadHebrewFont(doc);
   doc.setR2L(true);
+  if (questions.length === 0) return;
   const pct = Math.round((gradeResult.score / questions.length) * 100);
   let y = addPdfHeader(doc, `דוח ציון  ${gradeResult.score}/${questions.length} )${pct}%(`);
   addPdfFooter(doc, 1);
@@ -160,7 +171,8 @@ export const exportGradedPdf = async (questions: Question[], gradeResult: GradeR
   doc.text(`ציון סופי ${gradeResult.score} / ${questions.length} )${pct}%(`, PDF_WIDTH - PDF_MARGIN - 4, y + 9, { align: 'right' });
   y += 22;
 
-  gradeResult.feedback.forEach((fb, i) => {
+  const feedbackCount = Math.min(questions.length, gradeResult.feedback.length);
+  gradeResult.feedback.slice(0, feedbackCount).forEach((fb, i) => {
     const q = questions[i];
     const isCorrect = fb.points === 1;
     const isPartial = fb.points === 0.5;
@@ -272,6 +284,7 @@ export const exportBlankDocx = async (questions: Question[]) => {
 };
 
 export const exportGradedDocx = async (questions: Question[], gradeResult: GradeResult) => {
+  if (questions.length === 0) return;
   const pct = Math.round((gradeResult.score / questions.length) * 100);
   const scoreColor = pct >= 80 ? 'D1FAE5' : pct >= 60 ? 'FEF9C3' : 'FEE2E2';
   const scoreTextColor = pct >= 80 ? '166534' : pct >= 60 ? '854D0E' : 'B91C1C';
@@ -297,7 +310,8 @@ export const exportGradedDocx = async (questions: Question[], gradeResult: Grade
     }),
   ];
 
-  gradeResult.feedback.forEach((fb, i) => {
+  const docxFeedbackCount = Math.min(questions.length, gradeResult.feedback.length);
+  gradeResult.feedback.slice(0, docxFeedbackCount).forEach((fb, i) => {
     const q = questions[i];
     const isCorrect = fb.points === 1;
     const isPartial = fb.points === 0.5;
