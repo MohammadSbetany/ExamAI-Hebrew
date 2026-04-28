@@ -204,25 +204,30 @@ const Index = () => {
             <p className="text-sm font-medium text-foreground mb-3">רמת הקושי:</p>
             <div className="flex gap-3">
               {[
-                { value: 'easy', label: 'קל' },
-                { value: 'medium', label: 'בינוני' },
-                { value: 'hard', label: 'קשה' },
+                { value: 'easy', label: 'קל', bloom: 'זיכרון והבנה', bloomEn: "Bloom's L1–L2" },
+                { value: 'medium', label: 'בינוני', bloom: 'יישום וניתוח', bloomEn: "Bloom's L3–L4" },
+                { value: 'hard', label: 'קשה', bloom: 'הערכה ויצירה', bloomEn: "Bloom's L5–L6" },
               ].map((level) => (
                 <button
                   key={level.value}
                   onClick={() => setDifficulty(level.value)}
                   disabled={isLoading}
+                  title={level.bloomEn}
                   className={`
-                    flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all
+                    flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all flex flex-col items-center gap-0.5
                     ${difficulty === level.value
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border text-muted-foreground hover:border-primary/50'}
                   `}
                 >
-                  {level.label}
+                  <span>{level.label}</span>
+                  <span className="text-xs font-normal opacity-70">{level.bloom}</span>
                 </button>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              השאלות מותאמות לרמות טקסונומיית בלום
+            </p>
           </div>
 
           {/* Generate Button */}

@@ -139,9 +139,22 @@ Important: distribute the correct answers randomly across all options.
     instruction = type_instructions[question_type]
 
     difficulty_instructions = {
-        "easy": "The questions should be simple and basic, testing only fundamental understanding of the material.",
-        "medium": "The questions should require moderate understanding and some analysis of the material.",
-        "hard": "The questions should be challenging, requiring deep understanding, critical thinking and analysis of the material.",
+        "easy": (
+            "Focus specifically on the Remembering and Understanding levels of Bloom's Taxonomy (Levels 1–2). "
+            "Questions should test the student's ability to recall facts, define terms, and explain basic concepts "
+            "from the material. Avoid questions that require application or analysis."
+        ),
+        "medium": (
+            "Focus specifically on the Applying and Analyzing levels of Bloom's Taxonomy (Levels 3–4). "
+            "Questions should require the student to use information in new situations, solve problems using "
+            "learned concepts, or draw connections and distinctions among ideas in the material."
+        ),
+        "hard": (
+            "Focus specifically on the Evaluating and Creating levels of Bloom's Taxonomy (Levels 5–6). "
+            "Questions should require the student to justify a position, critique a theory, synthesize information "
+            "from multiple parts of the material, or propose an original solution or argument. "
+            "Avoid simple recall or straightforward application questions."
+        ),
     }
     difficulty_instruction = difficulty_instructions[difficulty]
 
