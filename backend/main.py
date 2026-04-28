@@ -8,7 +8,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from firebase_auth import verify_token
 import json
-from engine import generate_questions, grade_answers
+from engine import generate_questions, grade_answers, digitize_exam
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -87,6 +87,37 @@ async def upload_pdf(
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error("Upload error | user=%s error=%s", user.get("uid"), str(e))
+        raise HTTPException(status_code=500, detail="שגיאה בעיבוד הקובץ")
+
+# ── Digitize ──────────────────────────────────────────────────────────────────
+@app.post("/digitize")
+@limiter.limit("10/minute")
+async def digitize(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    user=Depends(verify_token),
+):
+    if len(files) > MAX_FILES:
+        raise HTTPException(status_code=400, detail=f"ניתן להעלות עד {MAX_FILES} קבצים בו-זמנית")
+
+    file_data = []
+    for file in files:
+        ext = (file.filename or "").lower().split(".")[-1]
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(status_code=400, detail=f"סוג קובץ לא נתמך: {file.filename}. מותר: PDF, DOCX, TXT, PPTX, JPG, PNG")
+        content = await file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"הקובץ {file.filename} גדול מדי. גודל מקסימלי: 10MB")
+        file_data.append((content, file.filename))
+
+    try:
+        logger.info("Digitizing exam | user=%s files=%d", user.get("uid"), len(files))
+        result_json_string = digitize_exam(file_data)
+        return json.loads(result_json_string)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error("Digitize error | user=%s error=%s", user.get("uid"), str(e))
         raise HTTPException(status_code=500, detail="שגיאה בעיבוד הקובץ")
     
 # ── Grade ─────────────────────────────────────────────────────────────────────

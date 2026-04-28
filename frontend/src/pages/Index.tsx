@@ -19,6 +19,7 @@ const Index = () => {
   const [answers, setAnswers] = useState<string[]>([]);
   const [isGrading, setIsGrading] = useState(false);
   const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
+  const [mode, setMode] = useState<'generate' | 'digitize'>('generate');
   const { user } = useAuth();
   const handleFilesChange = (files: File[]) => {
     setSelectedFiles(files);
@@ -74,10 +75,57 @@ const Index = () => {
     }
   };
 
+  const handleDigitize = async () => {
+    if (selectedFiles.length === 0) return;
+    setIsLoading(true);
+    setError(null);
+    setQuestions([]);
+    setAnswers([]);
+    setGradeResult(null);
+
+    try {
+      const formData = new FormData();
+      selectedFiles.forEach(file => formData.append('files', file));
+      console.log("Starting digitization for:", selectedFiles.map(f => f.name).join(', '));
+
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/digitize`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${user?.token}` },
+        body: formData,
+      });
+
+      console.log("Server responded with status:", response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Digitize failed (code: ${response.status}). Please try again.`);
+      }
+
+      const data = await response.json();
+      console.log("Data received from backend:", data);
+
+      if (data && data.error) {
+        throw new Error(data.error);
+      } else if (data && data.questions && Array.isArray(data.questions)) {
+        setQuestions(data.questions);
+        setActiveQuestionType(data.question_type || 'mixed');
+      } else {
+        console.error("Unexpected JSON structure:", data);
+        throw new Error('תשובה לא תקינה מהשרת - המבנה שהתקבל אינו תקין');
+      }
+    } catch (err) {
+      console.error("Full catch-block error:", err);
+      setError(err instanceof Error ? err.message : 'אירעה שגיאה בלתי צפויה');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleReset = () => {
     setSelectedFiles([]);
     setQuestions([]);
     setError(null);
+    setMode('generate');
     setQuestionType('open');
     setQuestionCount(5);
     setDifficulty('medium');
@@ -97,13 +145,13 @@ const Index = () => {
   const handleGrade = async () => {
     setIsGrading(true);
     try {
-      // Yes/No and Multiple choice: grade locally — answers already came from prompt 1, no API call needed
-      if (activeQuestionType === 'multiple' || activeQuestionType === 'yesno') {
+      // Yes/No and Multiple choice in generate mode: grade locally — no API call needed
+      if (mode === 'generate' && (activeQuestionType === 'multiple' || activeQuestionType === 'yesno')) {
         setGradeResult(gradeLocally(questions, answers, activeQuestionType as 'multiple' | 'yesno'));
         return;
       }
 
-      // Open questions: keep original behavior, send to API
+      // Digitized exams and open questions: use API (AI grades using knowledge + document context)
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/grade`, {
         method: 'POST',
         headers: {
@@ -113,7 +161,7 @@ const Index = () => {
         body: JSON.stringify({
           questions,
           answers,
-          question_type: questionType,
+          question_type: activeQuestionType,
         }),
       });
       const data = await response.json();
@@ -143,6 +191,45 @@ const Index = () => {
 
         {/* Main Card */}
         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 md:p-8">
+
+          {/* Mode Selector */}
+          <div className="mb-6">
+            <p className="text-sm font-medium text-foreground mb-3">מצב פעולה:</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setMode('generate')}
+                disabled={isLoading || questions.length > 0}
+                className={`
+                  flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all
+                  ${mode === 'generate'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground hover:border-primary/50'}
+                  ${questions.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+              >
+                יצירת שאלות חדשות
+              </button>
+              <button
+                onClick={() => setMode('digitize')}
+                disabled={isLoading || questions.length > 0}
+                className={`
+                  flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all
+                  ${mode === 'digitize'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground hover:border-primary/50'}
+                  ${questions.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+              >
+                ייבוא מבחן קיים
+              </button>
+            </div>
+            {mode === 'digitize' && (
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                העלה קובץ מבחן קיים — השאלות יחולצו אוטומטית לסימולציה אינטראקטיבית
+              </p>
+            )}
+          </div>
+
           {/* Upload Section */}
           <section className="mb-6">
             <FileUpload
@@ -152,87 +239,92 @@ const Index = () => {
             />
           </section>
 
-          {/* Question Type Selector */}
-          <div className="mb-6">
-            <p className="text-sm font-medium text-foreground mb-3">סוג השאלות:</p>
-            <div className="flex gap-3">
-              {[
-                { value: 'open', label: 'שאלות פתוחות' },
-                { value: 'yesno', label: 'כן / לא' },
-                { value: 'multiple', label: 'רב ברירה' },
-              ].map((type) => (
-                <button
-                  key={type.value}
-                  onClick={() => setQuestionType(type.value)}
+          {/* Generate mode controls */}
+          {mode === 'generate' && (
+            <>
+              {/* Question Type Selector */}
+              <div className="mb-6">
+                <p className="text-sm font-medium text-foreground mb-3">סוג השאלות:</p>
+                <div className="flex gap-3">
+                  {[
+                    { value: 'open', label: 'שאלות פתוחות' },
+                    { value: 'yesno', label: 'כן / לא' },
+                    { value: 'multiple', label: 'רב ברירה' },
+                  ].map((type) => (
+                    <button
+                      key={type.value}
+                      onClick={() => setQuestionType(type.value)}
+                      disabled={isLoading}
+                      className={`
+                        flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all
+                        ${questionType === type.value
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:border-primary/50'}
+                      `}
+                    >
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Question Count */}
+              <div className="mb-6">
+                <p className="text-sm font-medium text-foreground mb-3">מספר השאלות: {questionCount}</p>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={questionCount}
+                  onChange={(e) => setQuestionCount(Number(e.target.value))}
                   disabled={isLoading}
-                  className={`
-                    flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all
-                    ${questionType === type.value
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:border-primary/50'}
-                  `}
-                >
-                  {type.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Question Count */}
-          <div className="mb-6">
-            <p className="text-sm font-medium text-foreground mb-3">מספר השאלות: {questionCount}</p>
-            <input
-              type="range"
-              min={1}
-              max={100}
-              value={questionCount}
-              onChange={(e) => setQuestionCount(Number(e.target.value))}
-              disabled={isLoading}
-              className="w-full accent-primary"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>1</span>
-              <span>25</span>
-              <span>50</span>
-              <span>75</span>
-              <span>100</span>
-            </div>
-          </div>
+                  className="w-full accent-primary"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>1</span>
+                  <span>25</span>
+                  <span>50</span>
+                  <span>75</span>
+                  <span>100</span>
+                </div>
+              </div>
 
-          {/* Difficulty Selector */}
-          <div className="mb-6">
-            <p className="text-sm font-medium text-foreground mb-3">רמת הקושי:</p>
-            <div className="flex gap-3">
-              {[
-                { value: 'easy', label: 'קל', bloom: 'זיכרון והבנה', bloomEn: "Bloom's L1–L2" },
-                { value: 'medium', label: 'בינוני', bloom: 'יישום וניתוח', bloomEn: "Bloom's L3–L4" },
-                { value: 'hard', label: 'קשה', bloom: 'הערכה ויצירה', bloomEn: "Bloom's L5–L6" },
-              ].map((level) => (
-                <button
-                  key={level.value}
-                  onClick={() => setDifficulty(level.value)}
-                  disabled={isLoading}
-                  title={level.bloomEn}
-                  className={`
-                    flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all flex flex-col items-center gap-0.5
-                    ${difficulty === level.value
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:border-primary/50'}
-                  `}
-                >
-                  <span>{level.label}</span>
-                  <span className="text-xs font-normal opacity-70">{level.bloom}</span>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2 text-center">
-              השאלות מותאמות לרמות טקסונומיית בלום
-            </p>
-          </div>
+              {/* Difficulty Selector */}
+              <div className="mb-6">
+                <p className="text-sm font-medium text-foreground mb-3">רמת הקושי:</p>
+                <div className="flex gap-3">
+                  {[
+                    { value: 'easy', label: 'קל', bloom: 'זיכרון והבנה', bloomEn: "Bloom's L1–L2" },
+                    { value: 'medium', label: 'בינוני', bloom: 'יישום וניתוח', bloomEn: "Bloom's L3–L4" },
+                    { value: 'hard', label: 'קשה', bloom: 'הערכה ויצירה', bloomEn: "Bloom's L5–L6" },
+                  ].map((level) => (
+                    <button
+                      key={level.value}
+                      onClick={() => setDifficulty(level.value)}
+                      disabled={isLoading}
+                      title={level.bloomEn}
+                      className={`
+                        flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all flex flex-col items-center gap-0.5
+                        ${difficulty === level.value
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:border-primary/50'}
+                      `}
+                    >
+                      <span>{level.label}</span>
+                      <span className="text-xs font-normal opacity-70">{level.bloom}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  השאלות מותאמות לרמות טקסונומיית בלום
+                </p>
+              </div>
+            </>
+          )}
 
-          {/* Generate Button */}
+          {/* Action Button */}
           <button
-            onClick={handleGenerate}
+            onClick={mode === 'generate' ? handleGenerate : handleDigitize}
             disabled={selectedFiles.length === 0 || isLoading}
             className={`
               w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200
@@ -243,7 +335,12 @@ const Index = () => {
               }
             `}
           >
-            {isLoading ? 'מעבד...' : 'יצירת שאלות'}
+            {isLoading
+              ? 'מעבד...'
+              : mode === 'generate'
+                ? 'יצירת שאלות'
+                : 'חילוץ שאלות מהמבחן'
+            }
           </button>
 
           {/* Loading State */}
@@ -271,6 +368,7 @@ const Index = () => {
                 onSubmit={handleGrade}
                 isGrading={isGrading}
                 gradeResult={gradeResult}
+                isDigitized={mode === 'digitize'}
               />
               
               <button

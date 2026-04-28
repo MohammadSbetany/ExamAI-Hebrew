@@ -187,13 +187,78 @@ Important: distribute the correct answers randomly across all options.
 
     return response.choices[0].message.content
 
+def digitize_exam(files: list[tuple[bytes, str]]):
+    """Extract and structure existing exam questions from uploaded files."""
+    # 1. Extract and combine text from all uploaded files
+    all_texts = []
+    for file_bytes, filename in files:
+        text = extract_text_from_file(file_bytes, filename)
+        if text.strip():
+            all_texts.append(f"[קובץ: {filename}]\n{text}")
+    text = "\n\n---\n\n".join(all_texts)
+
+    prompt = f"""
+    You are an expert exam parser. Analyze the following exam document and extract ALL existing questions.
+
+    For each question you find, determine its type:
+    - "open": requires a free-text answer
+    - "yesno": can only be answered with כן (Yes) or לא (No)
+    - "multiple": has multiple choice options (labeled א/ב/ג/ד, A/B/C/D, or 1/2/3/4)
+
+    For each extracted question also provide:
+    - "answer": the correct answer based on the exam content or your own knowledge
+    - For "open" questions: "critical_points" — an array of 3-5 key points in Hebrew that a complete answer must cover
+    - For "multiple" questions: "options" — an object with keys "א", "ב", "ג", "ד" and the option text. If the original options use different labels (A/B/C/D or 1/2/3/4), map them to א/ב/ג/ד respectively. "answer" must be the correct key ("א", "ב", "ג", or "ד").
+    - For "yesno" questions: "answer" must be "כן" or "לא"
+
+    CRITICAL RULES:
+    - Do NOT rewrite, paraphrase, or modify questions. Copy them EXACTLY as they appear in the document.
+    - Do NOT skip any question, including sub-questions (e.g., 1a, 1b, question parts).
+    - Include ALL question text, context, and any relevant instructions attached to each question.
+
+    Before extracting questions, check the content:
+    - If the text is empty or too short, return: {{"error": "הקובץ שהועלה ריק או קצר מדי. אנא העלה קובץ עם תוכן."}}
+    - If the text contains no identifiable exam questions, return: {{"error": "לא זוהו שאלות בקובץ שהועלה. אנא העלה קובץ המכיל מבחן או שאלות."}}
+    - If questions are found, return a JSON object with:
+      - "questions": array of question objects
+      - "question_type": the overall exam type — "open", "yesno", "multiple", or "mixed" if the exam contains different question types
+
+    Each question object must have:
+    - "type": "open" | "yesno" | "multiple"
+    - "question": exact question text
+    - "answer": correct answer (inferred from document context or your knowledge)
+    - "critical_points": array of key points in Hebrew (only for "open" type, omit otherwise)
+    - "options": object with keys א/ב/ג/ד (only for "multiple" type, omit otherwise)
+
+    Document text:
+    {text}
+    """
+
+    response = client.chat.completions.create(
+        model="openai/gpt-5.4-mini",
+        messages=[
+            {"role": "system", "content": "You are an expert exam parser. You must respond with valid JSON only."},
+            {"role": "user", "content": prompt},
+        ],
+        stream=False,
+        max_tokens=8192,
+        timeout=90,
+        response_format={"type": "json_object"}
+    )
+
+    return response.choices[0].message.content
+
+
 def grade_answers(questions: list, answers: list, question_type: str):
     qa_text = ""
     for i, (q, a) in enumerate(zip(questions, answers)):
-        if question_type == "multiple":
+        # For mixed-type (digitized) exams, use the per-question type field
+        q_type = q.get("type", question_type) if question_type == "mixed" else question_type
+
+        if q_type == "multiple":
             options_text = ", ".join([f"{k}: {v}" for k, v in q.get("options", {}).items()])
             qa_text += f"שאלה {i+1}: {q['question']}\nאפשרויות: {options_text}\nתשובה נכונה: {q['answer']}\nתשובת התלמיד: {a}\n\n"
-        elif question_type == "yesno":
+        elif q_type == "yesno":
             qa_text += f"שאלה {i+1}: {q['question']}\nתשובה נכונה: {q['answer']}\nתשובת התלמיד: {a}\n\n"
         else:
             critical = "\n".join([f"- {p}" for p in q.get("critical_points", [])])
@@ -214,6 +279,7 @@ def grade_answers(questions: list, answers: list, question_type: str):
         * If the student covers all critical points correctly: 1 point (full credit)
         * If the student covers some but not all critical points: 0.5 points (partial credit)
         * If the student does not cover any critical points or writes gibberish: 0 points
+    - For mixed question types, apply the appropriate grading rule based on each question's type.
     - Be strict. Do not give credit for guesses or nonsense.
 
     Grade each answer and return a JSON object with:

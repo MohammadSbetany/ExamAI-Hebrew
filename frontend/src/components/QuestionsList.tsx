@@ -9,9 +9,10 @@ interface QuestionsListProps {
   onSubmit: () => void;
   isGrading: boolean;
   gradeResult: GradeResult | null;
+  isDigitized?: boolean;
 }
 
-const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSubmit, isGrading, gradeResult }: QuestionsListProps) => {
+const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSubmit, isGrading, gradeResult, isDigitized }: QuestionsListProps) => {
   if (questions.length === 0) return null;
 
   const allAnswered = answers.length === questions.length && answers.every(a => a.trim() !== '');
@@ -27,7 +28,10 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-foreground">
-            {questions.length === 1 ? 'שאלה אחת נוצרה בהצלחה' : `${questions.length} שאלות נוצרו בהצלחה`}
+            {isDigitized
+              ? questions.length === 1 ? 'שאלה אחת חולצה בהצלחה' : `${questions.length} שאלות חולצו בהצלחה`
+              : questions.length === 1 ? 'שאלה אחת נוצרה בהצלחה' : `${questions.length} שאלות נוצרו בהצלחה`
+            }
           </h2>
         </div>
         <div className="flex items-center gap-2">
@@ -57,6 +61,9 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
             points === 0 ? 'bg-red-50 border-red-200' :
             'bg-card border-border';
 
+          // Use the per-question type when available (digitized exams), otherwise fall back to global type
+          const qType = question.type || questionType;
+
           return (
             <li key={index} className={`flex gap-4 p-4 rounded-xl border transition-all ${questionBg}`}>
               <span className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-sm font-semibold text-primary">
@@ -79,7 +86,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                 </div>
 
                 {/* Open question */}
-                {questionType === 'open' && (
+                {qType === 'open' && (
                   <textarea
                     value={answers[index] || ''}
                     onChange={(e) => onAnswerChange(index, e.target.value)}
@@ -91,7 +98,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                 )}
 
                 {/* Yes/No question */}
-                {questionType === 'yesno' && (
+                {qType === 'yesno' && (
                   <div className="flex gap-3">
                     {['כן', 'לא'].map((option) => (
                       <button
@@ -110,7 +117,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                 )}
 
                 {/* Multiple choice question */}
-                {questionType === 'multiple' && (
+                {qType === 'multiple' && (
                   <div className="space-y-2">
                     {['א', 'ב', 'ג', 'ד'].map((option) => (
                       <button
@@ -141,7 +148,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                     <p className="text-xs text-muted-foreground">{feedback.explanation}</p>
 
                     {/* Covered points — open questions only */}
-                    {questionType === 'open' && feedback.covered_points?.length > 0 && (
+                    {qType === 'open' && feedback.covered_points?.length > 0 && (
                       <div className="mt-1">
                         <p className="text-xs font-medium text-green-700">נקודות שכוסו בתשובה:</p>
                         {feedback.covered_points.map((point: string, i: number) => (
@@ -151,7 +158,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                     )}
 
                     {/* Missed points — open questions only */}
-                    {questionType === 'open' && feedback.missed_points?.length > 0 && (
+                    {qType === 'open' && feedback.missed_points?.length > 0 && (
                       <div className="mt-1">
                         <p className="text-xs font-medium text-red-700">נקודות חסרות בתשובה:</p>
                         {feedback.missed_points.map((point: string, i: number) => (
