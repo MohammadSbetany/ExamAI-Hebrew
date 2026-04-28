@@ -74,7 +74,7 @@ const addPdfFooter = (doc: jsPDF, pageNum: number) => {
 const checkNewPage = (doc: jsPDF, y: number, needed = 20): number => {
   if (y + needed > doc.internal.pageSize.height - 20) {
     doc.addPage();
-    addPdfFooter(doc, (doc.internal as any).getCurrentPageInfo().pageNumber);
+    addPdfFooter(doc, (doc.internal as unknown as { getCurrentPageInfo: () => { pageNumber: number } }).getCurrentPageInfo().pageNumber);
     return 20;
   }
   return y;
