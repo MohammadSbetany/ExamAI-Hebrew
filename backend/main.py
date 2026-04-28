@@ -1,7 +1,7 @@
 import os
 import logging
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
-from typing import List
+from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -58,6 +58,7 @@ async def upload_pdf(
     question_type: str = Form("open"),
     question_count: int = Form(5),
     difficulty: str = Form("medium"),
+    blueprint_json: str = Form("{}"),
     user=Depends(verify_token),
 ):
     if question_type not in ("open", "yesno", "multiple"):
@@ -68,6 +69,38 @@ async def upload_pdf(
         raise HTTPException(status_code=400, detail="רמת קושי לא חוקית")
     if len(files) > MAX_FILES:
         raise HTTPException(status_code=400, detail=f"ניתן להעלות עד {MAX_FILES} קבצים בו-זמנית")
+
+    # ── Parse and validate blueprint ─────────────────────────────────────────
+    try:
+        blueprint = json.loads(blueprint_json) if blueprint_json else {}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="blueprint_json אינו JSON תקין")
+
+    if blueprint:
+        time_mode = blueprint.get("time_mode", "manual")
+        if time_mode not in ("manual", "ai_estimated"):
+            raise HTTPException(status_code=400, detail="time_mode חייב להיות 'manual' או 'ai_estimated'")
+
+        dist = blueprint.get("difficulty_distribution")
+        if dist is not None:
+            if not isinstance(dist, dict):
+                raise HTTPException(status_code=400, detail="difficulty_distribution חייב להיות אובייקט")
+            total = dist.get("easy", 0) + dist.get("medium", 0) + dist.get("hard", 0)
+            if abs(total - 100) > 1:
+                raise HTTPException(status_code=400, detail="סכום האחוזים בהתפלגות הקושי חייב להיות 100")
+
+        fc = blueprint.get("format_counts")
+        if fc is not None:
+            if not isinstance(fc, dict):
+                raise HTTPException(status_code=400, detail="format_counts חייב להיות אובייקט")
+            active = [t for t in ("yesno", "multiple", "open") if fc.get(t, 0) > 0]
+            if active:
+                total_fc = sum(fc.get(t, 0) for t in ("yesno", "multiple", "open"))
+                if total_fc != question_count:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"סכום ספירת הסוגים ({total_fc}) חייב להיות שווה למספר השאלות ({question_count})"
+                    )
 
     file_data = []
     for file in files:
@@ -80,8 +113,11 @@ async def upload_pdf(
         file_data.append((content, file.filename))
 
     try:
-        logger.info("Generating questions | user=%s files=%d type=%s count=%d", user.get("uid"), len(files), question_type, question_count)
-        result_json_string = generate_questions(file_data, question_type, question_count, difficulty)
+        logger.info(
+            "Generating questions | user=%s files=%d type=%s count=%d blueprint=%s",
+            user.get("uid"), len(files), question_type, question_count, bool(blueprint)
+        )
+        result_json_string = generate_questions(file_data, question_type, question_count, difficulty, blueprint or None)
         return json.loads(result_json_string)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
