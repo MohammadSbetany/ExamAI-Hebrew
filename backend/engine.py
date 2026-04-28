@@ -16,6 +16,24 @@ logger = logging.getLogger("examai.engine")
 
 MAX_QUESTION_COUNT = 100
 
+
+def _split_merged_questions(n: int) -> tuple[int, int, int]:
+    """Split n into (yesno_count, multiple_count, open_count) ≈ 30/40/30%.
+
+    Guarantees that open_count >= 1 and all counts >= 0, summing to n.
+    """
+    yesno = round(n * 0.30)
+    multiple = round(n * 0.40)
+    open_n = n - yesno - multiple
+    # Ensure at least one open question
+    while open_n < 1 and (multiple > 0 or yesno > 0):
+        if multiple > 0:
+            multiple -= 1
+        else:
+            yesno -= 1
+        open_n = n - yesno - multiple
+    return max(0, yesno), max(0, multiple), max(0, open_n)
+
 _openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
 if not _openrouter_api_key:
     raise EnvironmentError(
