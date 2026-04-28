@@ -184,7 +184,7 @@ const Index = () => {
             <input
               type="range"
               min={1}
-              max={50}
+              max={100}
               value={questionCount}
               onChange={(e) => setQuestionCount(Number(e.target.value))}
               disabled={isLoading}

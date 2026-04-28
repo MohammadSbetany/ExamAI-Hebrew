@@ -261,3 +261,68 @@ class TestGradeAnswers:
             ))
         assert result["score"] == 0.5
         assert result["feedback"][0]["points"] == 0.5
+
+class TestExtractTextFromImage:
+    def test_image_ocr_called(self):
+        """extract_text_from_image should call pytesseract."""
+        from engine import extract_text_from_image
+        from PIL import Image
+        import io
+        img = Image.new('RGB', (100, 30), color='white')
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        with patch('engine.pytesseract.image_to_string', return_value='hello') as mock_ocr:
+            result = extract_text_from_image(buf.getvalue())
+            mock_ocr.assert_called_once()
+            assert result == 'hello'
+
+class TestExtractTextFromFile:
+    def test_routes_jpg_to_image_extractor(self):
+        from engine import extract_text_from_file
+        with patch('engine.extract_text_from_image', return_value='img text') as mock:
+            result = extract_text_from_file(b'bytes', 'photo.jpg')
+            mock.assert_called_once_with(b'bytes')
+            assert result == 'img text'
+
+    def test_routes_png_to_image_extractor(self):
+        from engine import extract_text_from_file
+        with patch('engine.extract_text_from_image', return_value='img text') as mock:
+            result = extract_text_from_file(b'bytes', 'photo.png')
+            mock.assert_called_once_with(b'bytes')
+
+    def test_unsupported_extension_raises(self):
+        from engine import extract_text_from_file
+        with pytest.raises(ValueError, match='Unsupported file type'):
+            extract_text_from_file(b'bytes', 'file.xyz')
+
+class TestMultipleFiles:
+    def _mock_response(self, payload: dict):
+        mock_choice = MagicMock()
+        mock_choice.message.content = json.dumps(payload)
+        mock_resp = MagicMock()
+        mock_resp.choices = [mock_choice]
+        return mock_resp
+
+    def test_multiple_files_text_combined(self):
+        """Text from all files should be combined with separator."""
+        from engine import generate_questions
+        expected = {'questions': []}
+        with patch('engine.client') as mock_client, \
+             patch('engine.extract_text_from_txt', return_value='text content') as mock_extract:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b'a', 'a.txt'), (b'b', 'b.txt')], 'open', 1, 'medium')
+            assert mock_extract.call_count == 2
+            prompt = mock_client.chat.completions.create.call_args[1]['messages'][1]['content']
+            assert '---' in prompt
+
+    def test_empty_file_text_excluded(self):
+        """Files that produce empty text should be excluded from prompt."""
+        from engine import generate_questions
+        expected = {'questions': []}
+        with patch('engine.client') as mock_client, \
+             patch('engine.extract_text_from_txt', side_effect=['', 'real content']):
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b'a', 'a.txt'), (b'b', 'b.txt')], 'open', 1, 'medium')
+            prompt = mock_client.chat.completions.create.call_args[1]['messages'][1]['content']
+            assert 'a.txt' not in prompt
+            assert 'b.txt' in prompt    
