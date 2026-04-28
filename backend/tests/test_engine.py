@@ -358,4 +358,200 @@ class TestMultipleFiles:
             generate_questions([(b'a', 'a.txt'), (b'b', 'b.txt')], 'open', 1, 'medium')
             prompt = mock_client.chat.completions.create.call_args[1]['messages'][1]['content']
             assert 'a.txt' not in prompt
-            assert 'b.txt' in prompt    
+            assert 'b.txt' in prompt
+
+
+# ── Blueprint features ────────────────────────────────────────────────────────
+
+class TestBlueprint:
+    """Tests for generate_questions with blueprint configuration."""
+
+    def _mock_response(self, payload: dict):
+        mock_choice = MagicMock()
+        mock_choice.message.content = json.dumps(payload)
+        mock_resp = MagicMock()
+        mock_resp.choices = [mock_choice]
+        return mock_resp
+
+    # ── Difficulty distribution ───────────────────────────────────────────────
+
+    def test_difficulty_distribution_in_prompt(self):
+        """When difficulty_distribution is supplied, percentages appear in the prompt."""
+        from engine import generate_questions
+        expected = {"questions": []}
+        blueprint = {
+            "difficulty_distribution": {"easy": 20, "medium": 50, "hard": 30},
+        }
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"text", "test.txt")], "open", 5, "medium", blueprint)
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert "20%" in prompt
+        assert "50%" in prompt
+        assert "30%" in prompt
+
+    def test_difficulty_distribution_overrides_single_difficulty(self):
+        """Distribution prompt differs from single-difficulty 'easy' prompt."""
+        from engine import generate_questions
+        expected = {"questions": []}
+        blueprint = {
+            "difficulty_distribution": {"easy": 20, "medium": 50, "hard": 30},
+        }
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"text", "test.txt")], "open", 5, "easy", blueprint)
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        # Should NOT contain the single-difficulty L1-2 only phrasing
+        assert "Levels 1–2" not in prompt
+        # Should contain the distribution wording
+        assert "Distribute" in prompt or "distribute" in prompt
+
+    # ── AI time estimation ────────────────────────────────────────────────────
+
+    def test_ai_time_estimation_instruction_in_prompt(self):
+        """AI time mode should add recommended_time instruction to prompt."""
+        from engine import generate_questions
+        expected = {"questions": [], "recommended_time": 15}
+        blueprint = {"time_mode": "ai_estimated"}
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"text", "test.txt")], "open", 5, "medium", blueprint)
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert "recommended_time" in prompt
+
+    def test_manual_time_no_instruction_in_prompt(self):
+        """Manual time mode should NOT add recommended_time instruction to prompt."""
+        from engine import generate_questions
+        expected = {"questions": []}
+        blueprint = {"time_mode": "manual", "manual_time": 45}
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"text", "test.txt")], "open", 5, "medium", blueprint)
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert "recommended_time" not in prompt
+
+    # ── Format counts — single type ───────────────────────────────────────────
+
+    def test_single_format_count_overrides_question_type(self):
+        """A single active format count should override the question_type argument."""
+        from engine import generate_questions
+        expected = {"questions": [{"question": "כן?", "answer": "כן"}]}
+        blueprint = {"format_counts": {"yesno": 3, "multiple": 0, "open": 0}}
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"text", "test.txt")], "open", 5, "medium", blueprint)
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        # Prompt should request 3 yesno questions, not the default "open" type
+        assert "generate 3 yes/no questions" in prompt
+
+    def test_single_format_count_overrides_question_count(self):
+        """A single active format count should use its own count value."""
+        from engine import generate_questions
+        expected = {"questions": []}
+        blueprint = {"format_counts": {"yesno": 0, "multiple": 7, "open": 0}}
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"text", "test.txt")], "open", 5, "medium", blueprint)
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert "generate 7 multiple choice questions" in prompt
+
+    # ── Format counts — mixed exam ────────────────────────────────────────────
+
+    def test_mixed_exam_makes_multiple_api_calls(self):
+        """Mixed format counts should trigger one API call per active question type."""
+        from engine import generate_questions
+        yesno_payload = {"questions": [{"question": "כן?", "answer": "כן"}]}
+        open_payload = {"questions": [{"question": "מה?", "answer": "תשובה", "critical_points": []}]}
+        blueprint = {"format_counts": {"yesno": 1, "multiple": 0, "open": 1}}
+
+        with patch("engine.client") as mock_client, \
+             patch("engine.extract_text_from_txt", return_value="content"):
+            mock_client.chat.completions.create.side_effect = [
+                self._mock_response(yesno_payload),
+                self._mock_response(open_payload),
+            ]
+            result = json.loads(generate_questions([(b"text", "test.txt")], "open", 2, "medium", blueprint))
+
+        assert mock_client.chat.completions.create.call_count == 2
+        assert len(result["questions"]) == 2
+
+    def test_mixed_exam_tags_question_type_on_each_question(self):
+        """Mixed exam questions should have a question_type field."""
+        from engine import generate_questions
+        yesno_payload = {"questions": [{"question": "כן?", "answer": "כן"}]}
+        multiple_payload = {"questions": [{"question": "מה?", "answer": "א", "options": {}}]}
+        blueprint = {"format_counts": {"yesno": 1, "multiple": 1, "open": 0}}
+
+        with patch("engine.client") as mock_client, \
+             patch("engine.extract_text_from_txt", return_value="content"):
+            mock_client.chat.completions.create.side_effect = [
+                self._mock_response(yesno_payload),
+                self._mock_response(multiple_payload),
+            ]
+            result = json.loads(generate_questions([(b"text", "test.txt")], "open", 2, "medium", blueprint))
+
+        types = {q["question_type"] for q in result["questions"]}
+        assert "yesno" in types
+        assert "multiple" in types
+
+    def test_mixed_exam_ai_time_sums_batches(self):
+        """AI time estimation in mixed mode should sum across batches."""
+        from engine import generate_questions
+        yesno_payload = {"questions": [{"question": "כן?", "answer": "כן"}], "recommended_time": 5}
+        open_payload = {"questions": [{"question": "מה?", "answer": "תשובה", "critical_points": []}], "recommended_time": 10}
+        blueprint = {
+            "time_mode": "ai_estimated",
+            "format_counts": {"yesno": 1, "multiple": 0, "open": 1},
+        }
+
+        with patch("engine.client") as mock_client, \
+             patch("engine.extract_text_from_txt", return_value="content"):
+            mock_client.chat.completions.create.side_effect = [
+                self._mock_response(yesno_payload),
+                self._mock_response(open_payload),
+            ]
+            result = json.loads(generate_questions([(b"text", "test.txt")], "open", 2, "medium", blueprint))
+
+        assert result["recommended_time"] == 15
+
+    def test_mixed_exam_error_propagates(self):
+        """If the AI returns an error for any batch, it propagates immediately."""
+        from engine import generate_questions
+        error_payload = {"error": "הקובץ שהועלה ריק או קצר מדי. אנא העלה קובץ עם תוכן."}
+        blueprint = {"format_counts": {"yesno": 2, "multiple": 0, "open": 2}}
+
+        with patch("engine.client") as mock_client, \
+             patch("engine.extract_text_from_txt", return_value="content"):
+            mock_client.chat.completions.create.return_value = self._mock_response(error_payload)
+            result = json.loads(generate_questions([(b"text", "test.txt")], "open", 4, "medium", blueprint))
+
+        assert "error" in result
+
+    # ── grade_answers with per-question type ──────────────────────────────────
+
+    def test_grade_answers_respects_per_question_type(self):
+        """grade_answers should use q['question_type'] when available."""
+        from engine import grade_answers
+        expected = {
+            "score": 1,
+            "feedback": [
+                {"question": "כן?", "points": 1, "correct": True,
+                 "explanation": "נכון", "covered_points": [], "missed_points": []},
+            ]
+        }
+        with patch("engine.client") as mock_client:
+            mock_choice = MagicMock()
+            mock_choice.message.content = json.dumps(expected)
+            mock_resp = MagicMock()
+            mock_resp.choices = [mock_choice]
+            mock_client.chat.completions.create.return_value = mock_resp
+
+            grade_answers(
+                [{"question": "כן?", "answer": "כן", "question_type": "yesno"}],
+                ["כן"],
+                "open",  # global type is "open" but per-question is "yesno"
+            )
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+
+        # The yesno formatting (תשובה נכונה: כן) should appear, not open-question formatting
+        assert "תשובה נכונה: כן" in prompt    

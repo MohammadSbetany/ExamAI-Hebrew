@@ -3,8 +3,10 @@ import FileUpload from '@/components/FileUpload';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import QuestionsList from '@/components/QuestionsList';
 import ErrorMessage from '@/components/ErrorMessage';
+import ExamBlueprintPanel from '@/components/ExamBlueprintPanel';
 import { useAuth } from '@/context/AuthContext';
-import type { Question, GradeResult } from '@/types/questions';
+import type { Question, GradeResult, ExamBlueprint } from '@/types/questions';
+import { defaultBlueprint } from '@/types/questions';
 import { gradeLocally } from '@/utils/gradingUtils';
 
 const Index = () => {
@@ -19,11 +21,22 @@ const Index = () => {
   const [answers, setAnswers] = useState<string[]>([]);
   const [isGrading, setIsGrading] = useState(false);
   const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
+  const [blueprint, setBlueprint] = useState<ExamBlueprint>(defaultBlueprint);
+  const [recommendedTime, setRecommendedTime] = useState<number | null>(null);
   const { user } = useAuth();
+
   const handleFilesChange = (files: File[]) => {
     setSelectedFiles(files);
     setError(null);
   };
+
+  /** Convert camelCase blueprint to the snake_case shape the backend expects. */
+  const serializeBlueprint = (bp: ExamBlueprint): Record<string, unknown> => ({
+    time_mode: bp.timeMode,
+    manual_time: bp.manualTime,
+    difficulty_distribution: bp.difficultyDistribution,
+    format_counts: bp.formatCounts,
+  });
 
   const handleGenerate = async () => {
     if (selectedFiles.length === 0) return;
@@ -32,14 +45,33 @@ const Index = () => {
     setQuestions([]);
     setAnswers([]);
     setGradeResult(null);
-    setActiveQuestionType(questionType);
+    setRecommendedTime(null);
+
+    // Determine whether the blueprint has mixed format counts active
+    const fc = blueprint.formatCounts;
+    const fcTotal = fc.yesno + fc.multiple + fc.open;
+    const isMixedMode = fcTotal > 0;
+    const activeTypes = Object.entries(fc).filter(([, v]) => v > 0).map(([k]) => k);
+    const isTrulyMixed = activeTypes.length > 1;
+
+    // For UI grading: if mixed, set to 'mixed'; if single active type, use that; else use selector
+    const effectiveType = isTrulyMixed
+      ? 'mixed'
+      : activeTypes.length === 1
+        ? activeTypes[0]
+        : questionType;
+    setActiveQuestionType(effectiveType);
+
+    // question_count to send: use fcTotal when format counts are active; otherwise slider
+    const effectiveCount = isMixedMode ? fcTotal : questionCount;
 
     try {
       const formData = new FormData();
       selectedFiles.forEach(file => formData.append('files', file));
-      formData.append('question_type', questionType);
-      formData.append('question_count', String(questionCount));
+      formData.append('question_type', isMixedMode ? 'open' : questionType); // 'open' is a valid placeholder for mixed
+      formData.append('question_count', String(effectiveCount));
       formData.append('difficulty', difficulty);
+      formData.append('blueprint_json', JSON.stringify(serializeBlueprint(blueprint)));
       console.log("Starting upload for:", selectedFiles.map(f => f.name).join(', '));
 
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/upload`, {
@@ -61,7 +93,10 @@ const Index = () => {
       if (data && data.error) {
         throw new Error(data.error);
       } else if (data && data.questions && Array.isArray(data.questions)) {
-        setQuestions(data.questions.slice(0, questionCount));
+        setQuestions(data.questions);
+        if (typeof data.recommended_time === 'number') {
+          setRecommendedTime(data.recommended_time);
+        }
       } else {
         console.error("Unexpected JSON structure:", data);
         throw new Error('תשובה לא תקינה מהשרת - המבנה שהתקבל אינו תקין');
@@ -84,6 +119,8 @@ const Index = () => {
     setAnswers([]);
     setGradeResult(null);
     setActiveQuestionType('open');
+    setBlueprint(defaultBlueprint);
+    setRecommendedTime(null);
   };
 
   const handleAnswerChange = (index: number, answer: string) => {
@@ -97,13 +134,14 @@ const Index = () => {
   const handleGrade = async () => {
     setIsGrading(true);
     try {
-      // Yes/No and Multiple choice: grade locally — answers already came from prompt 1, no API call needed
+      // Pure yes/no or multiple choice: grade locally — no API call needed
       if (activeQuestionType === 'multiple' || activeQuestionType === 'yesno') {
         setGradeResult(gradeLocally(questions, answers, activeQuestionType as 'multiple' | 'yesno'));
         return;
       }
 
-      // Open questions: keep original behavior, send to API
+      // Open questions and mixed exams: send to API
+      // For mixed exams the backend uses per-question question_type field for grading
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/grade`, {
         method: 'POST',
         headers: {
@@ -113,7 +151,7 @@ const Index = () => {
         body: JSON.stringify({
           questions,
           answers,
-          question_type: questionType,
+          question_type: activeQuestionType === 'mixed' ? 'open' : questionType,
         }),
       });
       const data = await response.json();
@@ -124,6 +162,12 @@ const Index = () => {
       setIsGrading(false);
     }
   };
+
+  // Compute format-count totals for validation display
+  const fc = blueprint.formatCounts;
+  const fcTotal = fc.yesno + fc.multiple + fc.open;
+  const isMixedMode = fcTotal > 0;
+  const isBlueprintValid = !isMixedMode || fcTotal === questionCount;
 
   return (
     <div className="bg-background py-12 px-4">
@@ -152,54 +196,67 @@ const Index = () => {
             />
           </section>
 
-          {/* Question Type Selector */}
-          <div className="mb-6">
-            <p className="text-sm font-medium text-foreground mb-3">סוג השאלות:</p>
-            <div className="flex gap-3">
-              {[
-                { value: 'open', label: 'שאלות פתוחות' },
-                { value: 'yesno', label: 'כן / לא' },
-                { value: 'multiple', label: 'רב ברירה' },
-              ].map((type) => (
-                <button
-                  key={type.value}
-                  onClick={() => setQuestionType(type.value)}
-                  disabled={isLoading}
-                  className={`
-                    flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all
-                    ${questionType === type.value
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:border-primary/50'}
-                  `}
-                >
-                  {type.label}
-                </button>
-              ))}
+          {/* Question Type Selector — hidden when blueprint format counts are active */}
+          {!isMixedMode && (
+            <div className="mb-6">
+              <p className="text-sm font-medium text-foreground mb-3">סוג השאלות:</p>
+              <div className="flex gap-3">
+                {[
+                  { value: 'open', label: 'שאלות פתוחות' },
+                  { value: 'yesno', label: 'כן / לא' },
+                  { value: 'multiple', label: 'רב ברירה' },
+                ].map((type) => (
+                  <button
+                    key={type.value}
+                    onClick={() => setQuestionType(type.value)}
+                    disabled={isLoading}
+                    className={`
+                      flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all
+                      ${questionType === type.value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/50'}
+                    `}
+                  >
+                    {type.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           
           {/* Question Count */}
           <div className="mb-6">
-            <p className="text-sm font-medium text-foreground mb-3">מספר השאלות: {questionCount}</p>
-            <input
-              type="range"
-              min={1}
-              max={100}
-              value={questionCount}
-              onChange={(e) => setQuestionCount(Number(e.target.value))}
-              disabled={isLoading}
-              className="w-full accent-primary"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>1</span>
-              <span>25</span>
-              <span>50</span>
-              <span>75</span>
-              <span>100</span>
-            </div>
+            <p className="text-sm font-medium text-foreground mb-3">
+              מספר השאלות: {isMixedMode ? fcTotal : questionCount}
+              {isMixedMode && (
+                <span className="mr-2 text-xs text-muted-foreground font-normal">
+                  (מחושב מהגדרות Blueprint)
+                </span>
+              )}
+            </p>
+            {!isMixedMode && (
+              <>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={questionCount}
+                  onChange={(e) => setQuestionCount(Number(e.target.value))}
+                  disabled={isLoading}
+                  className="w-full accent-primary"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>1</span>
+                  <span>25</span>
+                  <span>50</span>
+                  <span>75</span>
+                  <span>100</span>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Difficulty Selector */}
+          {/* Difficulty Selector — hidden when blueprint distribution is active */}
           <div className="mb-6">
             <p className="text-sm font-medium text-foreground mb-3">רמת הקושי:</p>
             <div className="flex gap-3">
@@ -230,14 +287,22 @@ const Index = () => {
             </p>
           </div>
 
+          {/* Advanced Blueprint Panel */}
+          <ExamBlueprintPanel
+            blueprint={blueprint}
+            onChange={setBlueprint}
+            questionCount={questionCount}
+            disabled={isLoading}
+          />
+
           {/* Generate Button */}
           <button
             onClick={handleGenerate}
-            disabled={selectedFiles.length === 0 || isLoading}
+            disabled={selectedFiles.length === 0 || isLoading || !isBlueprintValid}
             className={`
               w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200
               ${
-                selectedFiles.length > 0 && !isLoading
+                selectedFiles.length > 0 && !isLoading && isBlueprintValid
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30'
                   : 'bg-muted text-muted-foreground cursor-not-allowed'
               }
@@ -263,6 +328,25 @@ const Index = () => {
           {/* Questions Display */}
           {questions.length > 0 && (
             <div className="mt-8 pt-8 border-t border-border">
+
+              {/* Time Banner */}
+              {(recommendedTime !== null || blueprint.timeMode === 'manual') && (
+                <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-xl border border-primary/20 bg-primary/5">
+                  <span className="text-lg">⏱</span>
+                  {recommendedTime !== null ? (
+                    <p className="text-sm text-foreground">
+                      <span className="font-semibold">זמן מומלץ על ידי AI:</span>{' '}
+                      <span className="text-primary font-bold">{recommendedTime} דקות</span>
+                    </p>
+                  ) : (
+                    <p className="text-sm text-foreground">
+                      <span className="font-semibold">זמן מבחן:</span>{' '}
+                      <span className="text-primary font-bold">{blueprint.manualTime} דקות</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
               <QuestionsList
                 questions={questions}
                 questionType={activeQuestionType}

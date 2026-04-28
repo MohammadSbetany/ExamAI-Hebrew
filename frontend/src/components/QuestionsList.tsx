@@ -49,6 +49,8 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
 
       <ol className="space-y-6">
         {questions.map((question, index) => {
+          // For mixed exams each question carries its own type; fall back to the global type
+          const qType = question.question_type || questionType;
           const feedback = gradeResult?.feedback[index];
           const points = feedback?.points;
           const questionBg =
@@ -79,7 +81,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                 </div>
 
                 {/* Open question */}
-                {questionType === 'open' && (
+                {qType === 'open' && (
                   <textarea
                     value={answers[index] || ''}
                     onChange={(e) => onAnswerChange(index, e.target.value)}
@@ -91,7 +93,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                 )}
 
                 {/* Yes/No question */}
-                {questionType === 'yesno' && (
+                {qType === 'yesno' && (
                   <div className="flex gap-3">
                     {['כן', 'לא'].map((option) => (
                       <button
@@ -110,7 +112,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                 )}
 
                 {/* Multiple choice question */}
-                {questionType === 'multiple' && (
+                {qType === 'multiple' && (
                   <div className="space-y-2">
                     {['א', 'ב', 'ג', 'ד'].map((option) => (
                       <button
@@ -141,7 +143,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                     <p className="text-xs text-muted-foreground">{feedback.explanation}</p>
 
                     {/* Covered points — open questions only */}
-                    {questionType === 'open' && feedback.covered_points?.length > 0 && (
+                    {qType === 'open' && feedback.covered_points?.length > 0 && (
                       <div className="mt-1">
                         <p className="text-xs font-medium text-green-700">נקודות שכוסו בתשובה:</p>
                         {feedback.covered_points.map((point: string, i: number) => (
@@ -151,7 +153,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                     )}
 
                     {/* Missed points — open questions only */}
-                    {questionType === 'open' && feedback.missed_points?.length > 0 && (
+                    {qType === 'open' && feedback.missed_points?.length > 0 && (
                       <div className="mt-1">
                         <p className="text-xs font-medium text-red-700">נקודות חסרות בתשובה:</p>
                         {feedback.missed_points.map((point: string, i: number) => (
