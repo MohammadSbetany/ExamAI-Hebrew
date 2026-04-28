@@ -16,6 +16,24 @@ logger = logging.getLogger("examai.engine")
 
 MAX_QUESTION_COUNT = 100
 
+
+def _split_merged_questions(n: int) -> tuple[int, int, int]:
+    """Split n into (yesno_count, multiple_count, open_count) ≈ 30/40/30%.
+
+    Guarantees that open_count >= 1 and all counts >= 0, summing to n.
+    """
+    yesno = round(n * 0.30)
+    multiple = round(n * 0.40)
+    open_n = n - yesno - multiple
+    # Ensure at least one open question
+    while open_n < 1 and (multiple > 0 or yesno > 0):
+        if multiple > 0:
+            multiple -= 1
+        else:
+            yesno -= 1
+        open_n = n - yesno - multiple
+    return max(0, yesno), max(0, multiple), max(0, open_n)
+
 _openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
 if not _openrouter_api_key:
     raise EnvironmentError(
@@ -136,7 +154,20 @@ Important: distribute the correct answers randomly across all options.
 - No single option ("א", "ב", "ג", or "ד") should be the correct answer for more than 50% of the questions.
 - The correct answers must be spread randomly and naturally across all {question_count} questions.""",
     }
-    instruction = type_instructions[question_type]
+
+    if question_type == "merged":
+        yn, mc, op = _split_merged_questions(question_count)
+        instruction = f"""generate {question_count} questions in Hebrew with a mix of formats: {yn} yes/no, {mc} multiple choice, and {op} open-ended.
+Return a JSON object with a key "questions" containing an array of exactly {question_count} objects.
+Each object must include a "type" field set to one of "yesno", "multiple", or "open", plus the fields for that type:
+- "yesno": {{"type": "yesno", "question": ..., "answer": "כן" or "לא"}}
+- "multiple": {{"type": "multiple", "question": ..., "options": {{"א": ..., "ב": ..., "ג": ..., "ד": ...}}, "answer": "א"/"ב"/"ג"/"ד"}}
+- "open": {{"type": "open", "question": ..., "answer": ..., "critical_points": [3-5 key points in Hebrew]}}
+
+For yes/no questions: distribute answers randomly between כן and לא — neither should exceed 70%.
+For multiple choice questions: distribute correct answers randomly across all options — no option should exceed 50%."""
+    else:
+        instruction = type_instructions[question_type]
 
     difficulty_instructions = {
         "easy": (
@@ -154,6 +185,11 @@ Important: distribute the correct answers randomly across all options.
             "Questions should require the student to justify a position, critique a theory, synthesize information "
             "from multiple parts of the material, or propose an original solution or argument. "
             "Avoid simple recall or straightforward application questions."
+        ),
+        "merged": (
+            "Distribute question difficulty across Bloom's Taxonomy: approximately 30% of questions at "
+            "Remembering and Understanding levels (L1–2), 50% at Applying and Analyzing levels (L3–4), "
+            "and 20% at Evaluating and Creating levels (L5–6). Vary the cognitive demand naturally across questions."
         ),
     }
     difficulty_instruction = difficulty_instructions[difficulty]
@@ -190,18 +226,28 @@ Important: distribute the correct answers randomly across all options.
 def grade_answers(questions: list, answers: list, question_type: str):
     qa_text = ""
     for i, (q, a) in enumerate(zip(questions, answers)):
-        if question_type == "multiple":
+        # For merged exams, use each question's own "type" field
+        q_type = q.get("type", "open") if question_type == "merged" else question_type
+        if q_type == "multiple":
             options_text = ", ".join([f"{k}: {v}" for k, v in q.get("options", {}).items()])
             qa_text += f"שאלה {i+1}: {q['question']}\nאפשרויות: {options_text}\nתשובה נכונה: {q['answer']}\nתשובת התלמיד: {a}\n\n"
-        elif question_type == "yesno":
+        elif q_type == "yesno":
             qa_text += f"שאלה {i+1}: {q['question']}\nתשובה נכונה: {q['answer']}\nתשובת התלמיד: {a}\n\n"
         else:
             critical = "\n".join([f"- {p}" for p in q.get("critical_points", [])])
             qa_text += f"שאלה {i+1}: {q['question']}\nתשובה נכונה: {q['answer']}\nנקודות מפתח:\n{critical}\nתשובת התלמיד: {a}\n\n"
 
+    if question_type == "merged":
+        type_note = (
+            "This is a mixed-type exam. Each question includes a 'type' field: 'yesno', 'multiple', or 'open'. "
+            "Grade each question according to its own type."
+        )
+    else:
+        type_note = f"Question type: {question_type}"
+
     prompt = f"""
     You are a strict expert educator grading a student's answers in Hebrew.
-    Question type: {question_type}
+    {type_note}
 
     Here are the questions, correct answers, and the student's answers:
     {qa_text}

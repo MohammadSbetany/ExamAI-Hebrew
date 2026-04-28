@@ -30,6 +30,20 @@ describe('Question type', () => {
     };
     expect(q.critical_points).toHaveLength(3);
   });
+
+  it('accepts a merged question with a type field', () => {
+    const q: Question = {
+      question: 'כן או לא?',
+      answer: 'כן',
+      type: 'yesno',
+    };
+    expect(q.type).toBe('yesno');
+  });
+
+  it('type field is optional', () => {
+    const q: Question = { question: 'מה זה?', answer: 'תשובה' };
+    expect(q.type).toBeUndefined();
+  });
 });
 
 describe('GradeFeedbackItem type', () => {

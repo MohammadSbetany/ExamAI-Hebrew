@@ -243,3 +243,62 @@ class TestGrade:
         with patch("main.grade_answers", return_value=mock_result):
             response = client.post("/grade", json=payload)
         assert response.status_code == 200
+
+
+# ── Merged question_type and difficulty ───────────────────────────────────────
+
+class TestMerged:
+    def _make_file(self, content=b"sample text content", filename="test.txt"):
+        return {"files": (filename, content, "text/plain")}
+
+    def test_upload_merged_question_type_accepted(self, client):
+        mock_result = json.dumps({"questions": []})
+        with patch("main.generate_questions", return_value=mock_result):
+            response = client.post(
+                "/upload",
+                files=self._make_file(),
+                data={"question_type": "merged", "question_count": 5, "difficulty": "medium"},
+            )
+        assert response.status_code == 200
+
+    def test_upload_merged_difficulty_accepted(self, client):
+        mock_result = json.dumps({"questions": []})
+        with patch("main.generate_questions", return_value=mock_result):
+            response = client.post(
+                "/upload",
+                files=self._make_file(),
+                data={"question_type": "open", "question_count": 5, "difficulty": "merged"},
+            )
+        assert response.status_code == 200
+
+    def test_upload_merged_type_and_difficulty(self, client):
+        mock_result = json.dumps({"questions": []})
+        with patch("main.generate_questions", return_value=mock_result):
+            response = client.post(
+                "/upload",
+                files=self._make_file(),
+                data={"question_type": "merged", "question_count": 10, "difficulty": "merged"},
+            )
+        assert response.status_code == 200
+
+    def test_upload_all_valid_question_types_including_merged(self, client):
+        mock_result = json.dumps({"questions": []})
+        with patch("main.generate_questions", return_value=mock_result):
+            for qtype in ("open", "yesno", "multiple", "merged"):
+                response = client.post(
+                    "/upload",
+                    files=self._make_file(),
+                    data={"question_type": qtype, "question_count": 3, "difficulty": "easy"},
+                )
+                assert response.status_code == 200, f"Failed for question_type={qtype}"
+
+    def test_upload_all_valid_difficulties_including_merged(self, client):
+        mock_result = json.dumps({"questions": []})
+        with patch("main.generate_questions", return_value=mock_result):
+            for diff in ("easy", "medium", "hard", "merged"):
+                response = client.post(
+                    "/upload",
+                    files=self._make_file(),
+                    data={"question_type": "open", "question_count": 3, "difficulty": diff},
+                )
+                assert response.status_code == 200, f"Failed for difficulty={diff}"

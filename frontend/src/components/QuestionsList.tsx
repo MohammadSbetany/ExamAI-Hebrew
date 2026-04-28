@@ -78,90 +78,98 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                   )}
                 </div>
 
-                {/* Open question */}
-                {questionType === 'open' && (
-                  <textarea
-                    value={answers[index] || ''}
-                    onChange={(e) => onAnswerChange(index, e.target.value)}
-                    disabled={!!gradeResult || isGrading}
-                    placeholder="כתוב את תשובתך כאן..."
-                    className="w-full border border-border rounded-lg p-3 text-sm resize-none h-24 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    dir="rtl"
-                  />
-                )}
+                {/* Determine the effective type for this question */}
+                {(() => {
+                  const effectiveType = questionType === 'merged' ? (question.type || 'open') : questionType;
+                  return (
+                    <>
+                      {/* Open question */}
+                      {effectiveType === 'open' && (
+                        <textarea
+                          value={answers[index] || ''}
+                          onChange={(e) => onAnswerChange(index, e.target.value)}
+                          disabled={!!gradeResult || isGrading}
+                          placeholder="כתוב את תשובתך כאן..."
+                          className="w-full border border-border rounded-lg p-3 text-sm resize-none h-24 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          dir="rtl"
+                        />
+                      )}
 
-                {/* Yes/No question */}
-                {questionType === 'yesno' && (
-                  <div className="flex gap-3">
-                    {['כן', 'לא'].map((option) => (
-                      <button
-                        key={option}
-                        onClick={() => onAnswerChange(index, option)}
-                        disabled={!!gradeResult || isGrading}
-                        className={`px-6 py-2 rounded-xl border-2 text-sm font-medium transition-all
-                          ${answers[index] === option
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border text-muted-foreground hover:border-primary/50'}`}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                      {/* Yes/No question */}
+                      {effectiveType === 'yesno' && (
+                        <div className="flex gap-3">
+                          {['כן', 'לא'].map((option) => (
+                            <button
+                              key={option}
+                              onClick={() => onAnswerChange(index, option)}
+                              disabled={!!gradeResult || isGrading}
+                              className={`px-6 py-2 rounded-xl border-2 text-sm font-medium transition-all
+                                ${answers[index] === option
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border text-muted-foreground hover:border-primary/50'}`}
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      )}
 
-                {/* Multiple choice question */}
-                {questionType === 'multiple' && (
-                  <div className="space-y-2">
-                    {['א', 'ב', 'ג', 'ד'].map((option) => (
-                      <button
-                        key={option}
-                        onClick={() => onAnswerChange(index, option)}
-                        disabled={!!gradeResult || isGrading}
-                        className={`w-full text-right px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all
-                          ${answers[index] === option
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border text-muted-foreground hover:border-primary/50'}`}
-                      >
-                        {option}. {question.options?.[option] || ''}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                      {/* Multiple choice question */}
+                      {effectiveType === 'multiple' && (
+                        <div className="space-y-2">
+                          {['א', 'ב', 'ג', 'ד'].map((option) => (
+                            <button
+                              key={option}
+                              onClick={() => onAnswerChange(index, option)}
+                              disabled={!!gradeResult || isGrading}
+                              className={`w-full text-right px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all
+                                ${answers[index] === option
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border text-muted-foreground hover:border-primary/50'}`}
+                            >
+                              {option}. {question.options?.[option] || ''}
+                            </button>
+                          ))}
+                        </div>
+                      )}
 
-                {/* Per-question feedback shown right after the answer */}
-                {feedback && (
-                  <div className="mt-3 space-y-1">
+                      {/* Per-question feedback shown right after the answer */}
+                      {feedback && (
+                        <div className="mt-3 space-y-1">
 
-                    {/* Correct answer */}
-                    <p className="text-sm font-medium text-foreground">
-                      התשובה הנכונה: <span className="text-green-700">{question.answer}</span>
-                    </p>
+                          {/* Correct answer */}
+                          <p className="text-sm font-medium text-foreground">
+                            התשובה הנכונה: <span className="text-green-700">{question.answer}</span>
+                          </p>
 
-                    {/* Explanation */}
-                    <p className="text-xs text-muted-foreground">{feedback.explanation}</p>
+                          {/* Explanation */}
+                          <p className="text-xs text-muted-foreground">{feedback.explanation}</p>
 
-                    {/* Covered points — open questions only */}
-                    {questionType === 'open' && feedback.covered_points?.length > 0 && (
-                      <div className="mt-1">
-                        <p className="text-xs font-medium text-green-700">נקודות שכוסו בתשובה:</p>
-                        {feedback.covered_points.map((point: string, i: number) => (
-                          <p key={i} className="text-xs text-green-600">✓ {point}</p>
-                        ))}
-                      </div>
-                    )}
+                          {/* Covered points — open questions only */}
+                          {effectiveType === 'open' && feedback.covered_points?.length > 0 && (
+                            <div className="mt-1">
+                              <p className="text-xs font-medium text-green-700">נקודות שכוסו בתשובה:</p>
+                              {feedback.covered_points.map((point: string, i: number) => (
+                                <p key={i} className="text-xs text-green-600">✓ {point}</p>
+                              ))}
+                            </div>
+                          )}
 
-                    {/* Missed points — open questions only */}
-                    {questionType === 'open' && feedback.missed_points?.length > 0 && (
-                      <div className="mt-1">
-                        <p className="text-xs font-medium text-red-700">נקודות חסרות בתשובה:</p>
-                        {feedback.missed_points.map((point: string, i: number) => (
-                          <p key={i} className="text-xs text-red-600">✗ {point}</p>
-                        ))}
-                      </div>
-                    )}
+                          {/* Missed points — open questions only */}
+                          {effectiveType === 'open' && feedback.missed_points?.length > 0 && (
+                            <div className="mt-1">
+                              <p className="text-xs font-medium text-red-700">נקודות חסרות בתשובה:</p>
+                              {feedback.missed_points.map((point: string, i: number) => (
+                                <p key={i} className="text-xs text-red-600">✗ {point}</p>
+                              ))}
+                            </div>
+                          )}
 
-                  </div>
-                )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
               </div>
             </li>

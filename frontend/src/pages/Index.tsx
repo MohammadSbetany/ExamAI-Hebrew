@@ -97,13 +97,13 @@ const Index = () => {
   const handleGrade = async () => {
     setIsGrading(true);
     try {
-      // Yes/No and Multiple choice: grade locally — answers already came from prompt 1, no API call needed
-      if (activeQuestionType === 'multiple' || activeQuestionType === 'yesno') {
+      // Yes/No and Multiple choice (non-merged): grade locally — no API call needed
+      if ((activeQuestionType === 'multiple' || activeQuestionType === 'yesno')) {
         setGradeResult(gradeLocally(questions, answers, activeQuestionType as 'multiple' | 'yesno'));
         return;
       }
 
-      // Open questions: keep original behavior, send to API
+      // Open questions or merged exams: send to API
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/grade`, {
         method: 'POST',
         headers: {
@@ -113,7 +113,7 @@ const Index = () => {
         body: JSON.stringify({
           questions,
           answers,
-          question_type: questionType,
+          question_type: activeQuestionType,
         }),
       });
       const data = await response.json();
@@ -160,6 +160,7 @@ const Index = () => {
                 { value: 'open', label: 'שאלות פתוחות' },
                 { value: 'yesno', label: 'כן / לא' },
                 { value: 'multiple', label: 'רב ברירה' },
+                { value: 'merged', label: 'מיזוג' },
               ].map((type) => (
                 <button
                   key={type.value}
@@ -207,6 +208,7 @@ const Index = () => {
                 { value: 'easy', label: 'קל', bloom: 'זיכרון והבנה', bloomEn: "Bloom's L1–L2" },
                 { value: 'medium', label: 'בינוני', bloom: 'יישום וניתוח', bloomEn: "Bloom's L3–L4" },
                 { value: 'hard', label: 'קשה', bloom: 'הערכה ויצירה', bloomEn: "Bloom's L5–L6" },
+                { value: 'merged', label: 'מיזוג', bloom: 'כל הרמות', bloomEn: "Bloom's L1–L6 mixed" },
               ].map((level) => (
                 <button
                   key={level.value}
