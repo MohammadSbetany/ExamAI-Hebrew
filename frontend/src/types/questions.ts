@@ -3,6 +3,7 @@ export interface Question {
   answer: string;
   options?: Record<string, string>;
   critical_points?: string[];
+  type?: string;
 }
 
 export interface GradeFeedbackItem {

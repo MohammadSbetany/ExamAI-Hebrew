@@ -60,11 +60,11 @@ async def upload_pdf(
     difficulty: str = Form("medium"),
     user=Depends(verify_token),
 ):
-    if question_type not in ("open", "yesno", "multiple"):
+    if question_type not in ("open", "yesno", "multiple", "merged"):
         raise HTTPException(status_code=400, detail="סוג שאלה לא חוקי")
     if not (1 <= question_count <= MAX_QUESTION_COUNT):
         raise HTTPException(status_code=400, detail=f"מספר השאלות חייב להיות בין 1 ל-{MAX_QUESTION_COUNT}")
-    if difficulty not in ("easy", "medium", "hard"):
+    if difficulty not in ("easy", "medium", "hard", "merged"):
         raise HTTPException(status_code=400, detail="רמת קושי לא חוקית")
     if len(files) > MAX_FILES:
         raise HTTPException(status_code=400, detail=f"ניתן להעלות עד {MAX_FILES} קבצים בו-זמנית")

@@ -328,6 +328,146 @@ class TestExtractTextFromFile:
         with pytest.raises(ValueError, match='Unsupported file type'):
             extract_text_from_file(b'bytes', 'file.xyz')
 
+
+class TestSplitMergedQuestions:
+    def test_split_sums_to_n(self):
+        from engine import _split_merged_questions
+        for n in range(1, 20):
+            yn, mc, op = _split_merged_questions(n)
+            assert yn + mc + op == n, f"Sum mismatch for n={n}: {yn}+{mc}+{op}"
+
+    def test_split_open_at_least_one(self):
+        from engine import _split_merged_questions
+        for n in range(1, 10):
+            _, _, op = _split_merged_questions(n)
+            assert op >= 1, f"open_count < 1 for n={n}"
+
+    def test_split_all_non_negative(self):
+        from engine import _split_merged_questions
+        for n in range(1, 20):
+            yn, mc, op = _split_merged_questions(n)
+            assert yn >= 0 and mc >= 0 and op >= 0
+
+
+class TestMergedQuestionType:
+    def _mock_response(self, payload):
+        mock_choice = MagicMock()
+        mock_choice.message.content = json.dumps(payload)
+        mock_resp = MagicMock()
+        mock_resp.choices = [mock_choice]
+        return mock_resp
+
+    def test_merged_type_instruction_references_all_types(self):
+        """merged question_type prompt should mention yes/no, multiple, and open."""
+        from engine import generate_questions
+        expected = {"questions": []}
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"text", "test.txt")], "merged", 10, "medium")
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert "yesno" in prompt or "yes/no" in prompt.lower()
+        assert "multiple" in prompt
+        assert "open" in prompt
+
+    def test_merged_type_instruction_contains_type_field(self):
+        """merged question_type prompt should instruct AI to include a 'type' field."""
+        from engine import generate_questions
+        expected = {"questions": []}
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"text", "test.txt")], "merged", 10, "medium")
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert '"type"' in prompt or "'type'" in prompt
+
+    def test_merged_type_uses_split_counts_in_prompt(self):
+        """merged prompt should include the computed split counts."""
+        from engine import generate_questions, _split_merged_questions
+        expected = {"questions": []}
+        n = 10
+        yn, mc, op = _split_merged_questions(n)
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"text", "test.txt")], "merged", n, "medium")
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert str(yn) in prompt
+        assert str(mc) in prompt
+        assert str(op) in prompt
+
+
+class TestMergedDifficulty:
+    def _mock_response(self, payload):
+        mock_choice = MagicMock()
+        mock_choice.message.content = json.dumps(payload)
+        mock_resp = MagicMock()
+        mock_resp.choices = [mock_choice]
+        return mock_resp
+
+    def test_merged_difficulty_references_multiple_bloom_levels(self):
+        """merged difficulty prompt should reference multiple Bloom levels."""
+        from engine import generate_questions
+        expected = {"questions": []}
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"text", "test.txt")], "open", 5, "merged")
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert "Bloom" in prompt
+        assert "L1" in prompt or "Levels 1" in prompt
+        assert "L3" in prompt or "Levels 3" in prompt
+        assert "L5" in prompt or "Levels 5" in prompt
+
+
+class TestGradeAnswersMerged:
+    def _mock_response(self, payload):
+        mock_choice = MagicMock()
+        mock_choice.message.content = json.dumps(payload)
+        mock_resp = MagicMock()
+        mock_resp.choices = [mock_choice]
+        return mock_resp
+
+    def test_grade_merged_uses_per_question_type_in_prompt(self):
+        """grade_answers with merged type formats each question by its own type."""
+        from engine import grade_answers
+        questions = [
+            {"question": "כן או לא?", "answer": "כן", "type": "yesno"},
+            {"question": "מה?", "answer": "א",
+             "options": {"א": "נ", "ב": "ל", "ג": "כ", "ד": "ד"}, "type": "multiple"},
+            {"question": "הסבר", "answer": "תשובה", "critical_points": ["נקודה"], "type": "open"},
+        ]
+        answers = ["כן", "א", "תשובה"]
+        expected = {
+            "score": 3,
+            "feedback": [
+                {"question": "כן או לא?", "points": 1, "correct": True,
+                 "explanation": "נכון", "covered_points": [], "missed_points": []},
+                {"question": "מה?", "points": 1, "correct": True,
+                 "explanation": "נכון", "covered_points": [], "missed_points": []},
+                {"question": "הסבר", "points": 1, "correct": True,
+                 "explanation": "נכון", "covered_points": ["נקודה"], "missed_points": []},
+            ]
+        }
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            result = json.loads(grade_answers(questions, answers, "merged"))
+        assert result["score"] == 3
+        prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        # Multiple choice question should have options in prompt
+        assert "אפשרויות" in prompt
+
+    def test_grade_merged_prompt_notes_mixed_type(self):
+        """grade_answers with merged type should mention 'mixed' in the prompt."""
+        from engine import grade_answers
+        questions = [{"question": "שאלה?", "answer": "כן", "type": "yesno"}]
+        expected = {
+            "score": 1,
+            "feedback": [{"question": "שאלה?", "points": 1, "correct": True,
+                          "explanation": "נכון", "covered_points": [], "missed_points": []}]
+        }
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            grade_answers(questions, ["כן"], "merged")
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert "mixed" in prompt.lower() or "merged" in prompt.lower()
+
 class TestMultipleFiles:
     def _mock_response(self, payload: dict):
         mock_choice = MagicMock()
