@@ -1,4 +1,5 @@
 import type { Question, GradeResult } from '@/types/questions';
+import ExportMenu from '@/components/ExportMenu';
 
 interface QuestionsListProps {
   questions: Question[];
@@ -18,15 +19,23 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
   return (
     <div className="space-y-4">
 
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center">
-          <svg className="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-foreground">
+            {questions.length === 1 ? 'שאלה אחת נוצרה בהצלחה' : `${questions.length} שאלות נוצרו בהצלחה`}
+          </h2>
         </div>
-        <h2 className="text-xl font-semibold text-foreground">
-          {questions.length === 1 ? 'שאלה אחת נוצרה בהצלחה' : `${questions.length} שאלות נוצרו בהצלחה`}
-        </h2>
+        <div className="flex items-center gap-2">
+          <ExportMenu questions={questions} gradeResult={gradeResult} variant="blank" />
+          {gradeResult && (
+            <ExportMenu questions={questions} gradeResult={gradeResult} variant="graded" />
+          )}
+        </div>
       </div>
 
       {/* Final grade displayed above questions */}

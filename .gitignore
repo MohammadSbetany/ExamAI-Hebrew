@@ -5,6 +5,7 @@ frontend/*.local
 frontend/.env
 frontend/.env.local
 frontend/.env.*.local
+frontend/node_modules/
 
 # --- Backend ---
 backend/__pycache__/
@@ -24,7 +25,7 @@ backend/serviceAccountKey.json
 .env
 .env.local
 .env.*.local
-node_modules/
+.claude/
 
 # --- General ---
 .DS_Store
