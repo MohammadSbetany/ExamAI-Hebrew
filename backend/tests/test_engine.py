@@ -168,6 +168,39 @@ class TestGenerateQuestions:
             prompt = call_args[1]["messages"][1]["content"]
             assert f"generate {MAX_QUESTION_COUNT}" in prompt
 
+    def test_easy_difficulty_bloom_keywords_in_prompt(self):
+        """Easy difficulty should reference Bloom's Taxonomy Levels 1-2 in the prompt."""
+        from engine import generate_questions
+        expected = {"questions": []}
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"some text", "test.txt")], "open", 1, "easy")
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert "Bloom" in prompt
+        assert "Levels 1" in prompt or "Level 1" in prompt
+
+    def test_medium_difficulty_bloom_keywords_in_prompt(self):
+        """Medium difficulty should reference Bloom's Taxonomy Levels 3-4 in the prompt."""
+        from engine import generate_questions
+        expected = {"questions": []}
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"some text", "test.txt")], "open", 1, "medium")
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert "Bloom" in prompt
+        assert "Levels 3" in prompt or "Level 3" in prompt
+
+    def test_hard_difficulty_bloom_keywords_in_prompt(self):
+        """Hard difficulty should reference Bloom's Taxonomy Levels 5-6 in the prompt."""
+        from engine import generate_questions
+        expected = {"questions": []}
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            generate_questions([(b"some text", "test.txt")], "open", 1, "hard")
+            prompt = mock_client.chat.completions.create.call_args[1]["messages"][1]["content"]
+        assert "Bloom" in prompt
+        assert "Levels 5" in prompt or "Level 5" in prompt
+
     def test_txt_file_dispatched_correctly(self):
         from engine import generate_questions
         expected = {"questions": []}
