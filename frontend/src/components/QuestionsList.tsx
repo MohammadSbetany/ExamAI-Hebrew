@@ -9,10 +9,10 @@ interface QuestionsListProps {
   onSubmit: () => void;
   isGrading: boolean;
   gradeResult: GradeResult | null;
+  isImported?: boolean;
 }
 
-const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSubmit, isGrading, gradeResult }: QuestionsListProps) => {
-  if (questions.length === 0) return null;
+const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSubmit, isGrading, gradeResult, isImported }: QuestionsListProps) => {  if (questions.length === 0) return null;
 
   const allAnswered = answers.length === questions.length && answers.every(a => a.trim() !== '');
 
@@ -27,7 +27,9 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-foreground">
-            {questions.length === 1 ? 'שאלה אחת נוצרה בהצלחה' : `${questions.length} שאלות נוצרו בהצלחה`}
+            {isImported
+              ? (questions.length === 1 ? 'שאלה אחת חולצה בהצלחה' : `${questions.length} שאלות חולצו בהצלחה`)
+              : (questions.length === 1 ? 'שאלה אחת נוצרה בהצלחה' : `${questions.length} שאלות נוצרו בהצלחה`)}
           </h2>
         </div>
         <div className="flex items-center gap-2">
