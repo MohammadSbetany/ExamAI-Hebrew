@@ -58,6 +58,10 @@ async def upload_pdf(
     question_type: str = Form("open"),
     question_count: int = Form(5),
     difficulty: str = Form("medium"),
+    time_mode: str = Form("ai"),
+    manual_minutes: int = Form(None),
+    difficulty_dist: str = Form(None),
+    format_counts: str = Form(None),
     user=Depends(verify_token),
 ):
     if question_type not in ("open", "yesno", "multiple", "merged"):
@@ -81,7 +85,15 @@ async def upload_pdf(
 
     try:
         logger.info("Generating questions | user=%s files=%d type=%s count=%d", user.get("uid"), len(files), question_type, question_count)
-        result_json_string = generate_questions(file_data, question_type, question_count, difficulty)
+        dist_parsed = json.loads(difficulty_dist) if difficulty_dist else None
+        fmt_parsed = json.loads(format_counts) if format_counts else None
+        result_json_string = generate_questions(
+            file_data, question_type, question_count, difficulty,
+            time_mode=time_mode,
+            manual_minutes=manual_minutes,
+            difficulty_dist=dist_parsed,
+            format_counts=fmt_parsed,
+        )
         return json.loads(result_json_string)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
