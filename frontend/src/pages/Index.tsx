@@ -6,6 +6,7 @@ import ErrorMessage from '@/components/ErrorMessage';
 import { useAuth } from '@/context/AuthContext';
 import type { Question, GradeResult } from '@/types/questions';
 import { gradeLocally } from '@/utils/gradingUtils';
+import AdvancedSettings from '@/components/AdvancedSettings';
 
 const Index = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -20,6 +21,12 @@ const Index = () => {
   const [isGrading, setIsGrading] = useState(false);
   const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
   const { user } = useAuth();
+  const [timeMode, setTimeMode] = useState<'manual' | 'ai'>('ai');
+  const [manualMinutes, setManualMinutes] = useState<number>(45);
+  const [difficultyDist, setDifficultyDist] = useState({ easy: 30, medium: 50, hard: 20 });
+  const [formatCounts, setFormatCounts] = useState({ yesno: 3, multiple: 4, open: 3 });
+  const [recommendedTime, setRecommendedTime] = useState<number | null>(null);
+
   const handleFilesChange = (files: File[]) => {
     setSelectedFiles(files);
     setError(null);
@@ -40,6 +47,10 @@ const Index = () => {
       formData.append('question_type', questionType);
       formData.append('question_count', String(questionCount));
       formData.append('difficulty', difficulty);
+      formData.append('time_mode', timeMode);
+      if (timeMode === 'manual') formData.append('manual_minutes', String(manualMinutes));
+      if (difficulty === 'merged') formData.append('difficulty_dist', JSON.stringify(difficultyDist));
+      if (questionType === 'merged') formData.append('format_counts', JSON.stringify(formatCounts));
       console.log("Starting upload for:", selectedFiles.map(f => f.name).join(', '));
 
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/upload`, {
@@ -62,6 +73,8 @@ const Index = () => {
         throw new Error(data.error);
       } else if (data && data.questions && Array.isArray(data.questions)) {
         setQuestions(data.questions.slice(0, questionCount));
+        if (data.recommended_time) setRecommendedTime(data.recommended_time);
+        else setRecommendedTime(null);
       } else {
         console.error("Unexpected JSON structure:", data);
         throw new Error('תשובה לא תקינה מהשרת - המבנה שהתקבל אינו תקין');
@@ -84,6 +97,11 @@ const Index = () => {
     setAnswers([]);
     setGradeResult(null);
     setActiveQuestionType('open');
+    setRecommendedTime(null);
+    setTimeMode('ai');
+    setManualMinutes(45);
+    setDifficultyDist({ easy: 30, medium: 50, hard: 20 });
+    setFormatCounts({ yesno: 3, multiple: 4, open: 3 });
   };
 
   const handleAnswerChange = (index: number, answer: string) => {
@@ -231,6 +249,32 @@ const Index = () => {
               השאלות מותאמות לרמות טקסונומיית בלום
             </p>
           </div>
+
+          {/* Advanced Settings */}
+          <AdvancedSettings
+            questionType={questionType}
+            difficulty={difficulty}
+            questionCount={questionCount}
+            timeMode={timeMode}
+            manualMinutes={manualMinutes}
+            onTimeModeChange={setTimeMode}
+            onManualMinutesChange={setManualMinutes}
+            difficultyDist={difficultyDist}
+            onDifficultyDistChange={setDifficultyDist}
+            formatCounts={formatCounts}
+            onFormatCountsChange={setFormatCounts}
+            disabled={isLoading}
+          />
+
+          {/* Recommended time banner */}
+          {recommendedTime && (
+            <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-primary/5 border border-primary/20 rounded-xl text-sm text-primary">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+              </svg>
+              זמן מומלץ לבחינה: <strong>{recommendedTime} דקות</strong>
+            </div>
+          )}
 
           {/* Generate Button */}
           <button

@@ -113,7 +113,16 @@ def extract_text_from_file(file_bytes: bytes, filename: str) -> str:
         raise ValueError(f"Unsupported file type: {ext}")
 
 
-def generate_questions(files: list[tuple[bytes, str]], question_type: str = "open", question_count: int = 5, difficulty: str = "medium"):
+def generate_questions(
+    files: list[tuple[bytes, str]],
+    question_type: str = "open",
+    question_count: int = 5,
+    difficulty: str = "medium",
+    time_mode: str = "ai",
+    manual_minutes: int | None = None,
+    difficulty_dist: dict | None = None,
+    format_counts: dict | None = None,
+):
     # 1. Extract and combine text from all uploaded files
     all_texts = []
     for file_bytes, filename in files:
@@ -156,7 +165,12 @@ Important: distribute the correct answers randomly across all options.
     }
 
     if question_type == "merged":
-        yn, mc, op = _split_merged_questions(question_count)
+        if format_counts and (format_counts.get('yesno', 0) + format_counts.get('multiple', 0) + format_counts.get('open', 0)) == question_count:
+            yn = format_counts['yesno']
+            mc = format_counts['multiple']
+            op = format_counts['open']
+        else:
+            yn, mc, op = _split_merged_questions(question_count)
         instruction = f"""generate {question_count} questions in Hebrew with a mix of formats: {yn} yes/no, {mc} multiple choice, and {op} open-ended.
 Return a JSON object with a key "questions" containing an array of exactly {question_count} objects.
 Each object must include a "type" field set to one of "yesno", "multiple", or "open", plus the fields for that type:
@@ -187,16 +201,29 @@ For multiple choice questions: distribute correct answers randomly across all op
             "Avoid simple recall or straightforward application questions."
         ),
         "merged": (
-            "Distribute question difficulty across Bloom's Taxonomy: approximately 30% of questions at "
-            "Remembering and Understanding levels (L1–2), 50% at Applying and Analyzing levels (L3–4), "
-            "and 20% at Evaluating and Creating levels (L5–6). Vary the cognitive demand naturally across questions."
+            f"Distribute question difficulty across Bloom's Taxonomy: approximately "
+            f"{difficulty_dist.get('easy', 30) if difficulty_dist else 30}% of questions at Remembering and Understanding levels (L1–2), "
+            f"{difficulty_dist.get('medium', 50) if difficulty_dist else 50}% at Applying and Analyzing levels (L3–4), "
+            f"and {difficulty_dist.get('hard', 20) if difficulty_dist else 20}% at Evaluating and Creating levels (L5–6). "
+            "Vary the cognitive demand naturally across questions."
         ),
     }
     difficulty_instruction = difficulty_instructions[difficulty]
 
+    if time_mode == "ai":
+        time_instruction = (
+            "After generating all questions, analyze the exam and estimate a realistic completion time for a student. "
+            "Add a 'recommended_time' field (integer, in minutes) to the root JSON object alongside 'questions'."
+        )
+    elif time_mode == "manual" and manual_minutes:
+        time_instruction = f"This exam has a manual time limit of {manual_minutes} minutes. Keep question complexity appropriate for this duration."
+    else:
+        time_instruction = ""
+
     prompt = f"""
     Analyze the following text and {instruction}
     {difficulty_instruction}
+    {time_instruction}
     Write all questions in Hebrew.
 
     Before generating questions, check the content:
