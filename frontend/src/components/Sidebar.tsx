@@ -170,12 +170,17 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
 
-  const mainItems: NavItem[] = [
+  const studentItems: NavItem[] = [
     { label: 'לוח בקרה', path: '/dashboard', icon: <IconDashboard /> },
     { label: 'יצירת בחינה', path: '/', icon: <IconCreate /> },
     { label: 'הבחינות שלי', path: '/my-exams', icon: <IconExams /> },
     { label: 'כרטיסיות לימוד', path: '/flashcards', icon: <IconFlashcards /> },
+    { label: 'הצטרף לכיתה', path: '/join-class', icon: <IconStudents /> },
   ];
+
+  const mainItems = resolvedIsTeacher
+    ? studentItems.filter(i => i.path !== '/join-class')
+    : studentItems;
 
   const teacherItems: NavItem[] = [
     { label: 'ניהול תלמידים', path: '/students', icon: <IconStudents /> },

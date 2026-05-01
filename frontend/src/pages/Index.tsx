@@ -438,6 +438,28 @@ const Index = () => {
                     נשמרה בהצלחה
                   </div>
                 )}
+
+                {savedExamId && user?.role === 'teacher' && (
+                  <button
+                    onClick={async () => {
+                      if (!user?.token) return;
+                      await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/teacher/share-exam`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.token}` },
+                        body: JSON.stringify({
+                          title: selectedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') || 'בחינה',
+                          question_type: activeQuestionType,
+                          questions,
+                        }),
+                      });
+                      alert('הבחינה שותפה בהצלחה עם התלמידים!');
+                    }}
+                    className="w-full py-3 px-6 rounded-xl border-2 border-primary text-primary font-medium hover:bg-primary/5 transition-colors"
+                  >
+                    שתף בחינה עם תלמידים
+                  </button>
+                )}
+
                 <button
                   onClick={handleReset}
                   className="flex-1 py-3 px-6 rounded-xl border-2 border-border text-foreground font-medium hover:bg-muted transition-colors"
