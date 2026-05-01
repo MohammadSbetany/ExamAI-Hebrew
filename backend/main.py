@@ -1,3 +1,5 @@
+from exams_db import save_exam, list_exams, get_exam, delete_exam
+from pydantic import BaseModel
 import os
 import logging
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
@@ -151,3 +153,58 @@ async def grade(request: Request, data: dict, user=Depends(verify_token)):
     except Exception as e:
         logger.error("Grading error | user=%s error=%s", user.get("uid"), str(e))
         raise HTTPException(status_code=500, detail="שגיאה בבדיקת התשובות")
+    
+# ── Exams CRUD ────────────────────────────────────────────────────────────────
+
+class SaveExamBody(BaseModel):
+    title: str
+    exam_type: str          # "generated" | "digitized"
+    question_type: str
+    questions: list
+    answers: list = []
+    grade_result: dict | None = None
+
+
+@app.post("/exams/save")
+async def save_exam_endpoint(body: SaveExamBody, user=Depends(verify_token)):
+    try:
+        uid = user.get("uid")
+        record = save_exam(
+            uid=uid,
+            title=body.title,
+            exam_type=body.exam_type,
+            question_type=body.question_type,
+            questions=body.questions,
+            answers=body.answers,
+            grade_result=body.grade_result,
+        )
+        logger.info("Exam saved | user=%s exam_id=%s", uid, record["id"])
+        return {"ok": True, "exam_id": record["id"]}
+    except Exception as e:
+        logger.error("Save exam error | user=%s error=%s", user.get("uid"), str(e))
+        raise HTTPException(status_code=500, detail="שגיאה בשמירת הבחינה")
+
+
+@app.get("/exams")
+async def list_exams_endpoint(user=Depends(verify_token)):
+    try:
+        return {"exams": list_exams(user.get("uid"))}
+    except Exception as e:
+        logger.error("List exams error | user=%s error=%s", user.get("uid"), str(e))
+        raise HTTPException(status_code=500, detail="שגיאה בטעינת הבחינות")
+
+
+@app.get("/exams/{exam_id}")
+async def get_exam_endpoint(exam_id: str, user=Depends(verify_token)):
+    exam = get_exam(user.get("uid"), exam_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="הבחינה לא נמצאה")
+    return exam
+
+
+@app.delete("/exams/{exam_id}")
+async def delete_exam_endpoint(exam_id: str, user=Depends(verify_token)):
+    deleted = delete_exam(user.get("uid"), exam_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="הבחינה לא נמצאה")
+    return {"ok": True}    

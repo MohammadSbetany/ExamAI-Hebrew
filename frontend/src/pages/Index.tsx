@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { saveExam } from '@/lib/examsApi';
 import FileUpload from '@/components/FileUpload';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import QuestionsList from '@/components/QuestionsList';
@@ -27,6 +28,8 @@ const Index = () => {
   const [formatCounts, setFormatCounts] = useState({ yesno: 3, multiple: 4, open: 3 });
   const [recommendedTime, setRecommendedTime] = useState<number | null>(null);
   const [appMode, setAppMode] = useState<'generate' | 'import'>('generate');
+  const [savedExamId, setSavedExamId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleFilesChange = (files: File[]) => {
     setSelectedFiles(files);
@@ -142,6 +145,7 @@ const Index = () => {
     setDifficultyDist({ easy: 30, medium: 50, hard: 20 });
     setFormatCounts({ yesno: 3, multiple: 4, open: 3 });
     setAppMode('generate');
+    setSavedExamId(null);
   };
 
   const handleAnswerChange = (index: number, answer: string) => {
@@ -180,6 +184,27 @@ const Index = () => {
       setError('אירעה שגיאה בבדיקת התשובות');
     } finally {
       setIsGrading(false);
+    }
+  };
+  
+  const handleSave = async () => {
+    if (!user?.token || questions.length === 0) return;
+    setIsSaving(true);
+    try {
+      const title = selectedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') || 'בחינה';
+      const id = await saveExam(user.token, {
+        title,
+        exam_type: appMode === 'import' ? 'digitized' : 'generated',
+        question_type: activeQuestionType,
+        questions,
+        answers,
+        grade_result: gradeResult,
+      });
+      setSavedExamId(id);
+    } catch {
+      setError('שגיאה בשמירת הבחינה');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -394,12 +419,32 @@ const Index = () => {
                 isImported={appMode === 'import'}
               />
               
-              <button
-                onClick={handleReset}
-                className="mt-8 w-full py-3 px-6 rounded-xl border-2 border-border text-foreground font-medium hover:bg-muted transition-colors"
-              >
-                התחל מחדש
-              </button>
+              <div className="mt-8 flex gap-3">
+                {!savedExamId ? (
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving || questions.length === 0}
+                    className="flex-1 py-3 px-6 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {isSaving ? (
+                      <><span className="w-4 h-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />שומר...</>
+                    ) : (
+                      <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeWidth="2" strokeLinecap="round" /><polyline points="17 21 17 13 7 13 7 21" strokeWidth="2" strokeLinecap="round" /><polyline points="7 3 7 8 15 8" strokeWidth="2" strokeLinecap="round" /></svg>שמור בחינה</>
+                    )}
+                  </button>
+                ) : (
+                  <div className="flex-1 py-3 px-6 rounded-xl bg-green-100 text-green-700 font-medium flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="2" strokeLinecap="round" /></svg>
+                    נשמרה בהצלחה
+                  </div>
+                )}
+                <button
+                  onClick={handleReset}
+                  className="flex-1 py-3 px-6 rounded-xl border-2 border-border text-foreground font-medium hover:bg-muted transition-colors"
+                >
+                  התחל מחדש
+                </button>
+              </div>
             </div>
           )}
         </div>
