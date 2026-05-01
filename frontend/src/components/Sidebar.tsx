@@ -174,7 +174,6 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
     { label: 'לוח בקרה', path: '/dashboard', icon: <IconDashboard /> },
     { label: 'יצירת בחינה', path: '/', icon: <IconCreate /> },
     { label: 'הבחינות שלי', path: '/my-exams', icon: <IconExams /> },
-    { label: 'התקדמות', path: '/progress', icon: <IconProgress /> },
     { label: 'כרטיסיות לימוד', path: '/flashcards', icon: <IconFlashcards /> },
   ];
 
