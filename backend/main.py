@@ -1,5 +1,6 @@
 from exams_db import save_exam, list_exams, get_exam, delete_exam
 from pydantic import BaseModel
+from flashcards import generate_flashcards
 import os
 import logging
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
@@ -60,6 +61,7 @@ async def digitize(
     files: List[UploadFile] = File(...),
     user=Depends(verify_token),
 ):
+
     if len(files) > MAX_FILES:
         raise HTTPException(status_code=400, detail=f"ניתן להעלות עד {MAX_FILES} קבצים בו-זמנית")
 
@@ -86,7 +88,42 @@ async def digitize(
     except Exception as e:
         logger.error("Digitize error | user=%s error=%s", user.get("uid"), str(e))
         raise HTTPException(status_code=500, detail="שגיאה בעיבוד קובץ הבחינה")
+    
 
+# ── Flashcards ────────────────────────────────────────────────────────────────
+@app.post("/flashcards")
+@limiter.limit("10/minute")
+async def flashcards(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    user=Depends(verify_token),
+):
+    if len(files) > MAX_FILES:
+        raise HTTPException(status_code=400, detail=f"ניתן להעלות עד {MAX_FILES} קבצים בו-זמנית")
+
+    all_texts = []
+    for file in files:
+        ext = (file.filename or "").lower().split(".")[-1]
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(status_code=400, detail=f"סוג קובץ לא נתמך: {file.filename}")
+        content = await file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"הקובץ {file.filename} גדול מדי.")
+        text = extract_text_from_file(content, file.filename)
+        if text.strip():
+            all_texts.append(text)
+
+    combined = "\n\n---\n\n".join(all_texts)
+
+    try:
+        logger.info("Generating flashcards | user=%s", user.get("uid"))
+        result = generate_flashcards(combined)
+        return json.loads(result)
+    except Exception as e:
+        logger.error("Flashcards error | user=%s error=%s", user.get("uid"), str(e))
+        raise HTTPException(status_code=500, detail="שגיאה ביצירת כרטיסיות")
+    
+    
 # ── Upload ────────────────────────────────────────────────────────────────────
 @app.post("/upload")
 @limiter.limit("10/minute")

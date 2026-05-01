@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
+import Flashcards from "./pages/Flashcards";
 import MyExams from "./pages/MyExams";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/Sidebar";
@@ -73,6 +74,22 @@ const App = () => (
                 <AppLayout><Students /></AppLayout>
               </ProtectedRoute>
             } /> */}
+
+            <Route path="/my-exams" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <MyExams />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/flashcards" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <Flashcards />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
