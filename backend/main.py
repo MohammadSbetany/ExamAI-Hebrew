@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from flashcards import generate_flashcards
 import os
 import logging
+from analytics import share_exam, list_shared_exams, submit_student_result, compute_analytics
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +11,12 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from firebase_auth import verify_token
+from students_db import (
+    generate_class_code, get_class_config, join_class_by_code,
+    get_roster, remove_student, save_note,
+    get_student_history, reset_attempt, override_grade,
+    set_exam_visibility, set_exam_deadline,
+)
 import json
 from engine import generate_questions, grade_answers, extract_text_from_file
 from digitize import digitize_exam
@@ -244,4 +251,136 @@ async def delete_exam_endpoint(exam_id: str, user=Depends(verify_token)):
     deleted = delete_exam(user.get("uid"), exam_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="הבחינה לא נמצאה")
-    return {"ok": True}    
+    return {"ok": True} 
+
+
+# ── Teacher Analytics ─────────────────────────────────────────────────────────
+
+class ShareExamBody(BaseModel):
+    title: str
+    question_type: str
+    questions: list
+
+
+@app.post("/teacher/share-exam")
+async def share_exam_endpoint(body: ShareExamBody, user=Depends(verify_token)):
+    uid = user.get("uid")
+    exam_id = share_exam(uid, body.dict())
+    logger.info("Exam shared | teacher=%s exam_id=%s", uid, exam_id)
+    return {"ok": True, "exam_id": exam_id}
+
+
+@app.get("/teacher/shared-exams")
+async def list_shared_exams_endpoint(user=Depends(verify_token)):
+    return {"exams": list_shared_exams(user.get("uid"))}
+
+
+@app.get("/teacher/analytics/{exam_id}")
+async def get_analytics(exam_id: str, user=Depends(verify_token)):
+    result = compute_analytics(exam_id, user.get("uid"))
+    if "error" in result:
+        raise HTTPException(status_code=403, detail=result["error"])
+    return result
+
+
+@app.post("/student/submit/{exam_id}")
+async def submit_result(exam_id: str, data: dict, user=Depends(verify_token)):
+    try:
+        submit_student_result(
+            exam_id=exam_id,
+            student_uid=user.get("uid"),
+            student_name=data.get("student_name", "תלמיד"),
+            answers=data.get("answers", []),
+            grade_result=data.get("grade_result", {}),
+        )
+        return {"ok": True}
+    except Exception as e:
+        logger.error("Submit result error | user=%s error=%s", user.get("uid"), str(e))
+        raise HTTPException(status_code=500, detail="שגיאה בשמירת התוצאה")
+    
+# ── Teacher: Roster ───────────────────────────────────────────────────────────
+
+@app.get("/teacher/class")
+async def get_class(user=Depends(verify_token)):
+    uid = user.get("uid")
+    config = get_class_config(uid)
+    roster = get_roster(uid)
+    return {"class_code": config.get("class_code"), "students": roster}
+
+
+@app.post("/teacher/class/generate-code")
+async def gen_code(user=Depends(verify_token)):
+    code = generate_class_code(user.get("uid"))
+    return {"class_code": code}
+
+
+@app.delete("/teacher/students/{student_uid}")
+async def remove_student_endpoint(student_uid: str, user=Depends(verify_token)):
+    remove_student(user.get("uid"), student_uid)
+    return {"ok": True}
+
+
+@app.get("/teacher/students/{student_uid}/history")
+async def student_history(student_uid: str, user=Depends(verify_token)):
+    history = get_student_history(user.get("uid"), student_uid)
+    return {"history": history}
+
+
+@app.delete("/teacher/students/{student_uid}/attempts/{exam_id}")
+async def reset_attempt_endpoint(student_uid: str, exam_id: str, user=Depends(verify_token)):
+    try:
+        reset_attempt(user.get("uid"), exam_id, student_uid)
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@app.patch("/teacher/students/{student_uid}/attempts/{exam_id}/grade")
+async def override_grade_endpoint(student_uid: str, exam_id: str, data: dict, user=Depends(verify_token)):
+    try:
+        override_grade(user.get("uid"), exam_id, student_uid, data.get("score", 0), data.get("note", ""))
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@app.post("/teacher/students/{student_uid}/notes")
+async def save_note_endpoint(student_uid: str, data: dict, user=Depends(verify_token)):
+    save_note(user.get("uid"), student_uid, data.get("note", ""))
+    return {"ok": True}
+
+
+# ── Teacher: Exam control ─────────────────────────────────────────────────────
+
+@app.patch("/teacher/exams/{exam_id}/visibility")
+async def set_visibility(exam_id: str, data: dict, user=Depends(verify_token)):
+    try:
+        set_exam_visibility(user.get("uid"), exam_id, data.get("visible", True))
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@app.patch("/teacher/exams/{exam_id}/deadline")
+async def set_deadline(exam_id: str, data: dict, user=Depends(verify_token)):
+    try:
+        set_exam_deadline(user.get("uid"), exam_id, data.get("deadline"))
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+# ── Student: Join class ───────────────────────────────────────────────────────
+
+@app.post("/student/join-class")
+async def join_class(data: dict, user=Depends(verify_token)):
+    try:
+        teacher_uid = join_class_by_code(
+            student_uid=user.get("uid"),
+            student_name=data.get("student_name", "תלמיד"),
+            student_email=user.get("email", ""),
+            code=data.get("class_code", "").strip().upper(),
+        )
+        return {"ok": True, "teacher_uid": teacher_uid}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))    
