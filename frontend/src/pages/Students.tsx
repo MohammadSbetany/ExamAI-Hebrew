@@ -20,7 +20,7 @@ interface ExamAttempt {
   total_questions: number;
   score: number | null;
   submitted_at: string;
-  grade_result: any;
+  grade_result: Record<string, unknown> | null;
   answers: string[];
 }
 

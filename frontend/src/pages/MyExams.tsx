@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { listExams, deleteExam, saveExam, type ExamRecord } from '@/lib/examsApi';
 import { gradeLocally } from '@/utils/gradingUtils';
@@ -99,7 +99,7 @@ interface ExportDropdownProps {
 
 const ExportDropdown = ({ label, variant, onExport, loading }: ExportDropdownProps) => {
   const [open, setOpen] = useState(false);
-  const ref = useState(() => ({ current: null as HTMLDivElement | null }))[0];
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -113,7 +113,7 @@ const ExportDropdown = ({ label, variant, onExport, loading }: ExportDropdownPro
   const isGraded = variant === 'graded';
 
   return (
-    <div className="relative" ref={el => { ref.current = el; }}>
+    <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
         disabled={isLoading}
