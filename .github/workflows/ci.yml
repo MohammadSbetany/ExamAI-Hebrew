@@ -77,6 +77,11 @@ jobs:
             backend/requirements.txt
             backend/requirements-dev.txt
 
+      - name: Fix Ubuntu Mirrors
+        run: |
+          sudo sed -i 's/http:\/\/azure.archive.ubuntu.com/http:\/\/archive.ubuntu.com/g' /etc/apt/sources.list
+          sudo apt-get update
+
       - name: Install Tesseract
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-heb tesseract-ocr-eng      
 

@@ -168,6 +168,7 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
   const resolvedIsTeacher = isTeacher ?? user?.role === 'teacher';
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
 
   const studentItems: NavItem[] = [
@@ -239,8 +240,8 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
         {/* User profile */}
 <div
   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mt-1 cursor-pointer hover:bg-accent transition-colors group ${collapsed ? 'justify-center' : ''}`}
-  onClick={logout}
-  title="התנתק"
+  onClick={() => setShowProfile(p => !p)}
+  title="פרופיל"
 >
   <div className="relative flex-shrink-0">
     <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary font-semibold text-sm">
@@ -255,6 +256,20 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
     </div>
   )}
 </div>
+      {/* Profile popover */}
+        {showProfile && !collapsed && (
+          <div className="mx-2 mb-2 p-3 bg-muted rounded-xl border border-border space-y-2 text-sm">
+            <p className="font-semibold text-foreground truncate">{user?.name}</p>
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+            <p className="text-xs text-muted-foreground">{user?.role === 'teacher' ? 'מורה' : 'תלמיד'}</p>
+            <button
+              onClick={logout}
+              className="w-full mt-1 py-1.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-colors"
+            >
+              התנתק
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

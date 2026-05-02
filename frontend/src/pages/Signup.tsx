@@ -49,7 +49,7 @@ const Signup = () => {
     setLoading(true);
     try {
       await signup(email, password, name, role);
-      navigate('/', { replace: true });
+      navigate('/dashboard');
     } catch (err) {
       const errorCode = (err as { code?: string })?.code ?? '';
       setError(toHebrewError(errorCode));
