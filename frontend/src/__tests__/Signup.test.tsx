@@ -95,7 +95,7 @@ describe('Signup page', () => {
     fireEvent.submit(screen.getByRole('button', { name: 'צור חשבון' }).closest('form')!);
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
     });
   });
 
