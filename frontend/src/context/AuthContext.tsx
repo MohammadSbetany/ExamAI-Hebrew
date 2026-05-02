@@ -80,6 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // ── Login ──────────────────────────────────────────────────────────────────
 
   const login = async (email: string, password: string) => {
+    setLoading(true);
     await signInWithEmailAndPassword(auth, email, password);
     // onAuthStateChanged above will update state automatically
   };
@@ -87,9 +88,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // ── Signup ─────────────────────────────────────────────────────────────────
 
   const signup = async (email: string, password: string, name: string, role: UserRole) => {
+    setLoading(true);
     const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-    // Store name + role in Firestore (Firebase Auth doesn't have a role field)
+    // Store name + role in Firestore before onAuthStateChanged fires
     await setDoc(doc(db, 'users', cred.user.uid), {
       name,
       role,

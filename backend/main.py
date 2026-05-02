@@ -466,3 +466,31 @@ async def join_class(data: dict, user=Depends(verify_token)):
         return {"ok": True, "teacher_uid": teacher_uid}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))    
+    
+
+# ── User Settings ─────────────────────────────────────────────────────────────
+@app.get("/settings")
+async def get_settings(user=Depends(verify_token)):
+    from firebase_admin import firestore as fs
+    db = fs.client()
+    doc = db.collection("users").document(user.get("uid")).get()
+    data = doc.to_dict() if doc.exists else {}
+    return data.get("settings", {})
+
+@app.patch("/settings")
+async def update_settings(data: dict, user=Depends(verify_token)):
+    from firebase_admin import firestore as fs
+    db = fs.client()
+    db.collection("users").document(user.get("uid")).set(
+        {"settings": data}, merge=True
+    )
+    return {"ok": True}
+
+@app.patch("/profile")
+async def update_profile(data: dict, user=Depends(verify_token)):
+    from firebase_admin import firestore as fs
+    db = fs.client()
+    allowed = {"name", "title", "department", "institution", "year_of_study", "field_of_study", "office_hours"}
+    update = {k: v for k, v in data.items() if k in allowed}
+    db.collection("users").document(user.get("uid")).update(update)
+    return {"ok": True}

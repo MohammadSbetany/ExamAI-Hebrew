@@ -38,7 +38,7 @@ const Login = () => {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/', { replace: true });
+      navigate('/dashboard');
     } catch (err) {
       const errorCode = (err as { code?: string })?.code ?? '';
       setError(toHebrewError(errorCode));
