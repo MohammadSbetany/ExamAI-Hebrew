@@ -60,6 +60,88 @@ ALLOWED_EXTENSIONS = {"pdf", "docx", "txt", "pptx", "jpg", "jpeg", "png"}
 def health():
     return {"status": "ok"}
 
+# ── Dashboard summary ─────────────────────────────────────────────────────────
+@app.get("/dashboard/summary")
+async def dashboard_summary(user=Depends(verify_token)):
+    from firebase_admin import firestore as fs
+    db = fs.client()
+    uid = user.get("uid")
+
+    # Get user's saved exams (last 5)
+    try:
+        exams_docs = (
+            db.collection("exams").document(uid).collection("records")
+            .order_by("created_at", direction=fs.Query.DESCENDING)
+            .limit(5)
+            .stream()
+        )
+        recent_exams = [d.to_dict() for d in exams_docs]
+    except Exception:
+        recent_exams = []
+
+    # Teacher-specific: class overview
+    teacher_data = None
+    if user.get("role") == "teacher" or True:  # role comes from Firestore, not token — compute both
+        try:
+            shared_docs = (
+                db.collection("shared_exams")
+                .where("teacher_uid", "==", uid)
+                .stream()
+            )
+            shared_exams = [d.to_dict() for d in shared_docs]
+            exam_ids = [e["id"] for e in shared_exams]
+
+            total_students = len(
+                db.collection("classes").document(uid).collection("students").stream()
+                .__class__.__mro__  # just check existence
+            ) if False else sum(1 for _ in db.collection("classes").document(uid).collection("students").stream())
+
+            # Get recent submissions across all shared exams
+            all_submissions = []
+            for exam_id in exam_ids[:5]:
+                subs = db.collection("shared_results").document(exam_id).collection("submissions").stream()
+                all_submissions.extend([s.to_dict() for s in subs])
+
+            scores = [s.get("score", 0) for s in all_submissions if s.get("score") is not None]
+            total_q_map = {e["id"]: len(e.get("questions", [])) for e in shared_exams}
+
+            pcts = []
+            for s in all_submissions:
+                exam_id = None
+                for eid in exam_ids:
+                    sub_doc = db.collection("shared_results").document(eid).collection("submissions").document(s.get("student_uid", "")).get()
+                    if sub_doc.exists:
+                        score = sub_doc.to_dict().get("score", 0)
+                        total = total_q_map.get(eid, 1)
+                        pcts.append(round((score / total) * 100) if total else 0)
+                        break
+
+            struggling = [
+                s for s in all_submissions
+                if s.get("score") is not None and
+                len(total_q_map) > 0 and
+                any(round((s.get("score", 0) / total_q_map.get(eid, 1)) * 100) < 60
+                    for eid in exam_ids if total_q_map.get(eid))
+            ]
+
+            teacher_data = {
+                "total_students": total_students,
+                "active_exams": len(shared_exams),
+                "class_average": round(sum(pcts) / len(pcts), 1) if pcts else None,
+                "recent_submissions": len(all_submissions),
+                "struggling_count": len(struggling),
+            }
+        except Exception:
+            teacher_data = {
+                "total_students": 0, "active_exams": 0,
+                "class_average": None, "recent_submissions": 0, "struggling_count": 0,
+            }
+
+    return {
+        "recent_exams": recent_exams,
+        "teacher_data": teacher_data,
+    }
+
 # ── Digitize ──────────────────────────────────────────────────────────────────
 @app.post("/digitize")
 @limiter.limit("10/minute")
