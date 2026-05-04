@@ -44,7 +44,7 @@ def get_class_config(teacher_uid: str) -> dict:
 def join_class_by_code(student_uid: str, student_name: str, student_email: str, code: str) -> str:
     """Student joins a class using the invite code. Returns teacher_uid or raises."""
     # Find teacher with this code
-    docs = _db().collection("classes").where("class_code", "==", code).limit(1).stream()
+    docs = _db().collection("classes").where(filter=firestore.FieldFilter("class_code", "==", code)).limit(1).stream()
     teacher_doc = next(docs, None)
     if not teacher_doc:
         raise ValueError("קוד כיתה לא תקין")

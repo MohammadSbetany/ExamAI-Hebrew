@@ -139,7 +139,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                       {feedback && (
                         <div className="mt-3 space-y-1">
 
-                          {/* Correct answer */}
+                          {/* Correct answer — shown for all question types */}
                           <p className="text-sm font-medium text-foreground">
                             התשובה הנכונה: <span className="text-green-700">{question.answer}</span>
                           </p>

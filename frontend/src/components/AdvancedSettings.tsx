@@ -4,11 +4,6 @@ interface AdvancedSettingsProps {
   questionType: string;
   difficulty: string;
   questionCount: number;
-  // Time
-  timeMode: 'manual' | 'ai';
-  manualMinutes: number;
-  onTimeModeChange: (mode: 'manual' | 'ai') => void;
-  onManualMinutesChange: (minutes: number) => void;
   // Difficulty distribution (merged difficulty only)
   difficultyDist: { easy: number; medium: number; hard: number };
   onDifficultyDistChange: (dist: { easy: number; medium: number; hard: number }) => void;
@@ -30,7 +25,6 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
 
 const AdvancedSettings = ({
   questionType, difficulty, questionCount,
-  timeMode, manualMinutes, onTimeModeChange, onManualMinutesChange,
   difficultyDist, onDifficultyDistChange,
   formatCounts, onFormatCountsChange,
   disabled,
@@ -53,7 +47,7 @@ const AdvancedSettings = ({
 
   const showDifficultyDist = difficulty === 'merged';
   const showFormatCounts = questionType === 'merged';
-  const hasContent = true; // time control always shown
+  const hasContent = showDifficultyDist || showFormatCounts;
 
   return (
     <div className="mb-6">
@@ -75,57 +69,6 @@ const AdvancedSettings = ({
 
       {open && hasContent && (
         <div className="mt-3 p-4 bg-muted/40 rounded-xl border border-border space-y-6">
-
-          {/* ── Time Control ─────────────────────────────────────────── */}
-          <div>
-            <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-              </svg>
-              הגבלת זמן לבחינה
-            </p>
-
-            {/* Toggle */}
-            <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-xl mb-3">
-              {[
-                { value: 'manual', label: '⏱ ידני' },
-                { value: 'ai', label: '✨ הערכת AI' },
-              ].map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => onTimeModeChange(value as 'manual' | 'ai')}
-                  disabled={disabled}
-                  className={`py-2 rounded-lg text-sm font-medium transition-all ${
-                    timeMode === value
-                      ? 'bg-card text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {timeMode === 'manual' ? (
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  min={1}
-                  max={300}
-                  value={manualMinutes}
-                  onChange={e => onManualMinutesChange(Math.max(1, Math.min(300, Number(e.target.value))))}
-                  disabled={disabled}
-                  className="w-24 px-3 py-2 rounded-xl border border-input bg-background text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                />
-                <span className="text-sm text-muted-foreground">דקות</span>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
-                ה-AI יחשב את משך הזמן המומלץ בהתבסס על מספר השאלות ורמת הקושי שלהן, ויכלול אותו בפלט הבחינה.
-              </p>
-            )}
-          </div>
 
           {/* ── Difficulty Distribution (merged difficulty only) ───────── */}
           {showDifficultyDist && (
