@@ -48,7 +48,7 @@ def list_shared_exams(teacher_uid: str) -> list:
     """List all exams shared by this teacher."""
     docs = (
         _db().collection("shared_exams")
-        .where("teacher_uid", "==", teacher_uid)
+        .where(filter=firestore.FieldFilter("teacher_uid", "==", teacher_uid))
         .stream()
     )
     results = [d.to_dict() for d in docs]

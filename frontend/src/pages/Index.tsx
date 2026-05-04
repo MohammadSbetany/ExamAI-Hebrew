@@ -7,7 +7,6 @@ import ErrorMessage from '@/components/ErrorMessage';
 import { useAuth } from '@/context/AuthContext';
 import type { Question, GradeResult } from '@/types/questions';
 import { gradeLocally } from '@/utils/gradingUtils';
-import AdvancedSettings from '@/components/AdvancedSettings';
 
 const Index = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -22,6 +21,12 @@ const Index = () => {
   const [isGrading, setIsGrading] = useState(false);
   const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
   const { user } = useAuth();
+  const [timerEnabled, setTimerEnabled] = useState(false);
+  const [timerHours, setTimerHours] = useState(0);
+  const [timerMinutes, setTimerMinutes] = useState(30);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null); // seconds remaining
+  const [timerInterval, setTimerInterval] = useState<ReturnType<typeof setInterval> | null>(null);
   const [timeMode, setTimeMode] = useState<'manual' | 'ai'>('ai');
   const [manualMinutes, setManualMinutes] = useState<number>(45);
   const [difficultyDist, setDifficultyDist] = useState({ easy: 30, medium: 50, hard: 20 });
@@ -34,6 +39,27 @@ const Index = () => {
   const handleFilesChange = (files: File[]) => {
     setSelectedFiles(files);
     setError(null);
+  };
+
+  const startTimer = (totalSeconds: number) => {
+    setTimeLeft(totalSeconds);
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          handleGrade(); // auto-submit when time runs out
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    setTimerInterval(interval);
+  };
+
+  const stopTimer = () => {
+    if (timerInterval) clearInterval(timerInterval);
+    setTimerInterval(null);
+    // Keep timeLeft as-is so the frozen time stays visible
   };
 
   const handleDigitize = async () => {
@@ -115,8 +141,19 @@ const Index = () => {
         throw new Error(data.error);
       } else if (data && data.questions && Array.isArray(data.questions)) {
         setQuestions(data.questions.slice(0, questionCount));
-        if (data.recommended_time) setRecommendedTime(data.recommended_time);
-        else setRecommendedTime(null);
+        if (timerEnabled) {
+          if (timeMode === 'ai' && data.recommended_time) {
+            const total = data.recommended_time * 60;
+            setRecommendedTime(data.recommended_time);
+            startTimer(total);
+          } else if (timeMode === 'manual') {
+            const total = timerHours * 3600 + timerMinutes * 60 + timerSeconds;
+            if (total >= 60) startTimer(total);
+          }
+        } else {
+          if (data.recommended_time) setRecommendedTime(data.recommended_time);
+          else setRecommendedTime(null);
+        }
       } else {
         console.error("Unexpected JSON structure:", data);
         throw new Error('תשובה לא תקינה מהשרת - המבנה שהתקבל אינו תקין');
@@ -146,6 +183,12 @@ const Index = () => {
     setFormatCounts({ yesno: 3, multiple: 4, open: 3 });
     setAppMode('generate');
     setSavedExamId(null);
+    stopTimer();
+    setTimeLeft(null);
+    setTimerEnabled(false);
+    setTimerHours(0);
+    setTimerMinutes(30);
+    setTimerSeconds(0);
   };
 
   const handleAnswerChange = (index: number, answer: string) => {
@@ -158,6 +201,7 @@ const Index = () => {
 
   const handleGrade = async () => {
     setIsGrading(true);
+    stopTimer();
     try {
       // Yes/No and Multiple choice — grade locally ONLY in generate mode
       if (appMode === 'generate' && (activeQuestionType === 'multiple' || activeQuestionType === 'yesno')) {
@@ -349,22 +393,6 @@ const Index = () => {
             </p>
           </div> </>)}
 
-          {/* Advanced Settings */}
-          <AdvancedSettings
-            questionType={questionType}
-            difficulty={difficulty}
-            questionCount={questionCount}
-            timeMode={timeMode}
-            manualMinutes={manualMinutes}
-            onTimeModeChange={setTimeMode}
-            onManualMinutesChange={setManualMinutes}
-            difficultyDist={difficultyDist}
-            onDifficultyDistChange={setDifficultyDist}
-            formatCounts={formatCounts}
-            onFormatCountsChange={setFormatCounts}
-            disabled={isLoading}
-          />
-
           {/* Recommended time banner */}
           {recommendedTime && (
             <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-primary/5 border border-primary/20 rounded-xl text-sm text-primary">
@@ -374,6 +402,115 @@ const Index = () => {
               זמן מומלץ לבחינה: <strong>{recommendedTime} דקות</strong>
             </div>
           )}
+
+          {/* Timer Section */}
+          <div className="mb-6">
+            <div className={`rounded-xl border-2 transition-all duration-200 overflow-hidden ${timerEnabled ? 'border-primary/30' : 'border-border'}`}>
+
+              {/* Header row — always visible */}
+              <div className={`flex items-center justify-between px-4 py-3 ${timerEnabled ? 'bg-primary/5' : 'bg-muted/30'}`}>
+                <div className="flex items-center gap-2.5">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                    className={timerEnabled ? 'text-primary' : 'text-muted-foreground'}>
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                 <p className={`text-sm font-medium ${timerEnabled ? 'text-primary' : 'text-muted-foreground'}`}>
+                    הגבלת זמן לבחינה
+                  </p>
+                  {timerEnabled && timeMode === 'ai' && (
+                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">✨ AI</span>
+                  )}
+                  {timerEnabled && timeMode === 'manual' && (timerHours * 3600 + timerMinutes * 60 + timerSeconds) >= 60 && (
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                      {timerHours > 0 && `${timerHours}ש׳ `}
+                      {timerMinutes > 0 && `${timerMinutes}ד׳ `}
+                      {timerSeconds > 0 && `${timerSeconds}ש״`}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTimerEnabled(t => !t)}
+                  disabled={isLoading || (questions.length > 0 && !gradeResult)}
+                  className={`relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${timerEnabled ? 'bg-primary' : 'bg-muted-foreground/30'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${timerEnabled ? 'right-1' : 'right-6'}`} />
+                </button>
+              </div>
+
+              {/* Time inputs — only when enabled */}
+              {timerEnabled && (questions.length === 0 || gradeResult !== null) && (
+                <div className="px-4 py-4 bg-card border-t border-primary/20 space-y-4">
+
+                  {/* AI or Manual toggle */}
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-xl">
+                    {[
+                      { value: 'ai', label: '✨ הגדרה אוטומטית על ידי AI' },
+                      { value: 'manual', label: '⏱ הגדרה ידנית' },
+                    ].map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => !gradeResult && setTimeMode(value as 'manual' | 'ai')}
+                        className={`py-2 rounded-lg text-xs font-medium transition-all ${
+                          timeMode === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                        } ${gradeResult ? 'cursor-default' : ''}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {gradeResult && timeLeft !== null && (
+                    <div className="flex items-center justify-center gap-2 px-3 py-2 bg-muted rounded-lg">
+                      <span className="text-xs text-muted-foreground">הבחינה הוגשה בזמן:</span>
+                      <span className="text-sm font-bold font-mono text-foreground tabular-nums">
+                        {String(Math.floor(timeLeft / 3600)).padStart(2, '0')}:
+                        {String(Math.floor((timeLeft % 3600) / 60)).padStart(2, '0')}:
+                        {String(timeLeft % 60).padStart(2, '0')}
+                      </span>
+                      <span className="text-xs text-muted-foreground">נותרו</span>
+                    </div>
+                  )}
+                  {!gradeResult && timeMode === 'ai' ? (
+                    <p className="text-xs text-muted-foreground bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-center">
+                      ה-AI יקבע את משך הזמן המומלץ בהתאם לרמת הקושי וכמות השאלות. הזמן יוצג לאחר יצירת הבחינה.
+                    </p>
+                  ) : !gradeResult ? (
+                    <>
+                      <div className="flex items-center justify-center gap-3">
+                        {[
+                          { value: timerHours, onChange: (v: number) => setTimerHours(Math.max(0, Math.min(23, v))), max: 23, label: 'שעות' },
+                          { value: timerMinutes, onChange: (v: number) => setTimerMinutes(Math.max(0, Math.min(59, v))), max: 59, label: 'דקות' },
+                          { value: timerSeconds, onChange: (v: number) => setTimerSeconds(Math.max(0, Math.min(59, v))), max: 59, label: 'שניות' },
+                        ].map((field, i) => (
+                          <div key={i} className="flex flex-col items-center gap-1.5">
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => field.onChange(field.value + 1)} className="w-6 h-6 rounded-lg bg-muted hover:bg-muted-foreground/20 text-muted-foreground text-xs font-bold transition-colors">+</button>
+                              <input
+                                type="number" min={0} max={field.max} value={field.value}
+                                onChange={e => field.onChange(Number(e.target.value))}
+                                className="w-14 text-center px-1 py-1.5 rounded-xl border border-input bg-background text-lg font-bold focus:outline-none focus:ring-2 focus:ring-primary/30 tabular-nums"
+                              />
+                              <button onClick={() => field.onChange(field.value - 1)} className="w-6 h-6 rounded-lg bg-muted hover:bg-muted-foreground/20 text-muted-foreground text-xs font-bold transition-colors">−</button>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{field.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {(timerHours * 3600 + timerMinutes * 60 + timerSeconds) < 60 && (
+                        <p className="text-xs text-destructive text-center">הזמן המינימלי הוא דקה אחת</p>
+                      )}
+                    </>
+                  ) : null}
+
+                  <p className="text-xs text-muted-foreground text-center">
+                    הבחינה תוגש אוטומטית כשהזמן יסתיים
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Generate / Digitize Button */}
           <button
@@ -408,6 +545,28 @@ const Index = () => {
           {/* Questions Display */}
           {questions.length > 0 && (
             <div className="mt-8 pt-8 border-t border-border">
+
+              {/* Countdown timer */}
+              {timeLeft !== null && (
+                <div className={`mb-6 flex items-center justify-center gap-3 p-4 rounded-xl border-2 ${
+                  timeLeft <= 60 ? 'border-destructive/50 bg-destructive/10' :
+                  timeLeft <= 300 ? 'border-yellow-400/50 bg-yellow-50' :
+                  'border-primary/30 bg-primary/5'
+                }`}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                    className={timeLeft <= 60 ? 'text-destructive' : timeLeft <= 300 ? 'text-yellow-600' : 'text-primary'}>
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  <span className={`text-2xl font-bold font-mono tabular-nums ${
+                    timeLeft <= 60 ? 'text-destructive' : timeLeft <= 300 ? 'text-yellow-700' : 'text-primary'
+                  }`}>
+                    {String(Math.floor(timeLeft / 3600)).padStart(2, '0')}:
+                    {String(Math.floor((timeLeft % 3600) / 60)).padStart(2, '0')}:
+                    {String(timeLeft % 60).padStart(2, '0')}
+                  </span>
+                  {timeLeft <= 60 && <span className="text-xs text-destructive font-semibold">הזמן עומד להסתיים!</span>}
+                </div>
+              )}
               <QuestionsList
                 questions={questions}
                 questionType={activeQuestionType}
