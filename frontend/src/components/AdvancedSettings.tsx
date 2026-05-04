@@ -4,11 +4,6 @@ interface AdvancedSettingsProps {
   questionType: string;
   difficulty: string;
   questionCount: number;
-  // Time
-  timeMode: 'manual' | 'ai';
-  manualMinutes: number;
-  onTimeModeChange: (mode: 'manual' | 'ai') => void;
-  onManualMinutesChange: (minutes: number) => void;
   // Difficulty distribution (merged difficulty only)
   difficultyDist: { easy: number; medium: number; hard: number };
   onDifficultyDistChange: (dist: { easy: number; medium: number; hard: number }) => void;
@@ -30,7 +25,6 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
 
 const AdvancedSettings = ({
   questionType, difficulty, questionCount,
-  timeMode, manualMinutes, onTimeModeChange, onManualMinutesChange,
   difficultyDist, onDifficultyDistChange,
   formatCounts, onFormatCountsChange,
   disabled,
@@ -53,7 +47,7 @@ const AdvancedSettings = ({
 
   const showDifficultyDist = difficulty === 'merged';
   const showFormatCounts = questionType === 'merged';
-  const hasContent = true; // time control always shown
+  const hasContent = showDifficultyDist || showFormatCounts;
 
   return (
     <div className="mb-6">

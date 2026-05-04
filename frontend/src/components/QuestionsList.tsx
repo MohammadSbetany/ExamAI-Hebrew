@@ -139,13 +139,10 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                       {feedback && (
                         <div className="mt-3 space-y-1">
 
-                          {/* For open questions: show correct answer + explanation separately */}
-                          {/* For yesno/multiple: explanation already contains the correct answer */}
-                          {effectiveType === 'open' && (
-                            <p className="text-sm font-medium text-foreground">
-                              התשובה הנכונה: <span className="text-green-700">{question.answer}</span>
-                            </p>
-                          )}
+                          {/* Correct answer — shown for all question types */}
+                          <p className="text-sm font-medium text-foreground">
+                            התשובה הנכונה: <span className="text-green-700">{question.answer}</span>
+                          </p>
 
                           {/* Explanation */}
                           <p className="text-xs text-muted-foreground">{feedback.explanation}</p>

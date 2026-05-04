@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { saveExam } from '@/lib/examsApi';
 import FileUpload from '@/components/FileUpload';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import QuestionsList from '@/components/QuestionsList';
 import ErrorMessage from '@/components/ErrorMessage';
+import AdvancedSettings from '@/components/AdvancedSettings';
 import { useAuth } from '@/context/AuthContext';
 import type { Question, GradeResult } from '@/types/questions';
 import { gradeLocally } from '@/utils/gradingUtils';
@@ -26,9 +27,9 @@ const Index = () => {
   const [timerMinutes, setTimerMinutes] = useState(30);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number | null>(null); // seconds remaining
-  const [timerInterval, setTimerInterval] = useState<ReturnType<typeof setInterval> | null>(null);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const handleGradeRef = useRef<(() => Promise<void>) | null>(null);
   const [timeMode, setTimeMode] = useState<'manual' | 'ai'>('ai');
-  const [manualMinutes, setManualMinutes] = useState<number>(45);
   const [difficultyDist, setDifficultyDist] = useState({ easy: 30, medium: 50, hard: 20 });
   const [formatCounts, setFormatCounts] = useState({ yesno: 3, multiple: 4, open: 3 });
   const [recommendedTime, setRecommendedTime] = useState<number | null>(null);
@@ -41,26 +42,40 @@ const Index = () => {
     setError(null);
   };
 
+  /** Total timer duration in seconds as set by the manual inputs */
+  const timerTotalSeconds = timerHours * 3600 + timerMinutes * 60 + timerSeconds;
+
+  const stopTimer = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    // Keep timeLeft as-is so the frozen time stays visible
+  };
+
   const startTimer = (totalSeconds: number) => {
+    stopTimer(); // clear any existing interval before starting a new one
     setTimeLeft(totalSeconds);
     const interval = setInterval(() => {
       setTimeLeft(prev => {
         if (prev === null || prev <= 1) {
           clearInterval(interval);
-          handleGrade(); // auto-submit when time runs out
+          timerIntervalRef.current = null;
+          handleGradeRef.current?.(); // auto-submit when time runs out (always uses latest handleGrade)
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-    setTimerInterval(interval);
+    timerIntervalRef.current = interval;
   };
 
-  const stopTimer = () => {
-    if (timerInterval) clearInterval(timerInterval);
-    setTimerInterval(null);
-    // Keep timeLeft as-is so the frozen time stays visible
-  };
+  // Clear the interval when the component unmounts to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, []);
 
   const handleDigitize = async () => {
     if (selectedFiles.length === 0) return;
@@ -70,6 +85,10 @@ const Index = () => {
     setAnswers([]);
     setGradeResult(null);
     setActiveQuestionType('merged');
+    // Clear any previous timer state before starting a new exam
+    stopTimer();
+    setTimeLeft(null);
+    setRecommendedTime(null);
 
     try {
       const formData = new FormData();
@@ -90,6 +109,11 @@ const Index = () => {
       if (data?.error) throw new Error(data.error);
       if (data?.questions && Array.isArray(data.questions)) {
         setQuestions(data.questions);
+        // Start timer for import mode (manual timer only — digitize has no AI recommended_time)
+        if (timerEnabled) {
+          const total = timerTotalSeconds;
+          if (total >= 60) startTimer(total);
+        }
       } else {
         throw new Error('תשובה לא תקינה מהשרת');
       }
@@ -108,6 +132,10 @@ const Index = () => {
     setAnswers([]);
     setGradeResult(null);
     setActiveQuestionType(questionType);
+    // Clear any previous timer/recommendation state before starting a new exam
+    stopTimer();
+    setTimeLeft(null);
+    setRecommendedTime(null);
 
     try {
       const formData = new FormData();
@@ -116,7 +144,7 @@ const Index = () => {
       formData.append('question_count', String(questionCount));
       formData.append('difficulty', difficulty);
       formData.append('time_mode', timeMode);
-      if (timeMode === 'manual') formData.append('manual_minutes', String(manualMinutes));
+      if (timeMode === 'manual') formData.append('manual_minutes', String(Math.ceil(timerTotalSeconds / 60)));
       if (difficulty === 'merged') formData.append('difficulty_dist', JSON.stringify(difficultyDist));
       if (questionType === 'merged') formData.append('format_counts', JSON.stringify(formatCounts));
       console.log("Starting upload for:", selectedFiles.map(f => f.name).join(', '));
@@ -147,12 +175,13 @@ const Index = () => {
             setRecommendedTime(data.recommended_time);
             startTimer(total);
           } else if (timeMode === 'manual') {
-            const total = timerHours * 3600 + timerMinutes * 60 + timerSeconds;
-            if (total >= 60) startTimer(total);
+            if (timerTotalSeconds >= 60) startTimer(timerTotalSeconds);
+            // if total < 60 the generate button was already disabled, so this branch shouldn't be reached
           }
+          // timerEnabled + ai + no recommended_time: timer stays cleared (already reset above)
         } else {
           if (data.recommended_time) setRecommendedTime(data.recommended_time);
-          else setRecommendedTime(null);
+          // recommendedTime already cleared at start of handleGenerate
         }
       } else {
         console.error("Unexpected JSON structure:", data);
@@ -178,7 +207,6 @@ const Index = () => {
     setActiveQuestionType('open');
     setRecommendedTime(null);
     setTimeMode('ai');
-    setManualMinutes(45);
     setDifficultyDist({ easy: 30, medium: 50, hard: 20 });
     setFormatCounts({ yesno: 3, multiple: 4, open: 3 });
     setAppMode('generate');
@@ -230,6 +258,9 @@ const Index = () => {
       setIsGrading(false);
     }
   };
+
+  // Keep the ref updated so the timer callback always invokes the latest handleGrade
+  handleGradeRef.current = handleGrade;
   
   const handleSave = async () => {
     if (!user?.token || questions.length === 0) return;
@@ -391,7 +422,20 @@ const Index = () => {
             <p className="text-xs text-muted-foreground mt-2 text-center">
               השאלות מותאמות לרמות טקסונומיית בלום
             </p>
-          </div> </>)}
+          </div>
+
+          {/* Advanced Settings (difficulty distribution + format counts for merged modes) */}
+          <AdvancedSettings
+            questionType={questionType}
+            difficulty={difficulty}
+            questionCount={questionCount}
+            difficultyDist={difficultyDist}
+            onDifficultyDistChange={setDifficultyDist}
+            formatCounts={formatCounts}
+            onFormatCountsChange={setFormatCounts}
+            disabled={isLoading}
+          />
+          </>)}
 
           {/* Recommended time banner */}
           {recommendedTime && (
@@ -420,7 +464,7 @@ const Index = () => {
                   {timerEnabled && timeMode === 'ai' && (
                     <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">✨ AI</span>
                   )}
-                  {timerEnabled && timeMode === 'manual' && (timerHours * 3600 + timerMinutes * 60 + timerSeconds) >= 60 && (
+                  {timerEnabled && timeMode === 'manual' && timerTotalSeconds >= 60 && (
                     <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
                       {timerHours > 0 && `${timerHours}ש׳ `}
                       {timerMinutes > 0 && `${timerMinutes}ד׳ `}
@@ -430,6 +474,9 @@ const Index = () => {
                 </div>
                 <button
                   type="button"
+                  role="switch"
+                  aria-checked={timerEnabled}
+                  aria-label="הגבלת זמן לבחינה"
                   onClick={() => setTimerEnabled(t => !t)}
                   disabled={isLoading || (questions.length > 0 && !gradeResult)}
                   className={`relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${timerEnabled ? 'bg-primary' : 'bg-muted-foreground/30'} disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -498,7 +545,7 @@ const Index = () => {
                           </div>
                         ))}
                       </div>
-                      {(timerHours * 3600 + timerMinutes * 60 + timerSeconds) < 60 && (
+                      {timerTotalSeconds < 60 && (
                         <p className="text-xs text-destructive text-center">הזמן המינימלי הוא דקה אחת</p>
                       )}
                     </>
@@ -513,20 +560,26 @@ const Index = () => {
           </div>
 
           {/* Generate / Digitize Button */}
-          <button
-            onClick={appMode === 'import' ? handleDigitize : handleGenerate}
-            disabled={selectedFiles.length === 0 || isLoading}
-            className={`
-              w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200
-              ${
-                selectedFiles.length > 0 && !isLoading
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed'
-              }
-            `}
-          >
-            {isLoading ? 'מעבד...' : appMode === 'import' ? 'חלץ שאלות מהבחינה' : 'יצירת שאלות'}
-          </button>
+          {(() => {
+            const timerTooShort = timerEnabled && timeMode === 'manual' && timerTotalSeconds < 60;
+            const isDisabled = selectedFiles.length === 0 || isLoading || timerTooShort;
+            return (
+              <button
+                onClick={appMode === 'import' ? handleDigitize : handleGenerate}
+                disabled={isDisabled}
+                className={`
+                  w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200
+                  ${
+                    !isDisabled
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30'
+                      : 'bg-muted text-muted-foreground cursor-not-allowed'
+                  }
+                `}
+              >
+                {isLoading ? 'מעבד...' : appMode === 'import' ? 'חלץ שאלות מהבחינה' : 'יצירת שאלות'}
+              </button>
+            );
+          })()}
 
           {/* Loading State */}
           {isLoading && (
