@@ -175,7 +175,7 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
             <p className="text-xs text-muted-foreground">הגיש {fmtDT(submission.submitted_at)}</p>
           </div>
           <div className="flex items-center gap-3">
-            {score !== null && (
+            {score != null && (
               <span className={`text-lg font-bold px-3 py-1 rounded-xl ${(score / total) >= 0.8 ? 'bg-green-100 text-green-700' : (score / total) >= 0.6 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
                 {score}/{total}
               </span>
@@ -251,8 +251,8 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
   );
 };
 
-const GenerateExamFlow = ({ exam, token, classId, onDone, onClose }: {
-  exam: ClassExam; token: string; classId: string;
+const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
+  exam: ClassExam; token: string;
   onDone: (updatedExam: ClassExam) => void; onClose: () => void;
 }) => {
   const [files, setFiles] = useState<File[]>([]);
@@ -298,9 +298,9 @@ const GenerateExamFlow = ({ exam, token, classId, onDone, onClose }: {
       await fetch(`${API()}/class-exams/${exam.id}/questions`, {
         method: 'PATCH',
         headers: jsonH(token),
-        body: JSON.stringify({ questions: generated }),
+        body: JSON.stringify({ questions: generated, question_type: questionType }),
       });
-      onDone({ ...exam, questions: generated });
+      onDone({ ...exam, questions: generated, question_type: questionType });
     } finally {
       setIsLoading(false);
     }
@@ -440,7 +440,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
   const [openAt, setOpenAt] = useState('');
   const [closeAt, setCloseAt] = useState('');
   const [examComment, setExamComment] = useState('');
-  const [commentError, setCommentError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const loadExams = useCallback(async () => {
     setLoading(true);
@@ -460,10 +460,10 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
 
   const createExam = async () => {
     if (!examTitle.trim()) {
-      setCommentError('שם הבחינה הוא שדה חובה');
+      setFormError('שם הבחינה הוא שדה חובה');
       return;
     }
-    setCommentError(null);
+    setFormError(null);
     const r = await fetch(`${API()}/classes/${cls.id}/exams`, {
       method: 'POST', headers: jsonH(token),
       body: JSON.stringify({
@@ -477,7 +477,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
     });
     if (!r.ok) {
       const err = await r.json();
-      setCommentError(err.detail || 'שגיאה ביצירת הבחינה');
+      setFormError(err.detail || 'שגיאה ביצירת הבחינה');
       return;
     }
     const exam = await r.json();
@@ -522,7 +522,6 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
         <GenerateExamFlow
           exam={generatingExam}
           token={token}
-          classId={cls.id}
           onDone={updated => {
             setExams(prev => prev.map(e => e.id === updated.id ? updated : e));
             setGeneratingExam(null);
@@ -552,7 +551,8 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
         </button>
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-foreground">{cls.name}</h2>
-<p className="text-sm text-muted-foreground">{cls.students?.length ?? 0} תלמידים · נוצרה {fmt(cls.created_at)}</p>        </div>
+          <p className="text-sm text-muted-foreground">{cls.students?.length ?? 0} תלמידים · נוצרה {fmt(cls.created_at)}</p>
+        </div>
         <div className="flex items-center gap-2">
           <div className="px-4 py-2 bg-primary/5 border border-primary/20 rounded-xl">
             <span className="text-lg font-bold text-primary tracking-widest">{cls.code}</span>
@@ -649,13 +649,13 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                   className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <p className="text-xs text-muted-foreground mt-1">ניתן לכתוב בעברית או באנגלית. ההוראות חייבות להתייחס לנושא הבחינה בלבד.</p>
-                {commentError && <p className="text-xs text-destructive mt-1">{commentError}</p>}
               </div>
 
               <div className="flex gap-3">
                 <button onClick={createExam} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90">צור ופתח עריכה</button>
                 <button onClick={() => setShowCreateExam(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
               </div>
+              {formError && <p className="text-xs text-destructive">{formError}</p>}
             </div>
           )}
 

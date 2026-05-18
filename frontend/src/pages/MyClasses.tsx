@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import type { Question } from '@/types/questions';
 
 const API = () => import.meta.env.VITE_API_BASE_URL ?? '/backend';
 const authH = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -7,11 +8,11 @@ const jsonH = (token: string) => ({ 'Content-Type': 'application/json', ...authH
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface Question { question: string; answer: string; type?: string; options?: Record<string, string>; }
 interface ClassExam {
   id: string; title: string; questions: Question[];
   question_type: string; visible: boolean;
   open_at: string | null; close_at: string | null; created_at: string;
+  my_submission?: Record<string, unknown> | null;
 }
 interface StudentClass { id: string; name: string; code: string; teacher_uid: string; created_at: string; }
 
@@ -328,12 +329,6 @@ const ClassDetail = ({ cls, token, studentName, onBack }: {
   const [previousSubmission, setPreviousSubmission] = useState<Record<string, unknown> | null>(null);
   const [checkingSubmission, setCheckingSubmission] = useState(false);
   const [submittedExams, setSubmittedExams] = useState<Record<string, Record<string, unknown>>>({});
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -343,18 +338,10 @@ const ClassDetail = ({ cls, token, studentName, onBack }: {
         const d = await r.json();
         const loadedExams = d.exams ?? [];
         setExams(loadedExams);
-        // Check submission status for all exams in parallel
-        const results = await Promise.all(
-          loadedExams.map(async (exam: ClassExam) => {
-            try {
-              const sr = await fetch(`${API()}/student/class-exam/${exam.id}/my-submission`, { headers: authH(token) });
-              const sd = await sr.json();
-              return { id: exam.id, data: sd.submitted ? sd.submission : null };
-            } catch { return { id: exam.id, data: null }; }
-          })
-        );
         const map: Record<string, Record<string, unknown>> = {};
-        results.forEach(r => { if (r.data) map[r.id] = r.data; });
+        loadedExams.forEach((exam: ClassExam) => {
+          if (exam.my_submission) map[exam.id] = exam.my_submission;
+        });
         setSubmittedExams(map);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'שגיאה');
@@ -363,6 +350,8 @@ const ClassDetail = ({ cls, token, studentName, onBack }: {
       }
     };
     load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
   }, [cls.id, token]);
 
   const handleOpenExam = async (exam: ClassExam) => {
@@ -405,8 +394,6 @@ const ClassDetail = ({ cls, token, studentName, onBack }: {
       />
     );
   }
-
-  void tick; // triggers re-render every 30s to update exam statuses  
 
   const open = exams.filter(e => examStatus(e) === 'open');
   const other = exams.filter(e => examStatus(e) !== 'open');

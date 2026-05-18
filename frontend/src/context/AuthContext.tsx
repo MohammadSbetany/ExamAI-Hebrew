@@ -8,6 +8,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { fetchSettings, applyTheme, applyFont, applyDirection } from '@/lib/settingsApi';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,12 +65,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           localStorage.setItem('auth_token', token);
           setUser(authUser);
+          try {
+            const settings = await fetchSettings(token);
+            applyTheme(settings.theme);
+            applyFont(settings.dyslexicFont);
+            applyDirection(settings.language);
+          } catch {
+            // ignore settings bootstrap failures
+          }
         } catch {
           setUser(null);
         }
       } else {
         localStorage.removeItem('auth_token');
-        document.documentElement.classList.remove('dark');
         setUser(null);
       }
       setLoading(false);
@@ -105,7 +113,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // ── Logout ─────────────────────────────────────────────────────────────────
 
   const logout = async () => {
-    document.documentElement.classList.remove('dark');
     await signOut(auth);
     localStorage.removeItem('auth_token');
     setUser(null);

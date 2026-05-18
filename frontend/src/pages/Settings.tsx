@@ -104,8 +104,9 @@ const Settings = () => {
     if (!user?.token) return;
     fetchSettings(user.token).then(s => {
       setSettings(s);
-      // Only apply theme if user has explicitly set one (not default 'system')
-      if (s.theme) applyTheme(s.theme);
+      applyTheme(s.theme);
+      applyFont(s.dyslexicFont);
+      applyDirection(s.language);
     }).finally(() => setLoading(false));
   }, [user?.token]);
 

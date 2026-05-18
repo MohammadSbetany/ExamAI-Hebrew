@@ -11,10 +11,6 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from firebase_auth import verify_token
-from firebase_admin import firestore as _firestore
-def _db():
-    return _firestore.client()
-
 import json
 from engine import generate_questions, grade_answers, extract_text_from_file
 from digitize import digitize_exam
@@ -144,6 +140,9 @@ async def regen_code(class_id: str, user=Depends(verify_token)):
 
 @app.post("/classes/{class_id}/add-student")
 async def add_student_endpoint(class_id: str, data: dict, user=Depends(verify_token)):
+    cls = get_class(class_id)
+    if not cls or cls.get("teacher_uid") != user.get("uid"):
+        raise HTTPException(status_code=403, detail="אין הרשאה")
     try:
         add_student_to_class(class_id, data["uid"], data["name"], data.get("email", ""))
         return {"ok": True}
@@ -203,7 +202,12 @@ async def list_class_exams(class_id: str, user=Depends(verify_token)):
 @app.patch("/class-exams/{exam_id}/questions")
 async def update_questions_endpoint(exam_id: str, data: dict, user=Depends(verify_token)):
     try:
-        update_exam_questions(user.get("uid"), exam_id, data.get("questions", []))
+        update_exam_questions(
+            user.get("uid"),
+            exam_id,
+            data.get("questions", []),
+            data.get("question_type"),
+        )
         return {"ok": True}
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
@@ -251,15 +255,40 @@ async def get_student_classes(user=Depends(verify_token)):
     db = fs.client()
     uid = user.get("uid")
     try:
-        docs = db.collection("classes").stream()
-        classes = [
-            d.to_dict() for d in docs
-            if any(s.get("uid") == uid for s in d.to_dict().get("students", []))
-        ]
+        docs = db.collection("classes").where(
+            filter=fs.FieldFilter("student_uids", "array_contains", uid)
+        ).stream()
+        classes = [d.to_dict() for d in docs]
+        if not classes:
+            fallback_docs = db.collection("classes").stream()
+            classes = [
+                d.to_dict() for d in fallback_docs
+                if any(s.get("uid") == uid for s in d.to_dict().get("students", []))
+            ]
         return {"classes": classes}
     except Exception as e:
         logger.error("Get student classes error | user=%s error=%s", uid, str(e))
         return {"classes": []}
+
+
+def _sanitize_question_for_student(question: dict) -> dict:
+    safe = dict(question or {})
+    safe.pop("answer", None)
+    options = safe.get("options")
+    if isinstance(options, dict):
+        cleaned = {}
+        for key, value in options.items():
+            if isinstance(value, dict):
+                option = dict(value)
+                option.pop("answer", None)
+                option.pop("correct", None)
+                option.pop("is_correct", None)
+                cleaned[key] = option
+            else:
+                cleaned[key] = value
+        safe["options"] = cleaned
+    return safe
+
 
 @app.get("/student/classes/{class_id}/exams")
 async def get_student_class_exams(class_id: str, user=Depends(verify_token)):
@@ -278,7 +307,21 @@ async def get_student_class_exams(class_id: str, user=Depends(verify_token)):
         filter=fs.FieldFilter("class_id", "==", class_id)
     ).stream()
     all_exams = [d.to_dict() for d in docs]
-    exams = all_exams  # Return all, let frontend handle availability display
+    exams = []
+    for exam in all_exams:
+        submission_doc = db.collection("class_results").document(exam["id"]).collection("submissions").document(uid).get()
+        submission = submission_doc.to_dict() if submission_doc.exists else None
+        exams.append({
+            "id": exam["id"],
+            "title": exam.get("title"),
+            "questions": [_sanitize_question_for_student(q) for q in exam.get("questions", [])],
+            "question_type": exam.get("question_type", "open"),
+            "visible": exam.get("visible", True),
+            "open_at": exam.get("open_at"),
+            "close_at": exam.get("close_at"),
+            "created_at": exam.get("created_at"),
+            "my_submission": submission,
+        })
     return {"exams": sorted(exams, key=lambda x: x.get("created_at", ""), reverse=True)}
 
 @app.get("/student/class-exam/{exam_id}")
@@ -294,10 +337,23 @@ async def get_student_exam_endpoint(exam_id: str, user=Depends(verify_token)):
 async def submit_exam_endpoint(exam_id: str, data: dict, user=Depends(verify_token)):
     from firebase_admin import firestore as fs
     db = fs.client()
+    access = get_student_exam(exam_id, user.get("uid"))
+    if not access:
+        raise HTTPException(status_code=404, detail="בחינה לא נמצאה")
+    if "error" in access:
+        raise HTTPException(status_code=403, detail=access["error"])
     existing = db.collection("class_results").document(exam_id).collection("submissions").document(user.get("uid")).get()
     if existing.exists:
         raise HTTPException(status_code=409, detail="כבר הגשת את הבחינה הזו")
-    submit_class_exam(exam_id, user.get("uid"), data.get("student_name", "תלמיד"), data.get("answers", []))
+    exam = get_class_exam(exam_id)
+    variant_idx = int((exam.get("assignments") or {}).get(user.get("uid"), 0)) if exam else 0
+    submit_class_exam(
+        exam_id,
+        user.get("uid"),
+        data.get("student_name", "תלמיד"),
+        data.get("answers", []),
+        variant_idx=variant_idx,
+    )
     return {"ok": True}
 
 @app.get("/student/class-exam/{exam_id}/my-submission")
@@ -330,7 +386,11 @@ async def grade_ai_endpoint(exam_id: str, student_uid: str, user=Depends(verify_
         if not docs.exists:
             raise HTTPException(status_code=404, detail="הגשה לא נמצאה")
         sub = docs.to_dict()
-        result_json = grade_answers(exam["questions"], sub["answers"], exam.get("question_type", "open"))
+        variant_idx = sub.get("variant_idx")
+        if variant_idx is None:
+            variant_idx = int((exam.get("assignments") or {}).get(student_uid, 0))
+        variant_questions = (exam.get("variants") or {}).get(str(variant_idx), exam.get("questions", []))
+        result_json = grade_answers(variant_questions, sub["answers"], exam.get("question_type", "open"))
         import json
         grade_result = json.loads(result_json)
         save_grade_result(user.get("uid"), exam_id, student_uid, grade_result, "ai")

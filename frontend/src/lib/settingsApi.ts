@@ -3,7 +3,7 @@ const authH = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 export interface UserSettings {
   // Appearance
-  theme: 'light' | 'dark';
+  theme: 'light' | 'dark' | 'system';
   language: 'he' | 'en' | 'ar';
   // Accessibility
   dyslexicFont: boolean;
@@ -70,12 +70,14 @@ export const saveProfile = async (token: string, profile: Record<string, string>
 
 // ── Theme management ──────────────────────────────────────────────────────────
 
-export const applyTheme = (theme: 'light' | 'dark') => {
+export const applyTheme = (theme: 'light' | 'dark' | 'system') => {
   const root = document.documentElement;
-  if (theme === 'dark') {
+  const resolvedTheme = theme === 'system'
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : theme;
+  if (resolvedTheme === 'dark') {
     root.classList.add('dark');
   } else {
-    // light or system — default to light
     root.classList.remove('dark');
   }
 };
