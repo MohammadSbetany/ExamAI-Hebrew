@@ -69,6 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } else {
         localStorage.removeItem('auth_token');
+        document.documentElement.classList.remove('dark');
         setUser(null);
       }
       setLoading(false);
@@ -104,6 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // ── Logout ─────────────────────────────────────────────────────────────────
 
   const logout = async () => {
+    document.documentElement.classList.remove('dark');
     await signOut(auth);
     localStorage.removeItem('auth_token');
     setUser(null);

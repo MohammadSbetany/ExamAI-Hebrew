@@ -176,11 +176,11 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
     { label: 'יצירת בחינה', path: '/', icon: <IconCreate /> },
     { label: 'הבחינות שלי', path: '/my-exams', icon: <IconExams /> },
     { label: 'כרטיסיות לימוד', path: '/flashcards', icon: <IconFlashcards /> },
-    { label: 'הצטרף לכיתה', path: '/join-class', icon: <IconStudents /> },
+    { label: 'הכיתות שלי', path: '/my-classes', icon: <IconStudents /> },
   ];
 
   const mainItems = resolvedIsTeacher
-    ? studentItems.filter(i => i.path !== '/join-class')
+    ? studentItems.filter(i => i.path !== '/my-classes')
     : studentItems;
 
   const teacherItems: NavItem[] = [
@@ -240,7 +240,7 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
         {/* User profile */}
 <div
   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mt-1 cursor-pointer hover:bg-accent transition-colors group ${collapsed ? 'justify-center' : ''}`}
-  onClick={() => setShowProfile(p => !p)}
+  onClick={e => { e.stopPropagation(); setShowProfile(p => !p); }}
   title="פרופיל"
 >
   <div className="relative flex-shrink-0">
@@ -258,7 +258,7 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
 </div>
       {/* Profile popover */}
         {showProfile && !collapsed && (
-          <div className="mx-2 mb-2 p-3 bg-muted rounded-xl border border-border space-y-2 text-sm">
+          <div className="mx-2 mb-2 p-3 bg-muted rounded-xl border border-border space-y-2 text-sm" onClick={e => e.stopPropagation()}>
             <p className="font-semibold text-foreground truncate">{user?.name}</p>
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             <p className="text-xs text-muted-foreground">{user?.role === 'teacher' ? 'מורה' : 'תלמיד'}</p>

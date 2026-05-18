@@ -1,355 +1,796 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import type { Question } from '@/types/questions';
 
 const API = () => import.meta.env.VITE_API_BASE_URL ?? '/backend';
+const authH = (token: string) => ({ Authorization: `Bearer ${token}` });
+const jsonH = (token: string) => ({ 'Content-Type': 'application/json', ...authH(token) });
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface Student {
-  student_uid: string;
-  student_name: string;
-  student_email: string;
-  joined_at: string;
-  notes: string;
+interface Student { uid: string; name: string; email: string; joined_at: string; }
+interface ClassItem { id: string; name: string; code: string; students: Student[]; created_at: string; teacher_uid?: string; }
+interface ClassExam {
+  id: string; title: string; questions: Question[]; num_variants: number;
+  assignments: Record<string, number>; open_at: string | null; close_at: string | null;
+  visible: boolean; created_at: string; question_type: string;
 }
-
-interface ExamAttempt {
-  exam_id: string;
-  exam_title: string;
-  question_type: string;
-  total_questions: number;
-  score: number | null;
-  submitted_at: string;
-  grade_result: Record<string, unknown> | null;
-  answers: string[];
-}
-
-interface SharedExam {
-  id: string;
-  title: string;
-  question_type: string;
-  visible: boolean;
-  deadline: string | null;
-  created_at: string;
+interface Submission {
+  student_uid: string; student_name: string; answers: string[];
+  grade_result: { score: number; feedback: { question: string; points: number; correct: boolean; explanation: string; covered_points: string[]; missed_points: string[]; override_note?: string }[] } | null;
+  graded_by: string | null; score: number | null; submitted_at: string;
+  grade_overrides: Record<string, { points: number; note: string }>;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
+const fmt = (iso: string) => new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
+const fmtDT = (iso: string) => new Date(iso).toLocaleString('he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-const pctColor = (pct: number) => {
-  if (pct >= 80) return 'text-green-700 bg-green-100';
-  if (pct >= 60) return 'text-yellow-700 bg-yellow-100';
-  return 'text-red-700 bg-red-100';
-};
+// ── Icons ─────────────────────────────────────────────────────────────────────
 
-const authHeader = (token: string) => ({ Authorization: `Bearer ${token}` });
+const Icon = ({ path }: { path: string }) => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d={path} />
+  </svg>
+);
 
-// ── Confirm dialog ────────────────────────────────────────────────────────────
+const Spinner = () => <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" />;
 
-const ConfirmModal = ({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) => (
-  <div className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCancel}>
+// ── Confirm Modal ─────────────────────────────────────────────────────────────
+
+const Confirm = ({ msg, onOk, onCancel }: { msg: string; onOk: () => void; onCancel: () => void }) => (
+  <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCancel}>
     <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()} dir="rtl">
-      <p className="text-foreground font-medium mb-5">{message}</p>
+      <p className="text-foreground font-medium mb-5">{msg}</p>
       <div className="flex gap-3">
-        <button onClick={onConfirm} className="flex-1 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:opacity-90 transition-opacity">אשר</button>
-        <button onClick={onCancel} className="flex-1 py-2 rounded-xl border-2 border-border text-foreground text-sm font-medium hover:bg-muted transition-colors">ביטול</button>
+        <button onClick={onOk} className="flex-1 py-2 rounded-xl bg-destructive text-white text-sm font-semibold hover:opacity-90">אשר</button>
+        <button onClick={onCancel} className="flex-1 py-2 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
       </div>
     </div>
   </div>
 );
 
-// ── Student Profile Modal ─────────────────────────────────────────────────────
+// ── Class Card ────────────────────────────────────────────────────────────────
 
-const StudentModal = ({
-  student, token, onClose, onRemove,
-}: {
-  student: Student; token: string; onClose: () => void; onRemove: () => void;
+const ClassCard = ({ cls, onSelect, onDelete }: { cls: ClassItem; onSelect: () => void; onDelete: () => void }) => (
+  <div onClick={onSelect} className="bg-card border border-border rounded-2xl p-5 cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group">
+    <div className="flex items-start justify-between mb-3">
+      <div>
+        <h3 className="font-bold text-foreground group-hover:text-primary transition-colors">{cls.name}</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">נוצרה {fmt(cls.created_at)}</p>
+      </div>
+      <button onClick={e => { e.stopPropagation(); onDelete(); }} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+        <Icon path="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+      </button>
+    </div>
+    <div className="flex items-center gap-3">
+      <div className="flex-1 py-2 px-3 bg-primary/5 border border-primary/20 rounded-xl text-center">
+        <p className="text-lg font-bold text-primary tracking-widest">{cls.code}</p>
+        <p className="text-xs text-muted-foreground">קוד הצטרפות</p>
+      </div>
+      <div className="text-center">
+        <p className="text-2xl font-bold text-foreground">{cls.students?.length ?? 0}</p>
+        <p className="text-xs text-muted-foreground">תלמידים</p>
+      </div>
+    </div>
+  </div>
+);
+
+// ── Question Editor ───────────────────────────────────────────────────────────
+
+const QuestionEditor = ({ questions, onSave, onClose }: {
+  questions: Question[]; onSave: (qs: Question[]) => void; onClose: () => void;
 }) => {
-  const [history, setHistory] = useState<ExamAttempt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [notes, setNotes] = useState(student.notes || '');
-  const [notesSaved, setNotesSaved] = useState(false);
-  const [overrideExamId, setOverrideExamId] = useState<string | null>(null);
-  const [newScore, setNewScore] = useState('');
-  const [overrideNote, setOverrideNote] = useState('');
-  const [confirm, setConfirm] = useState<{ message: string; action: () => void } | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [qs, setQs] = useState<Question[]>(questions.map(q => ({ ...q })));
+  const [newQ, setNewQ] = useState({ question: '', answer: '', type: 'open' });
 
-  useEffect(() => {
-    fetch(`${API()}/teacher/students/${student.student_uid}/history`, { headers: authHeader(token) })
-      .then(r => r.json())
-      .then(d => setHistory(d.history ?? []))
-      .finally(() => setLoading(false));
-  }, [student.student_uid, token]);
-
-  const saveNotes = async () => {
-    await fetch(`${API()}/teacher/students/${student.student_uid}/notes`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader(token) },
-      body: JSON.stringify({ note: notes }),
-    });
-    setNotesSaved(true);
-    setTimeout(() => setNotesSaved(false), 2000);
-  };
-
-  const handleReset = (examId: string, examTitle: string) => {
-    setConfirm({
-      message: `האם לאפס את ניסיון הגשה של ${student.student_name} לבחינה "${examTitle}"? התלמיד יוכל לגשת מחדש.`,
-      action: async () => {
-        setConfirm(null);
-        setActionLoading(true);
-        await fetch(`${API()}/teacher/students/${student.student_uid}/attempts/${examId}`, {
-          method: 'DELETE', headers: authHeader(token),
-        });
-        setHistory(prev => prev.filter(a => a.exam_id !== examId));
-        setActionLoading(false);
-      },
-    });
-  };
-
-  const handleOverride = async (examId: string) => {
-    const score = parseFloat(newScore);
-    if (isNaN(score)) return;
-    setActionLoading(true);
-    await fetch(`${API()}/teacher/students/${student.student_uid}/attempts/${examId}/grade`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...authHeader(token) },
-      body: JSON.stringify({ score, note: overrideNote }),
-    });
-    setHistory(prev => prev.map(a => a.exam_id === examId ? { ...a, score } : a));
-    setOverrideExamId(null);
-    setNewScore('');
-    setOverrideNote('');
-    setActionLoading(false);
+  const deleteQ = (i: number) => setQs(prev => prev.filter((_, j) => j !== i));
+  const addQ = () => {
+    if (!newQ.question.trim() || !newQ.answer.trim()) return;
+    setQs(prev => [...prev, { question: newQ.question, answer: newQ.answer } as Question]);
+    setNewQ({ question: '', answer: '', type: 'open' });
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl my-8" onClick={e => e.stopPropagation()} dir="rtl">
-        {confirm && <ConfirmModal message={confirm.message} onConfirm={confirm.action} onCancel={() => setConfirm(null)} />}
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <h2 className="text-lg font-bold text-foreground">עריכת שאלות</h2>
+          <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground"><Icon path="M18 6 6 18M6 6l12 12" /></button>
+        </div>
+        <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+          {qs.map((q, i) => (
+            <div key={i} className="flex items-start gap-3 p-3 bg-muted/40 rounded-xl border border-border">
+              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">{q.question}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">תשובה: {q.answer}</p>
+              </div>
+              <button onClick={() => deleteQ(i)} className="text-destructive hover:text-destructive/80 flex-shrink-0">
+                <Icon path="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+              </button>
+            </div>
+          ))}
+        </div>
+        {/* Add new question */}
+        <div className="p-5 border-t border-border space-y-3">
+          <p className="text-sm font-semibold text-foreground">הוסף שאלה חדשה</p>
+          <textarea value={newQ.question} onChange={e => setNewQ(p => ({ ...p, question: e.target.value }))}
+            placeholder="טקסט השאלה" rows={2}
+            className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          <input value={newQ.answer} onChange={e => setNewQ(p => ({ ...p, answer: e.target.value }))}
+            placeholder="תשובה נכונה"
+            className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          <button onClick={addQ} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90">+ הוסף שאלה</button>
+        </div>
+        <div className="flex gap-3 px-5 pb-5">
+          <button onClick={() => onSave(qs)} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90">שמור שינויים</button>
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
+// ── Grading Panel ─────────────────────────────────────────────────────────────
+
+const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
+  exam: ClassExam; submission: Submission; token: string; onClose: () => void; onRefresh: () => void;
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [overrideIdx, setOverrideIdx] = useState<number | null>(null);
+  const [overridePoints, setOverridePoints] = useState('');
+  const [overrideNote, setOverrideNote] = useState('');
+
+  const gradeWithAI = async () => {
+    setLoading(true);
+    await fetch(`${API()}/class-exams/${exam.id}/submissions/${submission.student_uid}/grade-ai`, {
+      method: 'POST', headers: jsonH(token), body: '{}',
+    });
+    onRefresh();
+    setLoading(false);
+  };
+
+  const submitOverride = async (qi: number) => {
+    await fetch(`${API()}/class-exams/${exam.id}/submissions/${submission.student_uid}/override`, {
+      method: 'PATCH', headers: jsonH(token),
+      body: JSON.stringify({ question_index: qi, new_points: parseFloat(overridePoints), note: overrideNote }),
+    });
+    onRefresh();
+    setOverrideIdx(null);
+    setOverridePoints(''); setOverrideNote('');
+  };
+
+  const fb = submission.grade_result?.feedback ?? [];
+  const score = submission.grade_result?.score;
+  const total = exam.questions.length;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl my-8" onClick={e => e.stopPropagation()} dir="rtl">
+        <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h2 className="text-xl font-bold text-foreground">{student.student_name}</h2>
-            <p className="text-sm text-muted-foreground">{student.student_email} · הצטרף {formatDate(student.joined_at)}</p>
+            <h2 className="text-lg font-bold text-foreground">{submission.student_name}</h2>
+            <p className="text-xs text-muted-foreground">הגיש {fmtDT(submission.submitted_at)}</p>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setConfirm({ message: `האם להסיר את ${student.student_name} מהכיתה?`, action: onRemove })}
-              className="px-3 py-2 rounded-xl border-2 border-destructive/30 text-destructive text-sm font-medium hover:bg-destructive/10 transition-colors"
-            >
-              הסר מהכיתה
-            </button>
-            <button onClick={onClose} className="p-2 rounded-xl text-muted-foreground hover:bg-muted transition-colors">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
+          <div className="flex items-center gap-3">
+            {score !== null && (
+              <span className={`text-lg font-bold px-3 py-1 rounded-xl ${(score / total) >= 0.8 ? 'bg-green-100 text-green-700' : (score / total) >= 0.6 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                {score}/{total}
+              </span>
+            )}
+            <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground"><Icon path="M18 6 6 18M6 6l12 12" /></button>
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Notes */}
-          <div>
-            <p className="text-sm font-semibold text-foreground mb-2">הערות פנימיות</p>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="הוסף הערה על התלמיד..."
-              className="w-full border border-border rounded-xl p-3 text-sm resize-none h-20 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
-              dir="rtl"
-            />
-            <button
-              onClick={saveNotes}
-              className="mt-2 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
-            >
-              {notesSaved ? '✓ נשמר' : 'שמור הערה'}
+        {!submission.grade_result && (
+          <div className="p-5 border-b border-border">
+            <button onClick={gradeWithAI} disabled={loading}
+              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
+              {loading ? <><Spinner /> בודק...</> : '✨ בדיקה אוטומטית על ידי AI'}
             </button>
           </div>
+        )}
 
-          {/* Exam history */}
-          <div>
-            <p className="text-sm font-semibold text-foreground mb-3">היסטוריית בחינות ({history.length})</p>
-            {loading ? (
-              <div className="flex justify-center py-8"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
-            ) : history.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">התלמיד עדיין לא הגיש אף בחינה.</p>
-            ) : (
-              <div className="space-y-3">
-                {history.map(attempt => {
-                  const pct = attempt.score !== null && attempt.total_questions > 0
-                    ? Math.round((attempt.score / attempt.total_questions) * 100) : null;
+        <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
+          {exam.questions.map((q, qi) => {
+            const f = fb[qi];
+            const answer = submission.answers[qi] || '';
+            const override = submission.grade_overrides?.[String(qi)];
+            const pts = f?.points ?? null;
+            const bg = pts === 1 ? 'border-green-200 bg-green-50' : pts === 0 ? 'border-red-200 bg-red-50' : pts !== null ? 'border-yellow-200 bg-yellow-50' : 'border-border bg-muted/30';
 
-                  return (
-                    <div key={attempt.exam_id} className="border border-border rounded-xl p-4">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{attempt.exam_title}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(attempt.submitted_at)}</p>
-                        </div>
-                        {pct !== null && (
-                          <span className={`text-xs font-bold px-2.5 py-1 rounded-lg flex-shrink-0 ${pctColor(pct)}`}>
-                            {attempt.score}/{attempt.total_questions} ({pct}%)
-                          </span>
-                        )}
+            return (
+              <div key={qi} className={`p-4 rounded-xl border-2 ${bg}`}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <p className="text-sm font-semibold text-foreground">{qi + 1}. {q.question}</p>
+                  {pts !== null && (
+                    <span className={`text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0 ${pts === 1 ? 'bg-green-100 text-green-700' : pts === 0 ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                      {pts}/1 {override ? '✏️' : ''}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mb-1">תשובת התלמיד: <span className="text-foreground font-medium">{answer || '—'}</span></p>
+                <p className="text-xs text-muted-foreground mb-1">תשובה נכונה: <span className="text-green-700 font-medium">{q.answer}</span></p>
+                {f?.explanation && <p className="text-xs text-muted-foreground italic">{f.explanation}</p>}
+
+                {/* Override controls */}
+                {submission.grade_result && (
+                  overrideIdx === qi ? (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex gap-2">
+                        <select value={overridePoints} onChange={e => setOverridePoints(e.target.value)}
+                          className="flex-1 px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none">
+                          <option value="">בחר ניקוד</option>
+                          <option value="1">1 — נכון</option>
+                          <option value="0.5">0.5 — חלקי</option>
+                          <option value="0">0 — שגוי</option>
+                        </select>
+                        <button onClick={() => submitOverride(qi)} disabled={!overridePoints}
+                          className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50">אשר</button>
+                        <button onClick={() => setOverrideIdx(null)} className="px-3 py-1.5 rounded-lg border border-border text-xs">ביטול</button>
                       </div>
+                      <input value={overrideNote} onChange={e => setOverrideNote(e.target.value)}
+                        placeholder="הסבר לשינוי (אופציונלי)"
+                        className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-xs focus:outline-none" />
+                    </div>
+                  ) : (
+                    <button onClick={() => { setOverrideIdx(qi); setOverridePoints(String(pts ?? '')); setOverrideNote(''); }}
+                      className="mt-2 text-xs text-muted-foreground hover:text-primary underline">
+                      ✏️ שנה ניקוד
+                    </button>
+                  )
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
 
-                      {/* Grade override form */}
-                      {overrideExamId === attempt.exam_id ? (
-                        <div className="mt-3 p-3 bg-muted/40 rounded-xl space-y-2">
-                          <div className="flex gap-2">
-                            <input
-                              type="number" min={0} max={attempt.total_questions} step={0.5}
-                              value={newScore}
-                              onChange={e => setNewScore(e.target.value)}
-                              placeholder={`ציון (0–${attempt.total_questions})`}
-                              className="flex-1 px-3 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                            />
-                            <button
-                              onClick={() => handleOverride(attempt.exam_id)}
-                              disabled={actionLoading}
-                              className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 disabled:opacity-50"
-                            >
-                              אשר
-                            </button>
-                            <button onClick={() => setOverrideExamId(null)} className="px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted">
-                              ביטול
-                            </button>
-                          </div>
-                          <input
-                            type="text" value={overrideNote}
-                            onChange={e => setOverrideNote(e.target.value)}
-                            placeholder="הסבר לשינוי הציון (אופציונלי)"
-                            className="w-full px-3 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                          />
-                        </div>
+const GenerateExamFlow = ({ exam, token, classId, onDone, onClose }: {
+  exam: ClassExam; token: string; classId: string;
+  onDone: (updatedExam: ClassExam) => void; onClose: () => void;
+}) => {
+  const [files, setFiles] = useState<File[]>([]);
+  const [questionType, setQuestionType] = useState('open');
+  const [questionCount, setQuestionCount] = useState(5);
+  const [difficulty, setDifficulty] = useState('medium');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [generated, setGenerated] = useState<Question[]>([]);
+
+  const handleGenerate = async () => {
+    if (files.length === 0) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      files.forEach(f => formData.append('files', f));
+      formData.append('question_type', questionType);
+      formData.append('question_count', String(questionCount));
+      formData.append('difficulty', difficulty);
+      const r = await fetch(`${API()}/upload`, {
+        method: 'POST',
+        headers: authH(token),
+        body: formData,
+      });
+      if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.detail || 'שגיאה ביצירת השאלות');
+      }
+      const data = await r.json();
+      setGenerated(data.questions ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'שגיאה');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (generated.length === 0) return;
+    setIsLoading(true);
+    try {
+      await fetch(`${API()}/class-exams/${exam.id}/questions`, {
+        method: 'PATCH',
+        headers: jsonH(token),
+        body: JSON.stringify({ questions: generated }),
+      });
+      onDone({ ...exam, questions: generated });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl my-8" onClick={e => e.stopPropagation()} dir="rtl">
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">יצירת שאלות — {exam.title}</h2>
+            <p className="text-xs text-muted-foreground">העלה חומר לימוד וה-AI ייצור שאלות לבחינה</p>
+          </div>
+          <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground">
+            <Icon path="M18 6 6 18M6 6l12 12" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* File upload */}
+          <div>
+            <p className="text-sm font-medium text-foreground mb-2">העלאת קבצים</p>
+            <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${files.length > 0 ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-primary/40'}`}>
+              <input type="file" multiple accept=".pdf,.docx,.txt,.pptx,.jpg,.jpeg,.png"
+                className="hidden" onChange={e => setFiles(Array.from(e.target.files ?? []))} />
+              {files.length > 0 ? (
+                <div className="text-center">
+                  <p className="text-sm font-medium text-primary">{files.length} קבצים נבחרו</p>
+                  <p className="text-xs text-muted-foreground">{files.map(f => f.name).join(', ')}</p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">לחץ לבחירת קבצים</p>
+                  <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, PPTX, JPG, PNG</p>
+                </div>
+              )}
+            </label>
+          </div>
+
+          {/* Question type */}
+          <div>
+            <p className="text-sm font-medium text-foreground mb-2">סוג שאלות</p>
+            <div className="flex gap-2">
+              {[{ v: 'open', l: 'פתוחות' }, { v: 'yesno', l: 'כן/לא' }, { v: 'multiple', l: 'רב ברירה' }, { v: 'merged', l: 'מיזוג' }].map(({ v, l }) => (
+                <button key={v} onClick={() => setQuestionType(v)}
+                  className={`flex-1 py-2 rounded-xl border-2 text-xs font-medium transition-all ${questionType === v ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Count + difficulty */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground mb-2">מספר שאלות: {questionCount}</p>
+              <input type="range" min={1} max={100} value={questionCount}
+                onChange={e => setQuestionCount(Number(e.target.value))}
+                className="w-full accent-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground mb-2">רמת קושי</p>
+              <div className="flex gap-1">
+                {[{ v: 'easy', l: 'קל' }, { v: 'medium', l: 'בינוני' }, { v: 'hard', l: 'קשה' }].map(({ v, l }) => (
+                  <button key={v} onClick={() => setDifficulty(v)}
+                    className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-all ${difficulty === v ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {error && <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-xl">{error}</p>}
+
+          {/* Generated questions preview */}
+          {generated.length > 0 && (
+            <div className="bg-muted/40 rounded-xl p-4 space-y-2 max-h-48 overflow-y-auto">
+              <p className="text-xs font-semibold text-foreground">{generated.length} שאלות נוצרו — תצוגה מקדימה:</p>
+              {generated.map((q, i) => (
+                <div key={i} className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{i + 1}.</span> {q.question}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 p-5 border-t border-border">
+          {generated.length === 0 ? (
+            <button onClick={handleGenerate} disabled={files.length === 0 || isLoading}
+              className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
+              {isLoading ? <><Spinner /> יוצר שאלות...</> : '✨ צור שאלות'}
+            </button>
+          ) : (
+            <>
+              <button onClick={handleSave} disabled={isLoading}
+                className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
+                {isLoading ? <><Spinner /> שומר...</> : 'שמור שאלות לבחינה'}
+              </button>
+              <button onClick={() => setGenerated([])}
+                className="px-4 py-3 rounded-xl border border-border text-sm hover:bg-muted">
+                נסה שוב
+              </button>
+            </>
+          )}
+          <button onClick={onClose} className="px-4 py-3 rounded-xl border border-border text-sm hover:bg-muted">
+            ביטול
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Class Detail ──────────────────────────────────────────────────────────────
+
+const ClassDetail = ({ cls, token, onBack, onRefresh }: {
+  cls: ClassItem; token: string; onBack: () => void; onRefresh: () => void;
+}) => {
+  const [showGenerateExam, setShowGenerateExam] = useState(false);
+  const [generatingExam, setGeneratingExam] = useState<ClassExam | null>(null);
+  const [tab, setTab] = useState<'students' | 'exams'>('students');
+  const [exams, setExams] = useState<ClassExam[]>([]);
+  const [submissions, setSubmissions] = useState<Record<string, Submission[]>>({});
+  const [loading, setLoading] = useState(false);
+  const [showCreateExam, setShowCreateExam] = useState(false);
+  const [editExam, setEditExam] = useState<ClassExam | null>(null);
+  const [gradingExam, setGradingExam] = useState<ClassExam | null>(null);
+  const [gradingSub, setGradingSub] = useState<Submission | null>(null);
+  const [confirm, setConfirm] = useState<{ msg: string; action: () => void } | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
+
+  // Create exam form
+  const [examTitle, setExamTitle] = useState('');
+  const [numVariants, setNumVariants] = useState(1);
+  const [openAt, setOpenAt] = useState('');
+  const [closeAt, setCloseAt] = useState('');
+  const [examComment, setExamComment] = useState('');
+  const [commentError, setCommentError] = useState<string | null>(null);
+
+  const loadExams = useCallback(async () => {
+    setLoading(true);
+    const r = await fetch(`${API()}/classes/${cls.id}/exams`, { headers: authH(token) });
+    const d = await r.json();
+    setExams(d.exams ?? []);
+    setLoading(false);
+  }, [cls.id, token]);
+
+  useEffect(() => { if (tab === 'exams') loadExams(); }, [tab, loadExams]);
+
+  const loadSubmissions = async (examId: string) => {
+    const r = await fetch(`${API()}/class-exams/${examId}/submissions`, { headers: authH(token) });
+    const d = await r.json();
+    setSubmissions(prev => ({ ...prev, [examId]: d.submissions ?? [] }));
+  };
+
+  const createExam = async () => {
+    if (!examTitle.trim()) {
+      setCommentError('שם הבחינה הוא שדה חובה');
+      return;
+    }
+    setCommentError(null);
+    const r = await fetch(`${API()}/classes/${cls.id}/exams`, {
+      method: 'POST', headers: jsonH(token),
+      body: JSON.stringify({
+        title: examTitle,
+        questions: [],
+        num_variants: numVariants,
+        open_at: openAt ? new Date(openAt).toISOString() : null,
+        close_at: closeAt ? new Date(closeAt).toISOString() : null,
+        comment: examComment || null,
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      setCommentError(err.detail || 'שגיאה ביצירת הבחינה');
+      return;
+    }
+    const exam = await r.json();
+    setExams(prev => [exam, ...prev]);
+    setShowCreateExam(false);
+    setExamTitle(''); setNumVariants(1); setOpenAt(''); setCloseAt(''); setExamComment('');
+    setGeneratingExam(exam); // open AI generation flow
+  };
+
+  const saveQuestions = async (exam: ClassExam, questions: Question[]) => {
+    await fetch(`${API()}/class-exams/${exam.id}/questions`, {
+      method: 'PATCH', headers: jsonH(token), body: JSON.stringify({ questions }),
+    });
+    setExams(prev => prev.map(e => e.id === exam.id ? { ...e, questions } : e));
+    setEditExam(null);
+  };
+
+  const toggleVisibility = async (exam: ClassExam) => {
+    await fetch(`${API()}/class-exams/${exam.id}/schedule`, {
+      method: 'PATCH', headers: jsonH(token),
+      body: JSON.stringify({ open_at: exam.open_at, close_at: exam.close_at, visible: !exam.visible }),
+    });
+    setExams(prev => prev.map(e => e.id === exam.id ? { ...e, visible: !e.visible } : e));
+  };
+
+  const deleteExam = async (examId: string) => {
+    await fetch(`${API()}/class-exams/${examId}`, { method: 'DELETE', headers: authH(token) });
+    setExams(prev => prev.filter(e => e.id !== examId));
+  };
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(cls.code);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  };
+
+  return (
+    <div className="space-y-6" dir="rtl">
+      {confirm && <Confirm msg={confirm.msg} onOk={() => { confirm.action(); setConfirm(null); }} onCancel={() => setConfirm(null)} />}
+      {editExam && <QuestionEditor questions={editExam.questions} onSave={qs => saveQuestions(editExam, qs)} onClose={() => setEditExam(null)} />}
+      {generatingExam && (
+        <GenerateExamFlow
+          exam={generatingExam}
+          token={token}
+          classId={cls.id}
+          onDone={updated => {
+            setExams(prev => prev.map(e => e.id === updated.id ? updated : e));
+            setGeneratingExam(null);
+            setEditExam(updated);
+          }}
+          onClose={() => setGeneratingExam(null)}
+        />
+      )} 
+      {gradingExam && gradingSub && (
+        <GradingPanel exam={gradingExam} submission={gradingSub} token={token}
+          onClose={() => { setGradingExam(null); setGradingSub(null); }}
+          onRefresh={async () => {
+            await loadSubmissions(gradingExam.id);
+            // Update the active submission from refreshed data
+            setSubmissions(prev => {
+              const updated = prev[gradingExam.id]?.find(s => s.student_uid === gradingSub.student_uid);
+              if (updated) setGradingSub(updated);
+              return prev;
+            });
+          }} />
+      )}
+
+      {/* Header */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Icon path="M15 18l-6-6 6-6" /> חזרה לכיתות
+        </button>
+        <div className="flex-1">
+          <h2 className="text-2xl font-bold text-foreground">{cls.name}</h2>
+<p className="text-sm text-muted-foreground">{cls.students?.length ?? 0} תלמידים · נוצרה {fmt(cls.created_at)}</p>        </div>
+        <div className="flex items-center gap-2">
+          <div className="px-4 py-2 bg-primary/5 border border-primary/20 rounded-xl">
+            <span className="text-lg font-bold text-primary tracking-widest">{cls.code}</span>
+          </div>
+          <button onClick={copyCode} className="px-3 py-2 rounded-xl border border-border text-sm hover:bg-muted transition-colors">
+            {codeCopied ? '✓' : 'העתק'}
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 p-1 bg-muted rounded-xl">
+        {[{ id: 'students', label: `👥 תלמידים (${cls.students?.length ?? 0})` }, { id: 'exams', label: `📝 בחינות` }].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id as 'students' | 'exams')}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Students tab */}
+      {tab === 'students' && (
+        <div className="space-y-3">
+          {cls.students.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p className="text-4xl mb-3">👥</p>
+              <p className="font-medium">אין תלמידים עדיין</p>
+              <p className="text-sm">שתף את הקוד <strong className="text-primary">{cls.code}</strong> עם התלמידים</p>
+            </div>
+          ) : (
+            (cls.students ?? []).map(s => (
+              <div key={s.uid} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
+                  {s.name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground">{s.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{s.email}</p>
+                </div>
+                <p className="text-xs text-muted-foreground flex-shrink-0">הצטרף {fmt(s.joined_at)}</p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Exams tab */}
+      {tab === 'exams' && (
+        <div className="space-y-4">
+          <button onClick={() => setShowCreateExam(true)}
+            className="w-full py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary text-sm font-semibold hover:bg-primary/5 transition-colors flex items-center justify-center gap-2">
+            <Icon path="M12 5v14M5 12h14" /> צור בחינה חדשה לכיתה
+          </button>
+
+          {/* Create exam form */}
+          {showCreateExam && (
+            <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+              <h3 className="font-bold text-foreground">בחינה חדשה</h3>
+              <label className="text-xs font-medium text-foreground mb-1 block">
+                שם הבחינה <span className="text-destructive">*</span>
+              </label>
+              <input value={examTitle} onChange={e => setExamTitle(e.target.value)} placeholder="שם הבחינה"
+                className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">מספר גרסאות ({numVariants})</label>
+                <div className="flex items-center gap-2">
+                  <input type="range" min={1} max={10} value={numVariants}                  onChange={e => setNumVariants(Number(e.target.value))} className="flex-1 accent-primary" />
+                  <span className="text-sm font-bold text-foreground w-8 text-center">{numVariants}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {numVariants === 1 ? 'כולם מקבלים את אותה בחינה' : `${numVariants} גרסאות שונות מחולקות אקראית`}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">פתיחה <span className="text-muted-foreground">(אופציונלי)</span></label>
+                  <input type="datetime-local" value={openAt} onChange={e => setOpenAt(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">סגירה <span className="text-muted-foreground">(אופציונלי)</span></label>
+                  <input type="datetime-local" value={closeAt} onChange={e => setCloseAt(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">הוראות מיוחדות לבחינה (אופציונלי)</label>
+                <textarea
+                  value={examComment}
+                  onChange={e => setExamComment(e.target.value)}
+                  placeholder="לדוגמה: התמקד בנושא רשימות מקושרות. כתוב שאלות ברמת קושי גבוהה."
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <p className="text-xs text-muted-foreground mt-1">ניתן לכתוב בעברית או באנגלית. ההוראות חייבות להתייחס לנושא הבחינה בלבד.</p>
+                {commentError && <p className="text-xs text-destructive mt-1">{commentError}</p>}
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={createExam} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90">צור ופתח עריכה</button>
+                <button onClick={() => setShowCreateExam(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
+              </div>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex justify-center py-8"><Spinner /></div>
+          ) : exams.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p className="text-4xl mb-3">📝</p>
+              <p className="font-medium">אין בחינות עדיין</p>
+            </div>
+          ) : (
+            exams.map(exam => {
+              const subs = submissions[exam.id];
+              return (
+                <div key={exam.id} className="bg-card border border-border rounded-2xl p-5">
+                  <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
+                    <div>
+                      <h3 className="font-bold text-foreground">{exam.title}</h3>
+                      <p className="text-xs text-muted-foreground">{exam.questions.length} שאלות · {exam.num_variants} גרסה/ות · נוצרה {fmt(exam.created_at)}</p>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <button onClick={() => setGeneratingExam(exam)}
+                        className="px-3 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-medium hover:bg-primary/10 transition-colors">
+                        ✨ צור שאלות עם AI
+                      </button>
+                      <button onClick={() => setEditExam(exam)}
+                        className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-muted transition-colors">
+                        ✏️ עריכת שאלות
+                      </button>
+                      <button onClick={() => toggleVisibility(exam)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${exam.visible ? 'border-green-300 bg-green-50 text-green-700' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
+                        {exam.visible ? '👁 גלוי' : '🔒 מוסתר'}
+                      </button>
+                      <button onClick={() => { loadSubmissions(exam.id); }}
+                        className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-muted transition-colors">
+                        📊 הגשות
+                      </button>
+                      <button onClick={() => setConfirm({ msg: `למחוק את הבחינה "${exam.title}"?`, action: () => deleteExam(exam.id) })}
+                        className="px-3 py-1.5 rounded-lg border border-destructive/30 text-destructive text-xs font-medium hover:bg-destructive/10 transition-colors">
+                        מחק
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Schedule */}
+                  {(exam.open_at || exam.close_at) && (
+                    <div className="flex gap-4 text-xs text-muted-foreground mb-3">
+                      {exam.open_at && <span>📅 פתיחה: {fmtDT(exam.open_at)}</span>}
+                      {exam.close_at && <span>🔒 סגירה: {fmtDT(exam.close_at)}</span>}
+                    </div>
+                  )}
+
+                  {/* Submissions */}
+                  {subs && (
+                    <div className="mt-3 pt-3 border-t border-border space-y-2">
+                      <p className="text-xs font-semibold text-foreground">הגשות ({subs.length}/{cls.students?.length ?? 0})</p>
+                      {subs.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">אין הגשות עדיין</p>
                       ) : (
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            onClick={() => { setOverrideExamId(attempt.exam_id); setNewScore(String(attempt.score ?? '')); }}
-                            className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
-                          >
-                            ✏️ שנה ציון
-                          </button>
-                          <button
-                            onClick={() => handleReset(attempt.exam_id, attempt.exam_title)}
-                            disabled={actionLoading}
-                            className="text-xs px-3 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                          >
-                            🔄 אפס ניסיון
-                          </button>
-                        </div>
+                        subs.map(sub => {
+                          const pct = sub.score !== null ? Math.round((sub.score / exam.questions.length) * 100) : null;
+                          return (
+                            <div key={sub.student_uid} className="flex items-center gap-3 p-2.5 bg-muted/40 rounded-xl cursor-pointer hover:bg-muted transition-colors"
+                              onClick={() => { setGradingExam(exam); setGradingSub(sub); }}>
+                              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
+                                {sub.student_name.charAt(0)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-foreground">{sub.student_name}</p>
+                                <p className="text-xs text-muted-foreground">{fmtDT(sub.submitted_at)}</p>
+                              </div>
+                              {pct !== null ? (
+                                <span className={`text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0 ${pct >= 80 ? 'bg-green-100 text-green-700' : pct >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                  {sub.score}/{exam.questions.length} ({pct}%)
+                                </span>
+                              ) : (
+                                <span className="text-xs px-2 py-1 rounded-lg bg-muted text-muted-foreground flex-shrink-0">לא נבדק</span>
+                              )}
+                              {sub.graded_by && (
+                                <span className="text-xs text-muted-foreground flex-shrink-0">{sub.graded_by === 'ai' ? '✨' : '👤'}</span>
+                              )}
+                            </div>
+                          );
+                        })
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
 
-// ── Exam control row ──────────────────────────────────────────────────────────
-
-const ExamRow = ({ exam, token, onUpdate }: { exam: SharedExam; token: string; onUpdate: (id: string, changes: Partial<SharedExam>) => void }) => {
-  const [deadline, setDeadline] = useState(exam.deadline ? exam.deadline.slice(0, 16) : '');
-  const [saving, setSaving] = useState(false);
-
-  const toggleVisibility = async () => {
-    setSaving(true);
-    await fetch(`${API()}/teacher/exams/${exam.id}/visibility`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ visible: !exam.visible }),
-    });
-    onUpdate(exam.id, { visible: !exam.visible });
-    setSaving(false);
-  };
-
-  const saveDeadline = async () => {
-    setSaving(true);
-    await fetch(`${API()}/teacher/exams/${exam.id}/deadline`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ deadline: deadline || null }),
-    });
-    onUpdate(exam.id, { deadline: deadline || null });
-    setSaving(false);
-  };
-
-  return (
-    <div className="border border-border rounded-xl p-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground truncate">{exam.title}</p>
-          <p className="text-xs text-muted-foreground">{formatDate(exam.created_at)}</p>
-        </div>
-        {/* Visibility toggle */}
-        <button
-          onClick={toggleVisibility}
-          disabled={saving}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border-2 transition-all disabled:opacity-50 ${
-            exam.visible ? 'border-green-300 bg-green-50 text-green-700' : 'border-border text-muted-foreground hover:border-primary/40'
-          }`}
-        >
-          {exam.visible ? '👁 גלוי לתלמידים' : '🔒 מוסתר'}
-        </button>
-      </div>
-      {/* Deadline */}
-      <div className="flex items-center gap-2 mt-3">
-        <input
-          type="datetime-local"
-          value={deadline}
-          onChange={e => setDeadline(e.target.value)}
-          className="flex-1 px-3 py-1.5 rounded-lg border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-        <button
-          onClick={saveDeadline}
-          disabled={saving}
-          className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 disabled:opacity-50"
-        >
-          {saving ? '...' : 'קבע דדליין'}
-        </button>
-        {deadline && (
-          <button onClick={() => { setDeadline(''); saveDeadline(); }} className="px-2 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted">
-            נקה
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Main Page ─────────────────────────────────────────────────────────────────
 
 const Students = () => {
   const { user } = useAuth();
-  const [roster, setRoster] = useState<Student[]>([]);
-  const [sharedExams, setSharedExams] = useState<SharedExam[]>([]);
-  const [classCode, setClassCode] = useState<string | null>(null);
+  const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [generatingCode, setGeneratingCode] = useState(false);
-  const [codeCopied, setCodeCopied] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newClassName, setNewClassName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [confirm, setConfirm] = useState<{ msg: string; action: () => void } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user?.token) return;
     setLoading(true);
+    setError(null);
     try {
-      const [classRes, examsRes] = await Promise.all([
-        fetch(`${API()}/teacher/class`, { headers: authHeader(user.token) }).then(r => r.json()),
-        fetch(`${API()}/teacher/shared-exams`, { headers: authHeader(user.token) }).then(r => r.json()),
-      ]);
-      setRoster(classRes.students ?? []);
-      setClassCode(classRes.class_code ?? null);
-      setSharedExams(examsRes.exams ?? []);
-    } catch {
-      setError('שגיאה בטעינת הנתונים');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const r = await fetch(`${API()}/classes`, {
+        headers: authH(user.token),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!r.ok) throw new Error(`שגיאה ${r.status}`);
+      const d = await r.json();
+      // Filter out malformed old documents that lack required fields
+      const validClasses = (d.classes ?? []).filter(
+        (c: ClassItem) => c.id && c.name && c.code && Array.isArray(c.students)
+      );
+      setClasses(validClasses);
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        setError('הבקשה לקחה יותר מדי זמן. בדוק את החיבור לשרת.');
+      } else {
+        setError('שגיאה בטעינת הכיתות');
+      }
     } finally {
       setLoading(false);
     }
@@ -357,153 +798,99 @@ const Students = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleGenerateCode = async () => {
+  const createClass = async () => {
+    if (!newClassName.trim() || !user?.token) return;
+    setCreating(true);
+    const r = await fetch(`${API()}/classes`, {
+      method: 'POST', headers: jsonH(user.token), body: JSON.stringify({ name: newClassName }),
+    });
+    const cls = await r.json();
+    setClasses(prev => [cls, ...prev]);
+    setShowCreate(false);
+    setNewClassName('');
+    setCreating(false);
+    setSelectedClass(cls);
+  };
+
+  const deleteClass = async (classId: string) => {
     if (!user?.token) return;
-    setGeneratingCode(true);
-    const r = await fetch(`${API()}/teacher/class/generate-code`, { method: 'POST', headers: authHeader(user.token) });
-    const d = await r.json();
-    setClassCode(d.class_code);
-    setGeneratingCode(false);
+    await fetch(`${API()}/classes/${classId}`, { method: 'DELETE', headers: authH(user.token) });
+    setClasses(prev => prev.filter(c => c.id !== classId));
+    if (selectedClass?.id === classId) setSelectedClass(null);
   };
 
-  const handleCopyCode = () => {
-    if (!classCode) return;
-    navigator.clipboard.writeText(classCode);
-    setCodeCopied(true);
-    setTimeout(() => setCodeCopied(false), 2000);
-  };
-
-  const handleRemoveStudent = async (studentUid: string) => {
-    if (!user?.token) return;
-    await fetch(`${API()}/teacher/students/${studentUid}`, { method: 'DELETE', headers: authHeader(user.token) });
-    setRoster(prev => prev.filter(s => s.student_uid !== studentUid));
-    setSelectedStudent(null);
-  };
-
-  const updateExam = (id: string, changes: Partial<SharedExam>) => {
-    setSharedExams(prev => prev.map(e => e.id === id ? { ...e, ...changes } : e));
-  };
-
-  const filtered = roster.filter(s =>
-    s.student_name.toLowerCase().includes(search.toLowerCase()) ||
-    s.student_email.toLowerCase().includes(search.toLowerCase())
-  );
+  if (selectedClass) {
+    return (
+      <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
+        <div className="max-w-5xl mx-auto">
+          <ClassDetail
+            cls={selectedClass}
+            token={user?.token ?? ''}
+            onBack={() => { setSelectedClass(null); load(); }}
+            onRefresh={load}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
-      {selectedStudent && (
-        <StudentModal
-          student={selectedStudent}
-          token={user?.token ?? ''}
-          onClose={() => setSelectedStudent(null)}
-          onRemove={() => handleRemoveStudent(selectedStudent.student_uid)}
-        />
-      )}
-
       <div className="max-w-5xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-1">ניהול תלמידים</h1>
-          <p className="text-muted-foreground">נהל את רשימת התלמידים, ציונים ובחינות משותפות</p>
+        {confirm && <Confirm msg={confirm.msg} onOk={() => { confirm.action(); setConfirm(null); }} onCancel={() => setConfirm(null)} />}
+
+        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-1">ניהול כיתות ובחינות</h1>
+            <p className="text-muted-foreground">נהל כיתות, הקצה בחינות ובדוק תלמידים</p>
+          </div>
+          <button onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-md shadow-primary/20">
+            <Icon path="M12 5v14M5 12h14" /> כיתה חדשה
+          </button>
         </div>
 
         {error && <div className="mb-6 px-4 py-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">{error}</div>}
 
+        {/* Create class form */}
+        {showCreate && (
+          <div className="bg-card border border-border rounded-2xl p-5 mb-6 space-y-4">
+            <h3 className="font-bold text-foreground">יצירת כיתה חדשה</h3>
+            <input value={newClassName} onChange={e => setNewClassName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && createClass()}
+              placeholder="שם הכיתה (למשל: מדעי המחשב — שנה ב׳)"
+              className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            <div className="flex gap-3">
+              <button onClick={createClass} disabled={creating || !newClassName.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60">
+                {creating ? <><Spinner /> יוצר...</> : 'צור כיתה'}
+              </button>
+              <button onClick={() => { setShowCreate(false); setNewClassName(''); }}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-20"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+        ) : classes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="text-6xl mb-4">🏫</div>
+            <h3 className="text-xl font-bold text-foreground mb-2">אין כיתות עדיין</h3>
+            <p className="text-muted-foreground max-w-xs mb-6">צור כיתה חדשה, שתף את קוד ההצטרפות עם התלמידים, והתחל לנהל בחינות.</p>
+            <button onClick={() => setShowCreate(true)}
+              className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90">
+              + צור כיתה ראשונה
+            </button>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            {/* Left column: roster */}
-            <div className="lg:col-span-2 space-y-4">
-
-              {/* Class code card */}
-              <div className="bg-card border border-border rounded-2xl p-5">
-                <p className="text-sm font-semibold text-foreground mb-3">קוד הצטרפות לכיתה</p>
-                {classCode ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 flex items-center justify-center py-3 bg-primary/5 border-2 border-dashed border-primary/30 rounded-xl">
-                      <span className="text-3xl font-bold text-primary tracking-[0.3em]">{classCode}</span>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <button onClick={handleCopyCode} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
-                        {codeCopied ? '✓ הועתק' : 'העתק'}
-                      </button>
-                      <button onClick={handleGenerateCode} disabled={generatingCode} className="px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50">
-                        חדש
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button onClick={handleGenerateCode} disabled={generatingCode}
-                    className="w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-60">
-                    {generatingCode ? 'יוצר...' : 'צור קוד הצטרפות'}
-                  </button>
-                )}
-                <p className="text-xs text-muted-foreground mt-2">שתף קוד זה עם התלמידים שלך כדי שיוכלו להצטרף לכיתה.</p>
-              </div>
-
-              {/* Search */}
-              <div className="relative">
-                <svg className="w-4 h-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle cx="11" cy="11" r="8" strokeWidth="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-                <input type="text" placeholder="חפש תלמיד..." value={search} onChange={e => setSearch(e.target.value)}
-                  className="w-full pr-9 pl-3 py-2.5 rounded-xl border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
-              </div>
-
-              {/* Roster */}
-              {filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center bg-card border border-border rounded-2xl">
-                  <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center mb-4">
-                    <svg className="w-7 h-7 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                    </svg>
-                  </div>
-                  <p className="text-base font-semibold text-foreground mb-1">אין תלמידים עדיין</p>
-                  <p className="text-sm text-muted-foreground max-w-xs">שתף את קוד הכיתה עם התלמידים שלך וציפה שיצטרפו.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filtered.map(s => (
-                    <div key={s.student_uid}
-                      onClick={() => setSelectedStudent(s)}
-                      className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:border-primary/40 hover:shadow-sm transition-all flex items-center gap-4 group"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-base flex-shrink-0">
-                        {s.student_name.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{s.student_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{s.student_email}</p>
-                      </div>
-                      <div className="text-left flex-shrink-0">
-                        <p className="text-xs text-muted-foreground">הצטרף</p>
-                        <p className="text-xs font-medium text-foreground">{formatDate(s.joined_at)}</p>
-                      </div>
-                      {s.notes && (
-                        <span className="text-xs px-2 py-1 rounded-lg bg-yellow-100 text-yellow-700 flex-shrink-0">📝</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Right column: exam control */}
-            <div className="space-y-4">
-              <div className="bg-card border border-border rounded-2xl p-5">
-                <p className="text-sm font-semibold text-foreground mb-3">בחינות משותפות ({sharedExams.length})</p>
-                {sharedExams.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-4">אין בחינות משותפות עדיין</p>
-                ) : (
-                  <div className="space-y-3">
-                    {sharedExams.map(exam => (
-                      <ExamRow key={exam.id} exam={exam} token={user?.token ?? ''} onUpdate={updateExam} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {classes.map((cls, index) => (
+                <ClassCard key={cls.id ?? index} cls={cls}
+                onSelect={() => setSelectedClass(cls)}
+                onDelete={() => setConfirm({ msg: `למחוק את הכיתה "${cls.name}"?`, action: () => deleteClass(cls.id) })}
+              />
+            ))}
           </div>
         )}
       </div>

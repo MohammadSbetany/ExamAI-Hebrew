@@ -148,7 +148,7 @@ const StudentDashboard = ({ user, exams }: { user: { name: string; token: string
             <QuickActionCard
               icon={<svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
               label="הצטרף לכיתה" sublabel="קוד מהמורה" color="bg-green-100"
-              onClick={() => navigate('/join-class')}
+              onClick={() => navigate('/my-classes')}
             />
           </div>
         </div>
@@ -227,13 +227,15 @@ const TeacherDashboard = ({ user, exams }: { user: { name: string; token: string
   useEffect(() => {
     const load = async () => {
       try {
-        const [classRes, examsRes] = await Promise.all([
-          fetch(`${API()}/teacher/class`, { headers: authH(user.token) }).then(r => r.json()),
+        const [classesRes, examsRes] = await Promise.all([
+          fetch(`${API()}/classes`, { headers: authH(user.token) }).then(r => r.json()),
           fetch(`${API()}/teacher/shared-exams`, { headers: authH(user.token) }).then(r => r.json()),
         ]);
         const sharedExams = examsRes.exams ?? [];
+        const allClasses = classesRes.classes ?? [];
+        const totalStudents = allClasses.reduce((sum: number, c: { students?: { uid: string }[] }) => sum + (c.students?.length ?? 0), 0);
         setTeacherData({
-          totalStudents: (classRes.students ?? []).length,
+          totalStudents,
           activeExams: sharedExams.filter((e: { visible: boolean }) => e.visible !== false).length,
           classAverage: null, // expensive to compute — show in Stats tab
           recentSubmissions: 0,
