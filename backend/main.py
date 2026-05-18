@@ -11,15 +11,17 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from firebase_auth import verify_token
-from students_db import (
-    generate_class_code, get_class_config, join_class_by_code,
-    get_roster, remove_student, save_note,
-    get_student_history, reset_attempt, override_grade,
-    set_exam_visibility, set_exam_deadline,
-)
 import json
 from engine import generate_questions, grade_answers, extract_text_from_file
 from digitize import digitize_exam
+from class_manager import (
+    create_class, get_teacher_classes, get_class, delete_class,
+    regenerate_code, add_student_to_class, remove_student_from_class,
+    join_class_by_code, create_class_exam, get_class_exams, get_class_exam,
+    update_exam_questions, update_exam_schedule, delete_class_exam,
+    add_question, delete_question, get_student_exam, submit_class_exam,
+    get_all_submissions, save_grade_result, override_question_grade,
+)
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -67,7 +69,6 @@ async def dashboard_summary(user=Depends(verify_token)):
     db = fs.client()
     uid = user.get("uid")
 
-    # Get user's saved exams (last 5)
     try:
         exams_docs = (
             db.collection("exams").document(uid).collection("records")
@@ -79,68 +80,336 @@ async def dashboard_summary(user=Depends(verify_token)):
     except Exception:
         recent_exams = []
 
-    # Teacher-specific: class overview
-    teacher_data = None
-    if user.get("role") == "teacher" or True:  # role comes from Firestore, not token — compute both
-        try:
-            shared_docs = (
-                db.collection("shared_exams")
-                .where("teacher_uid", "==", uid)
-                .stream()
-            )
-            shared_exams = [d.to_dict() for d in shared_docs]
-            exam_ids = [e["id"] for e in shared_exams]
+    try:
+        classes_docs = db.collection("classes").where(
+            filter=fs.FieldFilter("teacher_uid", "==", uid)
+        ).stream()
+        classes = [d.to_dict() for d in classes_docs]
+        total_students = sum(len(c.get("students", [])) for c in classes)
+        
+        class_exams_docs = db.collection("class_exams").where(
+            filter=fs.FieldFilter("teacher_uid", "==", uid)
+        ).stream()
+        active_exams = sum(1 for e in class_exams_docs if e.to_dict().get("visible", True))
+        
+        teacher_data = {
+            "total_students": total_students,
+            "active_exams": active_exams,
+            "class_average": None,
+            "recent_submissions": 0,
+            "struggling_count": 0,
+        }
+    except Exception:
+        teacher_data = {
+            "total_students": 0, "active_exams": 0,
+            "class_average": None, "recent_submissions": 0, "struggling_count": 0,
+        }
 
-            total_students = len(
-                db.collection("classes").document(uid).collection("students").stream()
-                .__class__.__mro__  # just check existence
-            ) if False else sum(1 for _ in db.collection("classes").document(uid).collection("students").stream())
+    return {"recent_exams": recent_exams, "teacher_data": teacher_data}
 
-            # Get recent submissions across all shared exams
-            all_submissions = []
-            for exam_id in exam_ids[:5]:
-                subs = db.collection("shared_results").document(exam_id).collection("submissions").stream()
-                all_submissions.extend([s.to_dict() for s in subs])
+# ── Classes ───────────────────────────────────────────────────────────────────
 
-            scores = [s.get("score", 0) for s in all_submissions if s.get("score") is not None]
-            total_q_map = {e["id"]: len(e.get("questions", [])) for e in shared_exams}
+@app.post("/classes")
+async def create_class_endpoint(data: dict, user=Depends(verify_token)):
+    cls = create_class(user.get("uid"), data.get("name", "כיתה חדשה"))
+    return cls
 
-            pcts = []
-            for s in all_submissions:
-                exam_id = None
-                for eid in exam_ids:
-                    sub_doc = db.collection("shared_results").document(eid).collection("submissions").document(s.get("student_uid", "")).get()
-                    if sub_doc.exists:
-                        score = sub_doc.to_dict().get("score", 0)
-                        total = total_q_map.get(eid, 1)
-                        pcts.append(round((score / total) * 100) if total else 0)
-                        break
+@app.get("/classes")
+async def list_classes(user=Depends(verify_token)):
+    try:
+        return {"classes": get_teacher_classes(user.get("uid"))}
+    except Exception as e:
+        logger.error("List classes error | user=%s error=%s", user.get("uid"), str(e))
+        return {"classes": []}
 
-            struggling = [
-                s for s in all_submissions
-                if s.get("score") is not None and
-                len(total_q_map) > 0 and
-                any(round((s.get("score", 0) / total_q_map.get(eid, 1)) * 100) < 60
-                    for eid in exam_ids if total_q_map.get(eid))
+@app.delete("/classes/{class_id}")
+async def delete_class_endpoint(class_id: str, user=Depends(verify_token)):
+    try:
+        delete_class(user.get("uid"), class_id)
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.post("/classes/{class_id}/regenerate-code")
+async def regen_code(class_id: str, user=Depends(verify_token)):
+    try:
+        code = regenerate_code(user.get("uid"), class_id)
+        return {"code": code}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.post("/classes/{class_id}/add-student")
+async def add_student_endpoint(class_id: str, data: dict, user=Depends(verify_token)):
+    cls = get_class(class_id)
+    if not cls or cls.get("teacher_uid") != user.get("uid"):
+        raise HTTPException(status_code=403, detail="אין הרשאה")
+    try:
+        add_student_to_class(class_id, data["uid"], data["name"], data.get("email", ""))
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/classes/{class_id}/students/{student_uid}")
+async def remove_student_endpoint(class_id: str, student_uid: str, user=Depends(verify_token)):
+    try:
+        remove_student_from_class(user.get("uid"), class_id, student_uid)
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.post("/classes/join")
+async def join_class_endpoint(data: dict, user=Depends(verify_token)):
+    try:
+        cls = join_class_by_code(
+            data.get("code", ""),
+            user.get("uid"),
+            data.get("name", "תלמיד"),
+            user.get("email", ""),
+        )
+        return cls
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ── Class Exams ───────────────────────────────────────────────────────────────
+
+@app.post("/classes/{class_id}/exams")
+async def create_exam_endpoint(class_id: str, data: dict, user=Depends(verify_token)):
+    try:
+        exam = create_class_exam(
+            teacher_uid=user.get("uid"),
+            class_id=class_id,
+            title=data.get("title", "בחינה"),
+            questions=data.get("questions", []),
+            num_variants=data.get("num_variants", 1),
+            assignments=data.get("assignments"),
+            open_at=data.get("open_at"),
+            close_at=data.get("close_at"),
+            comment=data.get("comment"),
+        )
+        return exam
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/classes/{class_id}/exams")
+async def list_class_exams(class_id: str, user=Depends(verify_token)):
+    try:
+        return {"exams": get_class_exams(user.get("uid"), class_id)}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.patch("/class-exams/{exam_id}/questions")
+async def update_questions_endpoint(exam_id: str, data: dict, user=Depends(verify_token)):
+    try:
+        update_exam_questions(
+            user.get("uid"),
+            exam_id,
+            data.get("questions", []),
+            data.get("question_type"),
+        )
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.post("/class-exams/{exam_id}/questions")
+async def add_question_endpoint(exam_id: str, data: dict, user=Depends(verify_token)):
+    try:
+        add_question(user.get("uid"), exam_id, data.get("question", {}))
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.delete("/class-exams/{exam_id}/questions/{question_index}")
+async def delete_question_endpoint(exam_id: str, question_index: int, user=Depends(verify_token)):
+    try:
+        delete_question(user.get("uid"), exam_id, question_index)
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.patch("/class-exams/{exam_id}/schedule")
+async def update_schedule_endpoint(exam_id: str, data: dict, user=Depends(verify_token)):
+    try:
+        update_exam_schedule(
+            user.get("uid"), exam_id,
+            data.get("open_at"), data.get("close_at"), data.get("visible", True)
+        )
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.delete("/class-exams/{exam_id}")
+async def delete_exam_endpoint(exam_id: str, user=Depends(verify_token)):
+    try:
+        delete_class_exam(user.get("uid"), exam_id)
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+# ── Student endpoints ─────────────────────────────────────────────────────────
+
+@app.get("/student/classes")
+async def get_student_classes(user=Depends(verify_token)):
+    from firebase_admin import firestore as fs
+    db = fs.client()
+    uid = user.get("uid")
+    try:
+        docs = db.collection("classes").where(
+            filter=fs.FieldFilter("student_uids", "array_contains", uid)
+        ).stream()
+        classes = [d.to_dict() for d in docs]
+        if not classes:
+            fallback_docs = db.collection("classes").stream()
+            classes = [
+                d.to_dict() for d in fallback_docs
+                if any(s.get("uid") == uid for s in d.to_dict().get("students", []))
             ]
+        return {"classes": classes}
+    except Exception as e:
+        logger.error("Get student classes error | user=%s error=%s", uid, str(e))
+        return {"classes": []}
 
-            teacher_data = {
-                "total_students": total_students,
-                "active_exams": len(shared_exams),
-                "class_average": round(sum(pcts) / len(pcts), 1) if pcts else None,
-                "recent_submissions": len(all_submissions),
-                "struggling_count": len(struggling),
-            }
-        except Exception:
-            teacher_data = {
-                "total_students": 0, "active_exams": 0,
-                "class_average": None, "recent_submissions": 0, "struggling_count": 0,
-            }
 
-    return {
-        "recent_exams": recent_exams,
-        "teacher_data": teacher_data,
-    }
+def _sanitize_question_for_student(question: dict) -> dict:
+    safe = dict(question or {})
+    safe.pop("answer", None)
+    options = safe.get("options")
+    if isinstance(options, dict):
+        cleaned = {}
+        for key, value in options.items():
+            if isinstance(value, dict):
+                option = dict(value)
+                option.pop("answer", None)
+                option.pop("correct", None)
+                option.pop("is_correct", None)
+                cleaned[key] = option
+            else:
+                cleaned[key] = value
+        safe["options"] = cleaned
+    return safe
+
+
+@app.get("/student/classes/{class_id}/exams")
+async def get_student_class_exams(class_id: str, user=Depends(verify_token)):
+    from firebase_admin import firestore as fs
+    db = fs.client()
+    uid = user.get("uid")
+    # Verify student is in this class
+    cls_doc = db.collection("classes").document(class_id).get()
+    if not cls_doc.exists:
+        raise HTTPException(status_code=404, detail="כיתה לא נמצאה")
+    cls = cls_doc.to_dict()
+    if not any(s.get("uid") == uid for s in cls.get("students", [])):
+        raise HTTPException(status_code=403, detail="אינך רשום לכיתה זו")
+    # Get visible exams
+    docs = db.collection("class_exams").where(
+        filter=fs.FieldFilter("class_id", "==", class_id)
+    ).stream()
+    all_exams = [d.to_dict() for d in docs]
+    exams = []
+    for exam in all_exams:
+        submission_doc = db.collection("class_results").document(exam["id"]).collection("submissions").document(uid).get()
+        submission = submission_doc.to_dict() if submission_doc.exists else None
+        exams.append({
+            "id": exam["id"],
+            "title": exam.get("title"),
+            "questions": [_sanitize_question_for_student(q) for q in exam.get("questions", [])],
+            "question_type": exam.get("question_type", "open"),
+            "visible": exam.get("visible", True),
+            "open_at": exam.get("open_at"),
+            "close_at": exam.get("close_at"),
+            "created_at": exam.get("created_at"),
+            "my_submission": submission,
+        })
+    return {"exams": sorted(exams, key=lambda x: x.get("created_at", ""), reverse=True)}
+
+@app.get("/student/class-exam/{exam_id}")
+async def get_student_exam_endpoint(exam_id: str, user=Depends(verify_token)):
+    result = get_student_exam(exam_id, user.get("uid"))
+    if result and "error" in result:
+        raise HTTPException(status_code=403, detail=result["error"])
+    if not result:
+        raise HTTPException(status_code=404, detail="בחינה לא נמצאה")
+    return result
+
+@app.post("/student/class-exam/{exam_id}/submit")
+async def submit_exam_endpoint(exam_id: str, data: dict, user=Depends(verify_token)):
+    from firebase_admin import firestore as fs
+    db = fs.client()
+    access = get_student_exam(exam_id, user.get("uid"))
+    if not access:
+        raise HTTPException(status_code=404, detail="בחינה לא נמצאה")
+    if "error" in access:
+        raise HTTPException(status_code=403, detail=access["error"])
+    existing = db.collection("class_results").document(exam_id).collection("submissions").document(user.get("uid")).get()
+    if existing.exists:
+        raise HTTPException(status_code=409, detail="כבר הגשת את הבחינה הזו")
+    exam = get_class_exam(exam_id)
+    variant_idx = int((exam.get("assignments") or {}).get(user.get("uid"), 0)) if exam else 0
+    submit_class_exam(
+        exam_id,
+        user.get("uid"),
+        data.get("student_name", "תלמיד"),
+        data.get("answers", []),
+        variant_idx=variant_idx,
+    )
+    return {"ok": True}
+
+@app.get("/student/class-exam/{exam_id}/my-submission")
+async def get_my_submission(exam_id: str, user=Depends(verify_token)):
+    from firebase_admin import firestore as fs
+    db = fs.client()
+    doc = db.collection("class_results").document(exam_id).collection("submissions").document(user.get("uid")).get()
+    if not doc.exists:
+        return {"submitted": False}
+    return {"submitted": True, "submission": doc.to_dict()}
+
+# ── Teacher grading ───────────────────────────────────────────────────────────
+
+@app.get("/class-exams/{exam_id}/submissions")
+async def get_submissions_endpoint(exam_id: str, user=Depends(verify_token)):
+    try:
+        return {"submissions": get_all_submissions(user.get("uid"), exam_id)}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.post("/class-exams/{exam_id}/submissions/{student_uid}/grade-ai")
+async def grade_ai_endpoint(exam_id: str, student_uid: str, user=Depends(verify_token)):
+    try:
+        from firebase_admin import firestore as _fs
+        db = _fs.client()
+        exam = get_class_exam(exam_id)
+        if not exam or exam["teacher_uid"] != user.get("uid"):
+            raise HTTPException(status_code=403, detail="אין הרשאה")
+        docs = db.collection("class_results").document(exam_id).collection("submissions").document(student_uid).get()
+        if not docs.exists:
+            raise HTTPException(status_code=404, detail="הגשה לא נמצאה")
+        sub = docs.to_dict()
+        variant_idx = sub.get("variant_idx")
+        if variant_idx is None:
+            variant_idx = int((exam.get("assignments") or {}).get(student_uid, 0))
+        variant_questions = (exam.get("variants") or {}).get(str(variant_idx), exam.get("questions", []))
+        result_json = grade_answers(variant_questions, sub["answers"], exam.get("question_type", "open"))
+        import json
+        grade_result = json.loads(result_json)
+        save_grade_result(user.get("uid"), exam_id, student_uid, grade_result, "ai")
+        return grade_result
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.patch("/class-exams/{exam_id}/submissions/{student_uid}/override")
+async def override_grade_endpoint(exam_id: str, student_uid: str, data: dict, user=Depends(verify_token)):
+    try:
+        override_question_grade(
+            user.get("uid"), exam_id, student_uid,
+            data.get("question_index", 0),
+            data.get("new_points", 0),
+            data.get("note", ""),
+        )
+        return {"ok": True}
+    except (PermissionError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # ── Digitize ──────────────────────────────────────────────────────────────────
 @app.post("/digitize")
@@ -381,92 +650,6 @@ async def submit_result(exam_id: str, data: dict, user=Depends(verify_token)):
         raise HTTPException(status_code=500, detail="שגיאה בשמירת התוצאה")
     
 # ── Teacher: Roster ───────────────────────────────────────────────────────────
-
-@app.get("/teacher/class")
-async def get_class(user=Depends(verify_token)):
-    uid = user.get("uid")
-    config = get_class_config(uid)
-    roster = get_roster(uid)
-    return {"class_code": config.get("class_code"), "students": roster}
-
-
-@app.post("/teacher/class/generate-code")
-async def gen_code(user=Depends(verify_token)):
-    code = generate_class_code(user.get("uid"))
-    return {"class_code": code}
-
-
-@app.delete("/teacher/students/{student_uid}")
-async def remove_student_endpoint(student_uid: str, user=Depends(verify_token)):
-    remove_student(user.get("uid"), student_uid)
-    return {"ok": True}
-
-
-@app.get("/teacher/students/{student_uid}/history")
-async def student_history(student_uid: str, user=Depends(verify_token)):
-    history = get_student_history(user.get("uid"), student_uid)
-    return {"history": history}
-
-
-@app.delete("/teacher/students/{student_uid}/attempts/{exam_id}")
-async def reset_attempt_endpoint(student_uid: str, exam_id: str, user=Depends(verify_token)):
-    try:
-        reset_attempt(user.get("uid"), exam_id, student_uid)
-        return {"ok": True}
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-
-
-@app.patch("/teacher/students/{student_uid}/attempts/{exam_id}/grade")
-async def override_grade_endpoint(student_uid: str, exam_id: str, data: dict, user=Depends(verify_token)):
-    try:
-        override_grade(user.get("uid"), exam_id, student_uid, data.get("score", 0), data.get("note", ""))
-        return {"ok": True}
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-
-
-@app.post("/teacher/students/{student_uid}/notes")
-async def save_note_endpoint(student_uid: str, data: dict, user=Depends(verify_token)):
-    save_note(user.get("uid"), student_uid, data.get("note", ""))
-    return {"ok": True}
-
-
-# ── Teacher: Exam control ─────────────────────────────────────────────────────
-
-@app.patch("/teacher/exams/{exam_id}/visibility")
-async def set_visibility(exam_id: str, data: dict, user=Depends(verify_token)):
-    try:
-        set_exam_visibility(user.get("uid"), exam_id, data.get("visible", True))
-        return {"ok": True}
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-
-
-@app.patch("/teacher/exams/{exam_id}/deadline")
-async def set_deadline(exam_id: str, data: dict, user=Depends(verify_token)):
-    try:
-        set_exam_deadline(user.get("uid"), exam_id, data.get("deadline"))
-        return {"ok": True}
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-
-
-# ── Student: Join class ───────────────────────────────────────────────────────
-
-@app.post("/student/join-class")
-async def join_class(data: dict, user=Depends(verify_token)):
-    try:
-        teacher_uid = join_class_by_code(
-            student_uid=user.get("uid"),
-            student_name=data.get("student_name", "תלמיד"),
-            student_email=user.get("email", ""),
-            code=data.get("class_code", "").strip().upper(),
-        )
-        return {"ok": True, "teacher_uid": teacher_uid}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))    
-    
 
 # ── User Settings ─────────────────────────────────────────────────────────────
 @app.get("/settings")

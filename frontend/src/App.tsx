@@ -8,7 +8,6 @@ import Flashcards from "./pages/Flashcards";
 import Dashboard from "./pages/Dashboard";
 import MyExams from "./pages/MyExams";
 import Students from "./pages/Students";
-import JoinClass from "./pages/JoinClass";
 import ClassStats from "./pages/ClassStats";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/Sidebar";
@@ -17,6 +16,8 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
+import MyClasses from "./pages/MyClasses.tsx";
+
 
 const queryClient = new QueryClient();
 
@@ -73,12 +74,11 @@ const App = () => (
               </ProtectedRoute>
             } /> */}
 
-            {/* Teacher-only example:
             <Route path="/students" element={
               <ProtectedRoute requireTeacher>
                 <AppLayout><Students /></AppLayout>
               </ProtectedRoute>
-            } /> */}
+            } />
 
             <Route path="/my-exams" element={
               <ProtectedRoute>
@@ -104,18 +104,10 @@ const App = () => (
               </ProtectedRoute>
             } />
 
-            <Route path="/students" element={
-              <ProtectedRoute requireTeacher>
-                <AppLayout>
-                  <Students />
-                </AppLayout>
-              </ProtectedRoute>
-            } />
-
-            <Route path="/join-class" element={
+            <Route path="/my-classes" element={
               <ProtectedRoute>
                 <AppLayout>
-                  <JoinClass />
+                  <MyClasses />
                 </AppLayout>
               </ProtectedRoute>
             } />

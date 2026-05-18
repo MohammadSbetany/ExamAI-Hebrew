@@ -27,7 +27,7 @@ export interface UserSettings {
 }
 
 export const defaultSettings: UserSettings = {
-  theme: 'system',
+  theme: 'light',
   language: 'he',
   dyslexicFont: false,
   highContrast: false,
@@ -72,14 +72,13 @@ export const saveProfile = async (token: string, profile: Record<string, string>
 
 export const applyTheme = (theme: 'light' | 'dark' | 'system') => {
   const root = document.documentElement;
-  if (theme === 'dark') {
+  const resolvedTheme = theme === 'system'
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : theme;
+  if (resolvedTheme === 'dark') {
     root.classList.add('dark');
-  } else if (theme === 'light') {
-    root.classList.remove('dark');
   } else {
-    // System
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    root.classList.toggle('dark', prefersDark);
+    root.classList.remove('dark');
   }
 };
 

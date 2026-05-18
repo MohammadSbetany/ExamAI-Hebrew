@@ -115,7 +115,7 @@ const Settings = () => {
     setSettings(updated as UserSettings);
 
     // Apply immediately
-    if (key === 'theme') applyTheme(value as 'light' | 'dark' | 'system');
+    if (key === 'theme') applyTheme(value as 'light' | 'dark');
     if (key === 'dyslexicFont') applyFont(value as boolean);
     if (key === 'language') applyDirection(value as 'he' | 'en' | 'ar');
 
@@ -314,8 +314,8 @@ const Settings = () => {
               <>
                 <Section title="ערכת נושא">
                   <Row label="מצב תצוגה" sub="בחר בין בהיר, כהה, או לפי הגדרות המערכת">
-                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-muted rounded-xl">
-                      {[{ value: 'light', label: '☀️ בהיר' }, { value: 'dark', label: '🌙 כהה' }, { value: 'system', label: '💻 מערכת' }].map(({ value, label }) => (
+                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-xl">
+                      {[{ value: 'light', label: '☀️ בהיר' }, { value: 'dark', label: '🌙 כהה' }].map(({ value, label }) => (
                         <button key={value} onClick={() => handleToggle('theme', value)}
                           className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${settings.theme === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
                           {label}
