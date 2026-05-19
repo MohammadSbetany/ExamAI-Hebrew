@@ -13,16 +13,19 @@ interface ClassItem  { id: string; name: string; }
 interface QuestionStat { index: number; question: string; success_rate: number; avg_points: number; answered_count: number; }
 interface StudentRow  { student_uid: string; student_name: string; score: number | null; pct: number; submitted_at: string; }
 interface DistractorItem { index: number; question: string; correct_answer: string; options: Record<string, string>; answer_counts: Record<string, number>; total_answers: number; }
+interface AIRecommendation { priority: 'high' | 'medium' | 'low'; title: string; description: string; }
 interface Analytics {
   exam: { title: string; question_type: string };
   student_count: number;
+  graded_count?: number;
   submissions: StudentRow[];
   score_stats: { mean: number; median: number; std: number; min: number; max: number; count: number } | null;
   question_stats: QuestionStat[];
   distractor_analysis: DistractorItem[];
   grade_distribution: { label: string; count: number }[];
-  ai_recommendations: unknown[];
+  ai_recommendations: AIRecommendation[] | null;
 }
+interface SharedExamItem { id: string; title: string; created_at: string; }
 interface ExamSummary {
   exam_id: string; title: string; created_at: string;
   total_submissions: number; graded_count: number;
@@ -30,7 +33,7 @@ interface ExamSummary {
   std_pct: number | null; failure_rate: number | null;
   min_pct: number | null; max_pct: number | null;
 }
-interface TrendPoint { exam_title: string; date: string; avg: number; submissions: number; }
+interface TrendPoint { exam_title: string; date: string; avg: number | null; submissions: number; }
 interface Comparative {
   highest_failure_exam: { title: string; rate: number };
   highest_std_exam:     { title: string; std: number };
@@ -56,7 +59,11 @@ const pctColor = (pct: number) => pct >= 80 ? 'text-green-700' : pct >= 60 ? 'te
 
 // ── Tooltips ──────────────────────────────────────────────────────────────────
 
-interface TooltipProps { active?: boolean; payload?: { value: number; name?: string }[]; label?: string; }
+interface TooltipProps {
+  active?: boolean;
+  payload?: { value: number | null; name?: string; payload?: TrendPoint }[];
+  label?: string;
+}
 const BarTooltip = ({ active, payload, label }: TooltipProps) => {
   if (!active || !payload?.length) return null;
   return (
@@ -68,11 +75,13 @@ const BarTooltip = ({ active, payload, label }: TooltipProps) => {
 };
 const LineTooltip = ({ active, payload, label }: TooltipProps) => {
   if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload;
   return (
     <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-sm" dir="rtl">
       <p className="font-semibold text-foreground">{label}</p>
+      {point?.exam_title && <p className="text-xs text-muted-foreground mb-1">{point.exam_title}</p>}
       {payload.map((p, i) => (
-        <p key={i} className="text-muted-foreground">{p.name}: {p.value}%</p>
+        <p key={i} className="text-muted-foreground">{p.name}: {p.value ?? '—'}{p.value === null ? '' : '%'}</p>
       ))}
     </div>
   );
@@ -120,7 +129,7 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={trendRTL} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="exam_title" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
               <Tooltip content={<LineTooltip />} />
               <Legend />
@@ -212,6 +221,7 @@ const ClassStats = () => {
   const [viewMode, setViewMode] = useState<'exam' | 'class'>('class');
 
   // Shared exams (analytics system)
+  const [sharedExams, setSharedExams] = useState<SharedExamItem[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [examSource, setExamSource] = useState<'shared' | 'class'>('shared');
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
@@ -230,9 +240,15 @@ const ClassStats = () => {
   useEffect(() => {
     if (!user?.token) return;
     setListsLoading(true);
-    fetch(`${API()}/classes`, { headers: { Authorization: `Bearer ${user.token}` } })
-      .then(r => r.json())
-      .then(d => setClasses((d.classes ?? []).filter((c: ClassItem & { teacher_uid?: string }) => c.id && c.name))).catch(() => setError('שגיאה בטעינת הנתונים'))
+    Promise.all([
+      fetch(`${API()}/classes`, { headers: { Authorization: `Bearer ${user.token}` } }).then(r => r.json()),
+      fetch(`${API()}/teacher/shared-exams`, { headers: { Authorization: `Bearer ${user.token}` } }).then(r => r.json()),
+    ])
+      .then(([classesData, examsData]) => {
+        setClasses((classesData.classes ?? []).filter((c: ClassItem & { teacher_uid?: string }) => c.id && c.name));
+        setSharedExams((examsData.exams ?? []).filter((e: SharedExamItem) => e.id && e.title));
+      })
+      .catch(() => setError('שגיאה בטעינת הנתונים'))
       .finally(() => setListsLoading(false));
   }, [user?.token]);
 
@@ -284,20 +300,54 @@ const ClassStats = () => {
 
         {/* Selector */}
         <div className="bg-card border border-border rounded-2xl p-5 mb-6">
-          <p className="text-sm font-semibold text-foreground mb-3">בחר כיתה</p>
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setViewMode('class')}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${viewMode === 'class' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}
+            >
+              צפייה כיתתית
+            </button>
+            <button
+              onClick={() => { setViewMode('exam'); setExamSource('shared'); }}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${viewMode === 'exam' && examSource === 'shared' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}
+            >
+              בחינה ספציפית
+            </button>
+          </div>
           {listsLoading ? (
             <div className="flex justify-center py-4"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
-          ) : classes.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">אין כיתות עדיין. צור כיתה בדף ניהול התלמידים.</p>
+          ) : viewMode === 'class' ? (
+            classes.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">אין כיתות עדיין. צור כיתה בדף ניהול התלמידים.</p>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-foreground mb-3">בחר כיתה</p>
+                <div className="flex flex-wrap gap-2">
+                  {classes.map(cls => (
+                    <button key={cls.id} onClick={() => { setSelectedClassId(cls.id); setViewMode('class'); }}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${selectedClassId === cls.id && viewMode === 'class' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
+                      {cls.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {classes.map(cls => (
-                <button key={cls.id} onClick={() => { setSelectedClassId(cls.id); setViewMode('class'); }}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${selectedClassId === cls.id && viewMode === 'class' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
-                  {cls.name}
-                </button>
-              ))}
-            </div>
+            sharedExams.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">אין בחינות משותפות עדיין.</p>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-foreground mb-3">בחר בחינה</p>
+                <div className="flex flex-wrap gap-2">
+                  {sharedExams.map(exam => (
+                    <button key={exam.id} onClick={() => { setSelectedExamId(exam.id); setExamSource('shared'); setViewMode('exam'); }}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${selectedExamId === exam.id && viewMode === 'exam' && examSource === 'shared' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
+                      {exam.title}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )
           )}
         </div>
 
