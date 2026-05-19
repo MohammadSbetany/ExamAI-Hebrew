@@ -324,7 +324,7 @@ const ClassStats = () => {
                 <p className="text-sm font-semibold text-foreground mb-3">בחר כיתה</p>
                 <div className="flex flex-wrap gap-2">
                   {classes.map(cls => (
-                    <button key={cls.id} onClick={() => { setSelectedClassId(cls.id); setViewMode('class'); }}
+                    <button key={cls.id} onClick={() => setSelectedClassId(cls.id)}
                       className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${selectedClassId === cls.id && viewMode === 'class' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
                       {cls.name}
                     </button>

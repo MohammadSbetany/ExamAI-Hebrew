@@ -294,7 +294,7 @@ def compute_class_analytics(class_id: str, teacher_uid: str) -> dict:
         total_q = len(questions)
 
         # Fetch submissions (summary only — no full text)
-        subs_docs = (
+        submissions_docs = (
             _db()
             .collection("class_results")
             .document(exam_id)
@@ -302,14 +302,14 @@ def compute_class_analytics(class_id: str, teacher_uid: str) -> dict:
             .select(["score"])
             .stream()
         )
-        subs = [d.to_dict() for d in subs_docs]
+        submissions = [d.to_dict() for d in submissions_docs]
 
         if total_q == 0:
             exams_summary.append({
                 "exam_id": exam_id,
                 "title": exam.get("title", ""),
                 "created_at": exam.get("created_at", ""),
-                "total_submissions": len(subs),
+                "total_submissions": len(submissions),
                 "graded_count": 0,
                 "avg_pct": None,
                 "median_pct": None,
@@ -326,13 +326,13 @@ def compute_class_analytics(class_id: str, teacher_uid: str) -> dict:
             })
             continue
 
-        graded = [s for s in subs if s.get("score") is not None]
+        graded = [s for s in submissions if s.get("score") is not None]
         if not graded:
             exams_summary.append({
                 "exam_id": exam_id,
                 "title": exam.get("title", ""),
                 "created_at": exam.get("created_at", ""),
-                "total_submissions": len(subs),
+                "total_submissions": len(submissions),
                 "graded_count": 0,
                 "avg_pct": None,
                 "median_pct": None,
@@ -353,7 +353,7 @@ def compute_class_analytics(class_id: str, teacher_uid: str) -> dict:
             "exam_id": exam_id,
             "title": exam.get("title", ""),
             "created_at": exam.get("created_at", ""),
-            "total_submissions": len(subs),
+            "total_submissions": len(submissions),
             "graded_count": len(graded),
             "avg_pct": avg,
             "median_pct": med,
@@ -413,6 +413,7 @@ def compute_class_exam_analytics(exam_id: str, teacher_uid: str) -> dict:
         return {
             "exam": {"title": exam.get("title", ""), "question_type": exam.get("question_type", "open")},
             "student_count": len(submissions),
+            "total_submissions": len(submissions),
             "graded_count": 0,
             "submissions": [],
             "score_stats": None,
@@ -490,6 +491,7 @@ def compute_class_exam_analytics(exam_id: str, teacher_uid: str) -> dict:
     return {
         "exam": {"title": exam.get("title", ""), "question_type": q_type},
         "student_count": len(submissions),
+        "total_submissions": len(submissions),
         "graded_count": len(graded),
         "submissions": [
             {"student_uid": s.get("student_uid"), "student_name": s.get("student_name", "תלמיד"),
