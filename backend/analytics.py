@@ -253,3 +253,117 @@ Return a JSON object with key "recommendations" containing the array.
         "grade_distribution": brackets,
         "ai_recommendations": ai_recommendations,
     }
+
+# ── Class-wide analytics ──────────────────────────────────────────────────────
+
+def compute_class_analytics(class_id: str, teacher_uid: str) -> dict:
+    """
+    Aggregate analytics across ALL exams for a class.
+    Returns chronological trend, per-exam summary matrix,
+    and comparative metrics (highest failure rate, highest std).
+    """
+    from datetime import datetime, timezone
+
+    # Verify class belongs to teacher
+    cls_doc = _db().collection("classes").document(class_id).get()
+    if not cls_doc.exists:
+        return {"error": "הכיתה לא נמצאה"}
+    cls = cls_doc.to_dict()
+    if cls.get("teacher_uid") != teacher_uid:
+        return {"error": "אין הרשאה"}
+
+    # Get all class exams
+    exams_docs = _db().collection("class_exams").where(
+        filter=firestore.FieldFilter("class_id", "==", class_id)
+    ).stream()
+    exams = [d.to_dict() for d in exams_docs if d.to_dict().get("teacher_uid") == teacher_uid]
+    exams = sorted(exams, key=lambda x: x.get("created_at", ""))
+
+    if not exams:
+        return {
+            "class": {"id": class_id, "name": cls.get("name", "")},
+            "exams_summary": [],
+            "trend": [],
+            "comparative": None,
+        }
+
+    exams_summary = []
+    trend = []
+
+    for exam in exams:
+        exam_id = exam.get("id")
+        questions = exam.get("questions", [])
+        total_q = len(questions)
+        if total_q == 0:
+            continue
+
+        # Fetch submissions (summary only — no full text)
+        subs_docs = _db().collection("class_results").document(exam_id).collection("submissions").stream()
+        subs = [d.to_dict() for d in subs_docs]
+
+        graded = [s for s in subs if s.get("score") is not None]
+        if not graded:
+            exams_summary.append({
+                "exam_id": exam_id,
+                "title": exam.get("title", ""),
+                "created_at": exam.get("created_at", ""),
+                "total_submissions": len(subs),
+                "graded_count": 0,
+                "avg_pct": None,
+                "median_pct": None,
+                "std_pct": None,
+                "failure_rate": None,
+                "min_pct": None,
+                "max_pct": None,
+            })
+            continue
+
+        pcts = [round((s["score"] / total_q) * 100) for s in graded]
+        avg = round(statistics.mean(pcts), 1)
+        med = round(statistics.median(pcts), 1)
+        std = round(statistics.stdev(pcts), 1) if len(pcts) > 1 else 0
+        fail_rate = round(sum(1 for p in pcts if p < 50) / len(pcts) * 100, 1)
+
+        exams_summary.append({
+            "exam_id": exam_id,
+            "title": exam.get("title", ""),
+            "created_at": exam.get("created_at", ""),
+            "total_submissions": len(subs),
+            "graded_count": len(graded),
+            "avg_pct": avg,
+            "median_pct": med,
+            "std_pct": std,
+            "failure_rate": fail_rate,
+            "min_pct": min(pcts),
+            "max_pct": max(pcts),
+        })
+
+        # Trend point
+        trend.append({
+            "exam_title": exam.get("title", "")[:20],
+            "date": exam.get("created_at", "")[:10],
+            "avg": avg,
+            "submissions": len(graded),
+        })
+
+    # Comparative metrics
+    graded_exams = [e for e in exams_summary if e["avg_pct"] is not None]
+    comparative = None
+    if graded_exams:
+        highest_fail = max(graded_exams, key=lambda x: x["failure_rate"] or 0)
+        highest_std  = max(graded_exams, key=lambda x: x["std_pct"] or 0)
+        best_avg     = max(graded_exams, key=lambda x: x["avg_pct"] if x["avg_pct"] is not None else 0)
+        worst_avg    = min(graded_exams, key=lambda x: x["avg_pct"] if x["avg_pct"] is not None else 100)
+        comparative = {
+            "highest_failure_exam": {"title": highest_fail["title"], "rate": highest_fail["failure_rate"]},
+            "highest_std_exam":     {"title": highest_std["title"],  "std":  highest_std["std_pct"]},
+            "best_exam":            {"title": best_avg["title"],     "avg":  best_avg["avg_pct"]},
+            "worst_exam":           {"title": worst_avg["title"],    "avg":  worst_avg["avg_pct"]},
+        }
+
+    return {
+        "class": {"id": class_id, "name": cls.get("name", "")},
+        "exams_summary": exams_summary,
+        "trend": trend,
+        "comparative": comparative,
+    }
