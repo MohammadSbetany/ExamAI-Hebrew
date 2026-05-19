@@ -3,7 +3,14 @@ from pydantic import BaseModel
 from flashcards import generate_flashcards
 import os
 import logging
-from analytics import share_exam, list_shared_exams, submit_student_result, compute_analytics
+from analytics import (
+    share_exam,
+    list_shared_exams,
+    submit_student_result,
+    compute_analytics,
+    compute_class_analytics,
+    compute_class_exam_analytics,
+)
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
@@ -631,6 +638,24 @@ async def get_analytics(exam_id: str, user=Depends(verify_token)):
     result = compute_analytics(exam_id, user.get("uid"))
     if "error" in result:
         raise HTTPException(status_code=403, detail=result["error"])
+    return result
+
+
+@app.get("/teacher/analytics/class/{class_id}")
+async def get_class_analytics(class_id: str, user=Depends(verify_token)):
+    result = compute_class_analytics(class_id, user.get("uid"))
+    if "error" in result:
+        status_code = 404 if result["error"] == "הכיתה לא נמצאה" else 403
+        raise HTTPException(status_code=status_code, detail=result["error"])
+    return result
+
+
+@app.get("/teacher/analytics/class-exam/{exam_id}")
+async def get_class_exam_analytics(exam_id: str, user=Depends(verify_token)):
+    result = compute_class_exam_analytics(exam_id, user.get("uid"))
+    if "error" in result:
+        status_code = 404 if result["error"] == "בחינה לא נמצאה" else 403
+        raise HTTPException(status_code=status_code, detail=result["error"])
     return result
 
 
