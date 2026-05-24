@@ -1,4 +1,4 @@
-from exams_db import save_exam, list_exams, get_exam, delete_exam
+from exams_db import save_exam, list_exams, get_exam, delete_exam, update_exam
 from pydantic import BaseModel
 from flashcards import generate_flashcards
 import os
@@ -565,6 +565,23 @@ class SaveExamBody(BaseModel):
     questions: list
     answers: list = []
     grade_result: dict | None = None
+
+
+@app.patch("/exams/{exam_id}")
+async def update_exam_endpoint(exam_id: str, data: dict, user=Depends(verify_token)):
+    answers = data.get("answers")
+    grade_result = data.get("grade_result")  # None if not provided — never default to {}
+    if answers is None:
+        raise HTTPException(status_code=422, detail="answers שדה חובה")
+    result = update_exam(
+        uid=user.get("uid"),
+        exam_id=exam_id,
+        answers=answers,
+        grade_result=grade_result if grade_result else None,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="בחינה לא נמצאה")
+    return {"ok": True}
 
 
 @app.post("/exams/save")

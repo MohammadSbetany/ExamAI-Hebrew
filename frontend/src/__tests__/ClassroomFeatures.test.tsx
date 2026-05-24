@@ -83,7 +83,7 @@ describe('gradeLocally — edge cases', () => {
 
 describe('Question TypeScript types', () => {
   it('Question interface has required fields', async () => {
-    const { } = await import('@/types/questions');
+    await import('@/types/questions');
     const q = { question: 'מה?', answer: 'תשובה' };
     expect(q.question).toBeDefined();
     expect(q.answer).toBeDefined();
@@ -278,8 +278,8 @@ describe('Settings — tabs and structure', () => {
     await waitFor(() => screen.getByText('מראה'));
     fireEvent.click(screen.getByText('מראה'));
     await waitFor(() => {
-      expect(screen.getByText(/בהיר/)).toBeInTheDocument();
-      expect(screen.getByText(/כהה/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /בהיר/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /כהה/ })).toBeInTheDocument();
     });
   });
 
@@ -289,7 +289,8 @@ describe('Settings — tabs and structure', () => {
     await waitFor(() => screen.getByText('מראה'));
     fireEvent.click(screen.getByText('מראה'));
     await waitFor(() => {
-      expect(screen.queryByText(/מערכת/)).toBeNull();
+      const systemButtons = screen.queryAllByRole('button', { name: /💻|מערכת/ });
+      expect(systemButtons).toHaveLength(0);
     });
   });
 });
@@ -337,7 +338,7 @@ describe('ExportMenu component', () => {
     const mockQuestions = [{ question: 'מה?', answer: 'תשובה' }];
     render(
       <MemoryRouter>
-        <ExportMenu questions={mockQuestions} gradeResult={null} questionType="open" />
+        <ExportMenu questions={mockQuestions} gradeResult={null} variant="blank" />
       </MemoryRouter>
     );
     expect(screen.getByText(/ייצוא/i)).toBeInTheDocument();

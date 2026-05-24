@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { listExams, deleteExam, saveExam, type ExamRecord } from '@/lib/examsApi';
+import { listExams, deleteExam, saveExam, updateExam, type ExamRecord } from '@/lib/examsApi';
 import { gradeLocally } from '@/utils/gradingUtils';
 import { exportBlankPdf, exportGradedPdf, exportBlankDocx, exportGradedDocx } from '@/lib/exportUtils';
 import type { Question, GradeResult } from '@/types/questions';
@@ -185,14 +185,8 @@ const ExportDropdown = ({ label, variant, onExport, loading }: ExportDropdownPro
     if (!user?.token) return;
     setIsSaving(true);
     try {
-      await saveExam(user.token, {
-        title: exam.title,
-        exam_type: exam.exam_type,
-        question_type: exam.question_type,
-        questions,
-        answers,
-        grade_result: result,
-      });
+      // Always update the existing record — exam.id is always present from ExamRecord
+      await updateExam(user.token, exam.id, answers, result);
       onGraded({ ...exam, answers, grade_result: result, score: result.score });
     } finally {
       setIsSaving(false);
