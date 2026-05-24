@@ -201,10 +201,10 @@ def join_class_by_code(code: str, student_uid: str, student_name: str, student_e
 # ── Class Exams ───────────────────────────────────────────────────────────────
 
 _FORBIDDEN_PATTERNS = [
-    "disregard", "override", "bypass", "pretend",
+    "ignore", "forget", "disregard", "override", "bypass", "pretend",
     "act as", "you are now", "new instruction", "system prompt",
-    "עקוף", "אתה עכשיו", "הוראה חדשה",
-    "jailbreak", "developer mode", "sudo",
+    "התעלם", "שכח", "עקוף", "תהיה", "אתה עכשיו", "הוראה חדשה",
+    "jailbreak", "dan", "developer mode", "sudo",
 ]
 
 def _validate_comment(comment: str) -> tuple[bool, str]:
