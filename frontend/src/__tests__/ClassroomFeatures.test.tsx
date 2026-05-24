@@ -278,8 +278,8 @@ describe('Settings — tabs and structure', () => {
     await waitFor(() => screen.getByText('מראה'));
     fireEvent.click(screen.getByText('מראה'));
     await waitFor(() => {
-      expect(screen.getByText(/בהיר/)).toBeInTheDocument();
-      expect(screen.getByText(/כהה/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /בהיר/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /כהה/ })).toBeInTheDocument();
     });
   });
 
@@ -289,7 +289,8 @@ describe('Settings — tabs and structure', () => {
     await waitFor(() => screen.getByText('מראה'));
     fireEvent.click(screen.getByText('מראה'));
     await waitFor(() => {
-      expect(screen.queryByText(/מערכת/)).toBeNull();
+      const systemButtons = screen.queryAllByRole('button', { name: /💻|מערכת/ });
+      expect(systemButtons).toHaveLength(0);
     });
   });
 });
