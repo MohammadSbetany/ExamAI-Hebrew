@@ -29,6 +29,26 @@ def _col(uid: str):
     return _get_db().collection("exams").document(uid).collection("records")
 
 
+def update_exam(
+    uid: str,
+    exam_id: str,
+    answers: list,
+    grade_result: dict,
+) -> dict | None:
+    ref = _col(uid).document(exam_id)
+    if not ref.get().exists:
+        return None
+    now = datetime.now(timezone.utc).isoformat()
+    updates = {
+        "answers": answers,
+        "grade_result": grade_result,
+        "score": grade_result.get("score"),
+        "graded_at": now,
+    }
+    ref.update(updates)
+    return updates
+
+
 def save_exam(
     uid: str,
     title: str,

@@ -59,3 +59,17 @@ export const deleteExam = async (token: string, examId: string): Promise<void> =
   });
   if (!r.ok) throw new Error('שגיאה במחיקת הבחינה');
 };
+
+export const updateExam = async (
+  token: string,
+  examId: string,
+  answers: string[],
+  gradeResult: GradeResult,
+): Promise<void> => {
+  const r = await fetch(`${API()}/exams/${examId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ answers, grade_result: gradeResult }),
+  });
+  if (!r.ok) throw new Error('שגיאה בשמירת הציון');
+};
