@@ -185,19 +185,8 @@ const ExportDropdown = ({ label, variant, onExport, loading }: ExportDropdownPro
     if (!user?.token) return;
     setIsSaving(true);
     try {
-      if (exam.id) {
-        // Update existing record — never create a duplicate
-        await updateExam(user.token, exam.id, answers, result);
-      } else {
-        await saveExam(user.token, {
-          title: exam.title,
-          exam_type: exam.exam_type,
-          question_type: exam.question_type,
-          questions,
-          answers,
-          grade_result: result,
-        });
-      }
+      // Always update the existing record — exam.id is always present from ExamRecord
+      await updateExam(user.token, exam.id, answers, result);
       onGraded({ ...exam, answers, grade_result: result, score: result.score });
     } finally {
       setIsSaving(false);

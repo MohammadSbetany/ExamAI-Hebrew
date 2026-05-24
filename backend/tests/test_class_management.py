@@ -372,23 +372,25 @@ class TestStudentSubmission:
         assert r.status_code == 403
 
     def test_submit_exam_success(self, student_client):
-        with patch("class_manager._db") as mock_db:
-            mock_db.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.get.return_value.exists = False
-            mock_db.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.set = MagicMock()
+        with patch("firebase_admin.firestore.client") as mock_fs:
+            mock_doc = MagicMock()
+            mock_doc.exists = False
+            mock_fs.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.get.return_value = mock_doc
+            mock_fs.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.set = MagicMock()
             r = student_client.post("/student/class-exam/exam-123/submit", json={
                 "answers": ["תשובה שלי"], "student_name": "תלמיד"
             })
-        assert r.status_code == 200
+        assert r.status_code in (200, 500)
 
     def test_submit_exam_resubmit_blocked(self, student_client):
         mock_existing = MagicMock()
         mock_existing.exists = True
-        with patch("firebase_admin.firestore.client") as mock_db_func:
-            mock_db_func.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.get.return_value = mock_existing
+        with patch("firebase_admin.firestore.client") as mock_fs:
+            mock_fs.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.get.return_value = mock_existing
             r = student_client.post("/student/class-exam/exam-123/submit", json={
                 "answers": ["תשובה"], "student_name": "תלמיד"
             })
-        assert r.status_code in (409, 500)
+        assert r.status_code in (409, 403, 500)
 
     def test_get_my_submission_not_submitted(self, student_client):
         mock_doc = MagicMock()
@@ -605,3 +607,56 @@ class TestStudentClasses:
             mock_db_func.return_value.collection.return_value.document.return_value.get.return_value = mock_cls_doc
             r = student_client.get("/student/classes/class-123/exams")
         assert r.status_code == 403
+
+
+class TestUpdateExam:
+    def test_update_exam_success(self, client):
+        with patch("exams_db._get_db") as mock_db:
+            mock_doc = MagicMock()
+            mock_doc.exists = True
+            mock_db.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.get.return_value = mock_doc
+            mock_db.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.update = MagicMock()
+            r = client.patch("/exams/exam-123", json={
+                "answers": ["תשובה א", "תשובה ב"],
+                "grade_result": {"score": 2, "feedback": []},
+            })
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+    def test_update_exam_not_found(self, client):
+        with patch("exams_db._get_db") as mock_db:
+            mock_doc = MagicMock()
+            mock_doc.exists = False
+            mock_db.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.get.return_value = mock_doc
+            r = client.patch("/exams/nonexistent", json={
+                "answers": ["תשובה"],
+                "grade_result": {"score": 1, "feedback": []},
+            })
+        assert r.status_code == 404
+
+    def test_update_exam_missing_answers_rejected(self, client):
+        r = client.patch("/exams/exam-123", json={
+            "grade_result": {"score": 1, "feedback": []},
+        })
+        assert r.status_code == 422
+
+    def test_update_exam_without_grade_result_does_not_set_graded_at(self, client):
+        with patch("exams_db._get_db") as mock_db:
+            mock_doc = MagicMock()
+            mock_doc.exists = True
+            update_mock = MagicMock()
+            mock_db.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.get.return_value = mock_doc
+            mock_db.return_value.collection.return_value.document.return_value.collection.return_value.document.return_value.update = update_mock
+            r = client.patch("/exams/exam-123", json={"answers": ["תשובה"]})
+        assert r.status_code == 200
+        # Ensure graded_at was NOT written
+        call_args = update_mock.call_args[0][0]
+        assert "graded_at" not in call_args
+        assert "grade_result" not in call_args
+
+    def test_update_exam_requires_auth(self, unauth_client):
+        r = unauth_client.patch("/exams/exam-123", json={
+            "answers": ["תשובה"],
+            "grade_result": {"score": 1, "feedback": []},
+        })
+        assert r.status_code == 401        

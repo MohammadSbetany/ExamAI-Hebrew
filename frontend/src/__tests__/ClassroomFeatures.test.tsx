@@ -83,7 +83,7 @@ describe('gradeLocally — edge cases', () => {
 
 describe('Question TypeScript types', () => {
   it('Question interface has required fields', async () => {
-    const { } = await import('@/types/questions');
+    await import('@/types/questions');
     const q = { question: 'מה?', answer: 'תשובה' };
     expect(q.question).toBeDefined();
     expect(q.answer).toBeDefined();
@@ -337,7 +337,7 @@ describe('ExportMenu component', () => {
     const mockQuestions = [{ question: 'מה?', answer: 'תשובה' }];
     render(
       <MemoryRouter>
-        <ExportMenu questions={mockQuestions} gradeResult={null} questionType="open" />
+        <ExportMenu questions={mockQuestions} gradeResult={null} variant="blank" />
       </MemoryRouter>
     );
     expect(screen.getByText(/ייצוא/i)).toBeInTheDocument();

@@ -68,7 +68,7 @@ export const updateExam = async (
 ): Promise<void> => {
   const r = await fetch(`${API()}/exams/${examId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify({ answers, grade_result: gradeResult }),
   });
   if (!r.ok) throw new Error('שגיאה בשמירת הציון');

@@ -33,18 +33,17 @@ def update_exam(
     uid: str,
     exam_id: str,
     answers: list,
-    grade_result: dict,
+    grade_result: dict | None,
 ) -> dict | None:
     ref = _col(uid).document(exam_id)
     if not ref.get().exists:
         return None
     now = datetime.now(timezone.utc).isoformat()
-    updates = {
-        "answers": answers,
-        "grade_result": grade_result,
-        "score": grade_result.get("score"),
-        "graded_at": now,
-    }
+    updates: dict = {"answers": answers}
+    if grade_result:
+        updates["grade_result"] = grade_result
+        updates["score"] = grade_result.get("score")
+        updates["graded_at"] = now
     ref.update(updates)
     return updates
 

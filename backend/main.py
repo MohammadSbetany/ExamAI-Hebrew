@@ -569,11 +569,15 @@ class SaveExamBody(BaseModel):
 
 @app.patch("/exams/{exam_id}")
 async def update_exam_endpoint(exam_id: str, data: dict, user=Depends(verify_token)):
+    answers = data.get("answers")
+    grade_result = data.get("grade_result")  # None if not provided — never default to {}
+    if answers is None:
+        raise HTTPException(status_code=422, detail="answers שדה חובה")
     result = update_exam(
         uid=user.get("uid"),
         exam_id=exam_id,
-        answers=data.get("answers", []),
-        grade_result=data.get("grade_result", {}),
+        answers=answers,
+        grade_result=grade_result if grade_result else None,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="בחינה לא נמצאה")
