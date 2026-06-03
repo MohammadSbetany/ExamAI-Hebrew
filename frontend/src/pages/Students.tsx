@@ -489,7 +489,8 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
 
   const saveQuestions = async (exam: ClassExam, questions: Question[]) => {
     await fetch(`${API()}/class-exams/${exam.id}/questions`, {
-      method: 'PATCH', headers: jsonH(token), body: JSON.stringify({ questions }),
+      method: 'PATCH', headers: jsonH(token),
+      body: JSON.stringify({ questions, question_type: exam.question_type }),
     });
     setExams(prev => prev.map(e => e.id === exam.id ? { ...e, questions } : e));
     setEditExam(null);
