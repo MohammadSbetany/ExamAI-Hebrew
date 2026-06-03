@@ -320,12 +320,25 @@ def update_exam_questions(teacher_uid: str, exam_id: str, questions: list, quest
     if not exam or exam["teacher_uid"] != teacher_uid:
         raise PermissionError("אין הרשאה")
     num_variants = max(1, min(int(exam.get("num_variants", 1)), 10))
+
+    # Rebuild all variant shuffles from the new question list
     variants = {}
     for vi in range(num_variants):
         shuffled = questions.copy()
         random.shuffle(shuffled)
         variants[str(vi)] = shuffled
-    update_data = {"questions": questions, "variants": variants}
+
+    # Rebuild assignments so students are spread across variants evenly
+    # (important when questions are added after exam creation with num_variants > 1)
+    cls_doc = _db().collection("classes").document(exam.get("class_id", "")).get()
+    students = cls_doc.to_dict().get("students", []) if cls_doc.exists else []
+    assignments = {s["uid"]: i % num_variants for i, s in enumerate(students)}
+
+    update_data = {
+        "questions": questions,
+        "variants": variants,
+        "assignments": assignments,
+    }
     if question_type:
         update_data["question_type"] = question_type
     _db().collection("class_exams").document(exam_id).update(update_data)
