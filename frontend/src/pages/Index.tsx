@@ -410,7 +410,7 @@ const Index = () => {
 
           {/* Question Count */}
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 mb-3">
               <p className="text-sm font-medium text-foreground">מספר השאלות</p>
               <input
                 type="number"

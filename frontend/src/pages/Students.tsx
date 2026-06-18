@@ -15,11 +15,22 @@ interface Student { uid: string; name: string; email: string; joined_at: string;
 interface ClassItem { id: string; name: string; code: string; students: Student[]; created_at: string; teacher_uid?: string; }
 interface ClassExam {
   id: string; title: string; questions: Question[]; num_variants: number;
+  variants?: Record<string, Question[]>;
   assignments: Record<string, number>; open_at: string | null; close_at: string | null;
   visible: boolean; created_at: string; question_type: string;
 }
+
+// Distinct question set per form/variant, ordered "0".."n-1".
+const examForms = (exam: ClassExam): Question[][] => {
+  const v = exam.variants;
+  if (v && Object.keys(v).length > 0) {
+    return Object.keys(v).sort((a, b) => Number(a) - Number(b)).map(k => v[k] ?? []);
+  }
+  return [exam.questions ?? []];
+};
+
 interface Submission {
-  student_uid: string; student_name: string; answers: string[];
+  student_uid: string; student_name: string; answers: string[]; variant_idx?: number;
   grade_result: { score: number; feedback: { question: string; points: number; correct: boolean; explanation: string; covered_points: string[]; missed_points: string[]; override_note?: string }[] } | null;
   graded_by: string | null; score: number | null; submitted_at: string;
   grade_overrides: Record<string, { points: number; note: string }>;
@@ -80,35 +91,60 @@ const ClassCard = ({ cls, onSelect, onDelete }: { cls: ClassItem; onSelect: () =
   </div>
 );
 
-// ── Question Editor ───────────────────────────────────────────────────────────
+// ── Forms Editor (distinct questions per form/variant) ────────────────────────
 
-const QuestionEditor = ({ questions, onSave, onClose }: {
-  questions: Question[]; onSave: (qs: Question[]) => void; onClose: () => void;
+const FormsEditor = ({ initialForms, title, onSave, onClose, saving }: {
+  initialForms: Question[][]; title: string;
+  onSave: (forms: Question[][]) => void; onClose: () => void; saving?: boolean;
 }) => {
-  const [qs, setQs] = useState<Question[]>(questions.map(q => ({ ...q })));
-  const [newQ, setNewQ] = useState({ question: '', answer: '', type: 'open' });
+  const [forms, setForms] = useState<Question[][]>(() => initialForms.map(f => f.map(q => ({ ...q }))));
+  const [active, setActive] = useState(0);
+  const [newQ, setNewQ] = useState({ question: '', answer: '' });
 
-  const deleteQ = (i: number) => setQs(prev => prev.filter((_, j) => j !== i));
+  const mutateActive = (fn: (qs: Question[]) => Question[]) =>
+    setForms(prev => prev.map((f, i) => (i === active ? fn(f) : f)));
+  const updateQ = (qi: number, patch: Partial<Question>) =>
+    mutateActive(qs => qs.map((q, j) => (j === qi ? { ...q, ...patch } : q)));
+  const deleteQ = (qi: number) => mutateActive(qs => qs.filter((_, j) => j !== qi));
   const addQ = () => {
     if (!newQ.question.trim() || !newQ.answer.trim()) return;
-    setQs(prev => [...prev, { question: newQ.question, answer: newQ.answer } as Question]);
-    setNewQ({ question: '', answer: '', type: 'open' });
+    mutateActive(qs => [...qs, { question: newQ.question, answer: newQ.answer } as Question]);
+    setNewQ({ question: '', answer: '' });
   };
+
+  const activeForm = forms[active] ?? [];
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl my-8" onClick={e => e.stopPropagation()} dir="rtl">
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <h2 className="text-lg font-bold text-foreground">עריכת שאלות</h2>
+          <h2 className="text-lg font-bold text-foreground">{title}</h2>
           <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground"><Icon path="M18 6 6 18M6 6l12 12" /></button>
         </div>
-        <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
-          {qs.map((q, i) => (
+
+        {/* Form tabs */}
+        {forms.length > 1 && (
+          <div className="flex gap-2 px-5 pt-4 flex-wrap">
+            {forms.map((f, i) => (
+              <button key={i} onClick={() => setActive(i)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${active === i ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
+                טופס {i + 1} ({f.length})
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Questions of the active form */}
+        <div className="p-5 space-y-3 max-h-[55vh] overflow-y-auto">
+          {activeForm.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">אין שאלות בטופס זה</p>}
+          {activeForm.map((q, i) => (
             <div key={i} className="flex items-start gap-3 p-3 bg-muted/40 rounded-xl border border-border">
               <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">{q.question}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">תשובה: {q.answer}</p>
+              <div className="flex-1 min-w-0 space-y-2">
+                <textarea value={q.question} onChange={e => updateQ(i, { question: e.target.value })} rows={2}
+                  className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                <input value={q.answer} onChange={e => updateQ(i, { answer: e.target.value })} placeholder="תשובה נכונה"
+                  className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" />
               </div>
               <button onClick={() => deleteQ(i)} className="text-destructive hover:text-destructive/80 flex-shrink-0">
                 <Icon path="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
@@ -116,9 +152,10 @@ const QuestionEditor = ({ questions, onSave, onClose }: {
             </div>
           ))}
         </div>
-        {/* Add new question */}
+
+        {/* Add new question to the active form */}
         <div className="p-5 border-t border-border space-y-3">
-          <p className="text-sm font-semibold text-foreground">הוסף שאלה חדשה</p>
+          <p className="text-sm font-semibold text-foreground">הוסף שאלה {forms.length > 1 ? `לטופס ${active + 1}` : ''}</p>
           <textarea value={newQ.question} onChange={e => setNewQ(p => ({ ...p, question: e.target.value }))}
             placeholder="טקסט השאלה" rows={2}
             className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
@@ -127,8 +164,12 @@ const QuestionEditor = ({ questions, onSave, onClose }: {
             className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
           <button onClick={addQ} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90">+ הוסף שאלה</button>
         </div>
+
         <div className="flex gap-3 px-5 pb-5">
-          <button onClick={() => onSave(qs)} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90">שמור שינויים</button>
+          <button onClick={() => onSave(forms)} disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
+            {saving ? <><Spinner /> שומר...</> : 'שמור שינויים'}
+          </button>
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
         </div>
       </div>
@@ -187,9 +228,11 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
   const [openOverrideIdx, setOpenOverrideIdx] = useState<number | null>(null);
 
   const isLocalGradable = exam.question_type === 'yesno' || exam.question_type === 'multiple';
+  // Grade/display against the exact form (variant) the student received.
+  const variantQs = examForms(exam)[submission.variant_idx ?? 0] ?? exam.questions;
 
   const gradeLocally = () => {
-    const feedback = exam.questions.map((q, i) => {
+    const feedback = variantQs.map((q, i) => {
       const answer = submission.answers[i] || '';
       const correct = answer.trim().toLowerCase() === q.answer.trim().toLowerCase();
       return { question: q.question, points: correct ? 1 : 0, correct, explanation: correct ? 'תשובה נכונה' : `תשובה שגויה. התשובה הנכונה: ${q.answer}`, covered_points: [], missed_points: [] };
@@ -217,7 +260,7 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
 
   const fb = submission.grade_result?.feedback ?? [];
   const score = submission.grade_result?.score;
-  const total = exam.questions.length;
+  const total = variantQs.length;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
@@ -247,7 +290,7 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
         )}
 
         <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
-          {exam.questions.map((q, qi) => {
+          {variantQs.map((q, qi) => {
             const f = fb[qi];
             const answer = submission.answers[qi] || '';
             const override = submission.grade_overrides?.[String(qi)];
@@ -304,7 +347,9 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
   const [difficulty, setDifficulty] = useState('medium');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generated, setGenerated] = useState<Question[]>([]);
+  const [forms, setForms] = useState<Question[][]>([]);     // one distinct question set per form
+  const [progress, setProgress] = useState<string | null>(null);
+  const numForms = Math.max(1, exam.num_variants || 1);
   // Mixed-mode distributions as counts that sum to questionCount
   const [typeCounts, setTypeCounts] = useState<number[]>([1, 3, 1]);   // yesno, multiple, open
   const [levelCounts, setLevelCounts] = useState<number[]>([1, 3, 1]); // easy, medium, hard
@@ -314,61 +359,82 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
     setLevelCounts(prev => rescaleCounts(prev, questionCount));
   }, [questionCount]);
 
+  const buildFormData = () => {
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+    formData.append('question_type', questionType);
+    formData.append('question_count', String(questionCount));
+    formData.append('difficulty', difficulty);
+    if (questionType === 'merged') {
+      formData.append('format_counts', JSON.stringify({
+        yesno: typeCounts[0], multiple: typeCounts[1], open: typeCounts[2],
+      }));
+    }
+    if (difficulty === 'merged') {
+      const t = Math.max(1, questionCount);
+      formData.append('difficulty_dist', JSON.stringify({
+        easy: Math.round((levelCounts[0] / t) * 100),
+        medium: Math.round((levelCounts[1] / t) * 100),
+        hard: Math.round((levelCounts[2] / t) * 100),
+      }));
+    }
+    return formData;
+  };
+
+  // Generate one distinct question set per form (the AI returns fresh questions each call).
   const handleGenerate = async () => {
     if (files.length === 0) return;
     setIsLoading(true);
     setError(null);
     try {
-      const formData = new FormData();
-      files.forEach(f => formData.append('files', f));
-      formData.append('question_type', questionType);
-      formData.append('question_count', String(questionCount));
-      formData.append('difficulty', difficulty);
-      if (questionType === 'merged') {
-        formData.append('format_counts', JSON.stringify({
-          yesno: typeCounts[0], multiple: typeCounts[1], open: typeCounts[2],
-        }));
+      const results: Question[][] = [];
+      for (let i = 0; i < numForms; i++) {
+        if (numForms > 1) setProgress(`יוצר טופס ${i + 1}/${numForms}...`);
+        const r = await fetch(`${API()}/upload`, { method: 'POST', headers: authH(token), body: buildFormData() });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.detail || 'שגיאה ביצירת השאלות');
+        }
+        const data = await r.json();
+        results.push(data.questions ?? []);
       }
-      if (difficulty === 'merged') {
-        const t = Math.max(1, questionCount);
-        formData.append('difficulty_dist', JSON.stringify({
-          easy: Math.round((levelCounts[0] / t) * 100),
-          medium: Math.round((levelCounts[1] / t) * 100),
-          hard: Math.round((levelCounts[2] / t) * 100),
-        }));
-      }
-      const r = await fetch(`${API()}/upload`, {
-        method: 'POST',
-        headers: authH(token),
-        body: formData,
-      });
-      if (!r.ok) {
-        const err = await r.json();
-        throw new Error(err.detail || 'שגיאה ביצירת השאלות');
-      }
-      const data = await r.json();
-      setGenerated(data.questions ?? []);
+      setForms(results);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה');
+    } finally {
+      setIsLoading(false);
+      setProgress(null);
+    }
+  };
+
+  const saveForms = async (edited: Question[][]) => {
+    setIsLoading(true);
+    try {
+      const variants: Record<string, Question[]> = {};
+      edited.forEach((f, i) => { variants[String(i)] = f; });
+      await fetch(`${API()}/class-exams/${exam.id}/variants`, {
+        method: 'PATCH',
+        headers: jsonH(token),
+        body: JSON.stringify({ variants, question_type: questionType }),
+      });
+      onDone({ ...exam, variants, questions: edited[0] ?? [], num_variants: edited.length, question_type: questionType });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSave = async () => {
-    if (generated.length === 0) return;
-    setIsLoading(true);
-    try {
-      await fetch(`${API()}/class-exams/${exam.id}/questions`, {
-        method: 'PATCH',
-        headers: jsonH(token),
-        body: JSON.stringify({ questions: generated, question_type: questionType }),
-      });
-      onDone({ ...exam, questions: generated, question_type: questionType });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // After generating, review/edit the forms before saving.
+  if (forms.length > 0) {
+    return (
+      <FormsEditor
+        initialForms={forms}
+        title={`טפסים שנוצרו — ${exam.title}`}
+        saving={isLoading}
+        onSave={saveForms}
+        onClose={() => setForms([])}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
@@ -376,7 +442,9 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
             <h2 className="text-lg font-bold text-foreground">יצירת שאלות — {exam.title}</h2>
-            <p className="text-xs text-muted-foreground">העלה חומר לימוד וה-AI ייצור שאלות לבחינה</p>
+            <p className="text-xs text-muted-foreground">
+              {numForms > 1 ? `ה-AI ייצור ${numForms} טפסים שונים מאותו חומר` : 'העלה חומר לימוד וה-AI ייצור שאלות לבחינה'}
+            </p>
           </div>
           <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground">
             <Icon path="M18 6 6 18M6 6l12 12" />
@@ -422,9 +490,18 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
           {/* Count + difficulty — on separate lines */}
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-medium text-foreground mb-2">מספר שאלות: {questionCount}</p>
+              <div className="flex items-center gap-2 mb-2">
+                <p className="text-sm font-medium text-foreground">מספר שאלות</p>
+                <input
+                  type="number" min={1} max={100} value={questionCount}
+                  onChange={e => setQuestionCount(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                  disabled={isLoading}
+                  className="w-16 px-2 py-1 rounded-lg border border-input bg-background text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
               <input type="range" min={1} max={100} value={questionCount}
                 onChange={e => setQuestionCount(Number(e.target.value))}
+                disabled={isLoading}
                 className="w-full accent-primary" />
             </div>
             <div>
@@ -459,38 +536,13 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
           )}
 
           {error && <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-xl">{error}</p>}
-
-          {/* Generated questions preview */}
-          {generated.length > 0 && (
-            <div className="bg-muted/40 rounded-xl p-4 space-y-2 max-h-48 overflow-y-auto">
-              <p className="text-xs font-semibold text-foreground">{generated.length} שאלות נוצרו — תצוגה מקדימה:</p>
-              {generated.map((q, i) => (
-                <div key={i} className="text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">{i + 1}.</span> {q.question}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="flex gap-3 p-5 border-t border-border">
-          {generated.length === 0 ? (
-            <button onClick={handleGenerate} disabled={files.length === 0 || isLoading}
-              className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
-              {isLoading ? <><Spinner /> יוצר שאלות...</> : '✨ צור שאלות'}
-            </button>
-          ) : (
-            <>
-              <button onClick={handleSave} disabled={isLoading}
-                className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
-                {isLoading ? <><Spinner /> שומר...</> : 'שמור שאלות לבחינה'}
-              </button>
-              <button onClick={() => setGenerated([])}
-                className="px-4 py-3 rounded-xl border border-border text-sm hover:bg-muted">
-                נסה שוב
-              </button>
-            </>
-          )}
+          <button onClick={handleGenerate} disabled={files.length === 0 || isLoading}
+            className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
+            {isLoading ? <><Spinner /> {progress ?? 'יוצר שאלות...'}</> : (numForms > 1 ? `✨ צור ${numForms} טפסים` : '✨ צור שאלות')}
+          </button>
           <button onClick={onClose} className="px-4 py-3 rounded-xl border border-border text-sm hover:bg-muted">
             ביטול
           </button>
@@ -585,13 +637,23 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
     setGeneratingExam(exam); // open AI generation flow
   };
 
-  const saveQuestions = async (exam: ClassExam, questions: Question[]) => {
-    await fetch(`${API()}/class-exams/${exam.id}/questions`, {
-      method: 'PATCH', headers: jsonH(token),
-      body: JSON.stringify({ questions, question_type: exam.question_type }),
-    });
-    setExams(prev => prev.map(e => e.id === exam.id ? { ...e, questions } : e));
-    setEditExam(null);
+  const [savingForms, setSavingForms] = useState(false);
+  const saveExamForms = async (exam: ClassExam, forms: Question[][]) => {
+    setSavingForms(true);
+    try {
+      const variants: Record<string, Question[]> = {};
+      forms.forEach((f, i) => { variants[String(i)] = f; });
+      await fetch(`${API()}/class-exams/${exam.id}/variants`, {
+        method: 'PATCH', headers: jsonH(token),
+        body: JSON.stringify({ variants, question_type: exam.question_type }),
+      });
+      setExams(prev => prev.map(e => e.id === exam.id
+        ? { ...e, variants, questions: forms[0] ?? [], num_variants: forms.length }
+        : e));
+      setEditExam(null);
+    } finally {
+      setSavingForms(false);
+    }
   };
 
   const toggleVisibility = async (exam: ClassExam) => {
@@ -649,7 +711,15 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
   return (
     <div className="space-y-6" dir="rtl">
       {confirm && <Confirm msg={confirm.msg} onOk={() => { confirm.action(); setConfirm(null); }} onCancel={() => setConfirm(null)} />}
-      {editExam && <QuestionEditor questions={editExam.questions} onSave={qs => saveQuestions(editExam, qs)} onClose={() => setEditExam(null)} />}
+      {editExam && (
+        <FormsEditor
+          initialForms={examForms(editExam)}
+          title={`עריכת שאלות — ${editExam.title}`}
+          saving={savingForms}
+          onSave={forms => saveExamForms(editExam, forms)}
+          onClose={() => setEditExam(null)}
+        />
+      )}
       {generatingExam && (
         <GenerateExamFlow
           exam={generatingExam}
@@ -657,11 +727,10 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
           onDone={updated => {
             setExams(prev => prev.map(e => e.id === updated.id ? updated : e));
             setGeneratingExam(null);
-            setEditExam(updated);
           }}
           onClose={() => setGeneratingExam(null)}
         />
-      )} 
+      )}
       {gradingExam && gradingSub && (
         <GradingPanel exam={gradingExam} submission={gradingSub} token={token}
           onClose={() => { setGradingExam(null); setGradingSub(null); }}
@@ -806,13 +875,13 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
               <input value={examTitle} onChange={e => setExamTitle(e.target.value)} placeholder="שם הבחינה"
                 className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">מספר גרסאות ({numVariants})</label>
+                <label className="text-xs text-muted-foreground mb-1 block">מספר טפסים ({numVariants})</label>
                 <div className="flex items-center gap-2">
                   <input type="range" min={1} max={10} value={numVariants}                  onChange={e => setNumVariants(Number(e.target.value))} className="flex-1 accent-primary" />
                   <span className="text-sm font-bold text-foreground w-8 text-center">{numVariants}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {numVariants === 1 ? 'כולם מקבלים את אותה בחינה' : `${numVariants} גרסאות שונות מחולקות אקראית`}
+                  {numVariants === 1 ? 'כולם מקבלים את אותו טופס' : `${numVariants} טפסים שונים (שאלות שונות) מחולקים אקראית`}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -863,7 +932,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                   <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
                     <div>
                       <h3 className="font-bold text-foreground">{exam.title}</h3>
-                      <p className="text-xs text-muted-foreground">{exam.questions.length} שאלות · {exam.num_variants} גרסה/ות · נוצרה {fmt(exam.created_at)}</p>
+                      <p className="text-xs text-muted-foreground">{exam.questions.length} שאלות · {exam.num_variants} טפסים · נוצרה {fmt(exam.created_at)}</p>
                     </div>
                     <div className="flex gap-2 flex-wrap">
                       {exam.questions.length === 0 && (

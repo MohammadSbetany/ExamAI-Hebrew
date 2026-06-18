@@ -25,7 +25,7 @@ from class_manager import (
     create_class, get_teacher_classes, get_class, delete_class,
     regenerate_code, add_student_to_class, remove_student_from_class,
     join_class_by_code, create_class_exam, get_class_exams, get_class_exam,
-    update_exam_questions, update_exam_schedule, delete_class_exam,
+    update_exam_questions, set_exam_variants, update_exam_schedule, delete_class_exam,
     add_question, delete_question, get_student_exam, submit_class_exam,
     get_all_submissions, save_grade_result, override_question_grade,
 )
@@ -268,6 +268,20 @@ async def update_questions_endpoint(exam_id: str, data: dict, user=Depends(verif
             user.get("uid"),
             exam_id,
             data.get("questions", []),
+            data.get("question_type"),
+        )
+        return {"ok": True}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@app.patch("/class-exams/{exam_id}/variants")
+async def update_variants_endpoint(exam_id: str, data: dict, user=Depends(verify_token)):
+    """Store distinct questions per form/variant (used by the multi-form generator/editor)."""
+    try:
+        set_exam_variants(
+            user.get("uid"),
+            exam_id,
+            data.get("variants", {}),
             data.get("question_type"),
         )
         return {"ok": True}
