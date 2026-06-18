@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import FileUpload from '@/components/FileUpload';
+import DistributionBar from '@/components/DistributionBar';
+import { rescaleCounts } from '@/utils/distribution';
 import type { Question } from '@/types/questions';
 
 const API = () => import.meta.env.VITE_API_BASE_URL ?? '/backend';
@@ -302,6 +305,14 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generated, setGenerated] = useState<Question[]>([]);
+  // Mixed-mode distributions as counts that sum to questionCount
+  const [typeCounts, setTypeCounts] = useState<number[]>([1, 3, 1]);   // yesno, multiple, open
+  const [levelCounts, setLevelCounts] = useState<number[]>([1, 3, 1]); // easy, medium, hard
+
+  useEffect(() => {
+    setTypeCounts(prev => rescaleCounts(prev, questionCount));
+    setLevelCounts(prev => rescaleCounts(prev, questionCount));
+  }, [questionCount]);
 
   const handleGenerate = async () => {
     if (files.length === 0) return;
@@ -313,6 +324,19 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
       formData.append('question_type', questionType);
       formData.append('question_count', String(questionCount));
       formData.append('difficulty', difficulty);
+      if (questionType === 'merged') {
+        formData.append('format_counts', JSON.stringify({
+          yesno: typeCounts[0], multiple: typeCounts[1], open: typeCounts[2],
+        }));
+      }
+      if (difficulty === 'merged') {
+        const t = Math.max(1, questionCount);
+        formData.append('difficulty_dist', JSON.stringify({
+          easy: Math.round((levelCounts[0] / t) * 100),
+          medium: Math.round((levelCounts[1] / t) * 100),
+          hard: Math.round((levelCounts[2] / t) * 100),
+        }));
+      }
       const r = await fetch(`${API()}/upload`, {
         method: 'POST',
         headers: authH(token),
@@ -360,24 +384,10 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
         </div>
 
         <div className="p-5 space-y-5">
-          {/* File upload */}
+          {/* File upload (up to 5 files) */}
           <div>
-            <p className="text-sm font-medium text-foreground mb-2">העלאת קבצים</p>
-            <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${files.length > 0 ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-primary/40'}`}>
-              <input type="file" multiple accept=".pdf,.docx,.txt,.pptx,.jpg,.jpeg,.png"
-                className="hidden" onChange={e => setFiles(Array.from(e.target.files ?? []))} />
-              {files.length > 0 ? (
-                <div className="text-center">
-                  <p className="text-sm font-medium text-primary">{files.length} קבצים נבחרו</p>
-                  <p className="text-xs text-muted-foreground">{files.map(f => f.name).join(', ')}</p>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">לחץ לבחירת קבצים</p>
-                  <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, PPTX, JPG, PNG</p>
-                </div>
-              )}
-            </label>
+            <p className="text-sm font-medium text-foreground mb-2">העלאת קבצים (עד 5)</p>
+            <FileUpload selectedFiles={files} onFilesChange={setFiles} disabled={isLoading} />
           </div>
 
           {/* Question type */}
@@ -391,10 +401,26 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
                 </button>
               ))}
             </div>
+            {questionType === 'merged' && (
+              <div className="mt-3 p-3 bg-muted/40 rounded-xl border border-border">
+                <p className="text-xs font-medium text-foreground mb-2">כמה שאלות מכל סוג? (סה״כ {questionCount})</p>
+                <DistributionBar
+                  total={questionCount}
+                  segments={[
+                    { key: 'yesno', label: 'כן/לא', color: 'bg-blue-500' },
+                    { key: 'multiple', label: 'רב ברירה', color: 'bg-violet-500' },
+                    { key: 'open', label: 'פתוחות', color: 'bg-emerald-500' },
+                  ]}
+                  counts={typeCounts}
+                  onChange={setTypeCounts}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Count + difficulty */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Count + difficulty — on separate lines */}
+          <div className="space-y-4">
             <div>
               <p className="text-sm font-medium text-foreground mb-2">מספר שאלות: {questionCount}</p>
               <input type="range" min={1} max={100} value={questionCount}
@@ -404,7 +430,7 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
             <div>
               <p className="text-sm font-medium text-foreground mb-2">רמת קושי</p>
               <div className="flex gap-1">
-                {[{ v: 'easy', l: 'קל' }, { v: 'medium', l: 'בינוני' }, { v: 'hard', l: 'קשה' }].map(({ v, l }) => (
+                {[{ v: 'easy', l: 'קל' }, { v: 'medium', l: 'בינוני' }, { v: 'hard', l: 'קשה' }, { v: 'merged', l: 'מיזוג' }].map(({ v, l }) => (
                   <button key={v} onClick={() => setDifficulty(v)}
                     className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-all ${difficulty === v ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>
                     {l}
@@ -413,6 +439,24 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
               </div>
             </div>
           </div>
+
+          {/* Mixed difficulty — how many questions of each level */}
+          {difficulty === 'merged' && (
+            <div className="p-3 bg-muted/40 rounded-xl border border-border">
+              <p className="text-xs font-medium text-foreground mb-2">כמה שאלות בכל רמת קושי? (סה״כ {questionCount})</p>
+              <DistributionBar
+                total={questionCount}
+                segments={[
+                  { key: 'easy', label: 'קל', color: 'bg-emerald-500' },
+                  { key: 'medium', label: 'בינוני', color: 'bg-amber-500' },
+                  { key: 'hard', label: 'קשה', color: 'bg-rose-500' },
+                ]}
+                counts={levelCounts}
+                onChange={setLevelCounts}
+                disabled={isLoading}
+              />
+            </div>
+          )}
 
           {error && <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-xl">{error}</p>}
 
@@ -592,13 +636,9 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setAddError(d.detail || 'שגיאה בהוספת התלמיד'); return; }
-      // Reflect the new student immediately, then refresh from the server
-      if (d.student) {
-        cls.students = [...(cls.students ?? []), { ...d.student, joined_at: new Date().toISOString() }];
-      }
       setAddSuccess(`${d.student?.name ?? email} נוסף/ה לכיתה`);
       setAddEmail('');
-      onRefresh();
+      onRefresh(); // re-syncs the roster from the server (see load())
     } catch {
       setAddError('שגיאה בהוספת התלמיד');
     } finally {
@@ -941,6 +981,9 @@ const Students = () => {
         (c: ClassItem) => c.id && c.name && c.code && Array.isArray(c.students)
       );
       setClasses(validClasses);
+      // Keep the open class detail in sync with the server (roster changes, etc.);
+      // if the class no longer exists, fall back to the list view.
+      setSelectedClass(prev => prev ? (validClasses.find((c: ClassItem) => c.id === prev.id) ?? null) : prev);
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') {
         setError('הבקשה לקחה יותר מדי זמן. בדוק את החיבור לשרת.');
