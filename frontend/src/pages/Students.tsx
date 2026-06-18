@@ -133,33 +133,83 @@ const QuestionEditor = ({ questions, onSave, onClose }: {
   );
 };
 
+// ── Override Form (per-question, isolated state) ──────────────────────────────
+
+const OverrideForm = ({ qi, initialPoints, examId, studentUid, token, onDone }: {
+  qi: number; initialPoints: string; examId: string; studentUid: string; token: string; onDone: () => void;
+}) => {
+  const [points, setPoints] = useState(initialPoints);
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    setSaving(true);
+    await fetch(`${API()}/class-exams/${examId}/submissions/${studentUid}/override`, {
+      method: 'PATCH', headers: jsonH(token),
+      body: JSON.stringify({ question_index: qi, new_points: parseFloat(points), note }),
+    });
+    setSaving(false);
+    onDone();
+  };
+
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="flex gap-2">
+        <select value={points} onChange={e => setPoints(e.target.value)}
+          className="flex-1 px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none">
+          <option value="">בחר ניקוד</option>
+          <option value="1">1 — נכון</option>
+          <option value="0.5">0.5 — חלקי</option>
+          <option value="0">0 — שגוי</option>
+        </select>
+        <button onClick={submit} disabled={!points || saving}
+          className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50">
+          {saving ? <Spinner /> : 'אשר'}
+        </button>
+        <button onClick={onDone} className="px-3 py-1.5 rounded-lg border border-border text-xs">ביטול</button>
+      </div>
+      <input value={note} onChange={e => setNote(e.target.value)}
+        placeholder="הסבר לשינוי (אופציונלי)"
+        className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-xs focus:outline-none" />
+    </div>
+  );
+};
+
 // ── Grading Panel ─────────────────────────────────────────────────────────────
 
 const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
   exam: ClassExam; submission: Submission; token: string; onClose: () => void; onRefresh: () => void;
 }) => {
   const [loading, setLoading] = useState(false);
-  const [overrideIdx, setOverrideIdx] = useState<number | null>(null);
-  const [overridePoints, setOverridePoints] = useState('');
-  const [overrideNote, setOverrideNote] = useState('');
+  const [openOverrideIdx, setOpenOverrideIdx] = useState<number | null>(null);
+
+  const isLocalGradable = exam.question_type === 'yesno' || exam.question_type === 'multiple';
+
+  const gradeLocally = () => {
+    const feedback = exam.questions.map((q, i) => {
+      const answer = submission.answers[i] || '';
+      const correct = answer.trim().toLowerCase() === q.answer.trim().toLowerCase();
+      return { question: q.question, points: correct ? 1 : 0, correct, explanation: correct ? 'תשובה נכונה' : `תשובה שגויה. התשובה הנכונה: ${q.answer}`, covered_points: [], missed_points: [] };
+    });
+    const score = feedback.reduce((s, f) => s + f.points, 0);
+    return { score, feedback };
+  };
 
   const gradeWithAI = async () => {
     setLoading(true);
-    await fetch(`${API()}/class-exams/${exam.id}/submissions/${submission.student_uid}/grade-ai`, {
-      method: 'POST', headers: jsonH(token), body: '{}',
-    });
+    if (isLocalGradable) {
+      const result = gradeLocally();
+      await fetch(`${API()}/class-exams/${exam.id}/submissions/${submission.student_uid}/grade-ai`, {
+        method: 'POST', headers: jsonH(token),
+        body: JSON.stringify({ local_result: result }),
+      });
+    } else {
+      await fetch(`${API()}/class-exams/${exam.id}/submissions/${submission.student_uid}/grade-ai`, {
+        method: 'POST', headers: jsonH(token), body: '{}',
+      });
+    }
     onRefresh();
     setLoading(false);
-  };
-
-  const submitOverride = async (qi: number) => {
-    await fetch(`${API()}/class-exams/${exam.id}/submissions/${submission.student_uid}/override`, {
-      method: 'PATCH', headers: jsonH(token),
-      body: JSON.stringify({ question_index: qi, new_points: parseFloat(overridePoints), note: overrideNote }),
-    });
-    onRefresh();
-    setOverrideIdx(null);
-    setOverridePoints(''); setOverrideNote('');
   };
 
   const fb = submission.grade_result?.feedback ?? [];
@@ -188,7 +238,7 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
           <div className="p-5 border-b border-border">
             <button onClick={gradeWithAI} disabled={loading}
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
-              {loading ? <><Spinner /> בודק...</> : '✨ בדיקה אוטומטית על ידי AI'}
+              {loading ? <><Spinner /> בודק...</> : isLocalGradable ? '⚡ בדיקה מהירה' : '✨ בדיקה אוטומטית על ידי AI'}
             </button>
           </div>
         )}
@@ -215,28 +265,18 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
                 <p className="text-xs text-muted-foreground mb-1">תשובה נכונה: <span className="text-green-700 font-medium">{q.answer}</span></p>
                 {f?.explanation && <p className="text-xs text-muted-foreground italic">{f.explanation}</p>}
 
-                {/* Override controls */}
                 {submission.grade_result && (
-                  overrideIdx === qi ? (
-                    <div className="mt-3 space-y-2">
-                      <div className="flex gap-2">
-                        <select value={overridePoints} onChange={e => setOverridePoints(e.target.value)}
-                          className="flex-1 px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none">
-                          <option value="">בחר ניקוד</option>
-                          <option value="1">1 — נכון</option>
-                          <option value="0.5">0.5 — חלקי</option>
-                          <option value="0">0 — שגוי</option>
-                        </select>
-                        <button onClick={() => submitOverride(qi)} disabled={!overridePoints}
-                          className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50">אשר</button>
-                        <button onClick={() => setOverrideIdx(null)} className="px-3 py-1.5 rounded-lg border border-border text-xs">ביטול</button>
-                      </div>
-                      <input value={overrideNote} onChange={e => setOverrideNote(e.target.value)}
-                        placeholder="הסבר לשינוי (אופציונלי)"
-                        className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-xs focus:outline-none" />
-                    </div>
+                  openOverrideIdx === qi ? (
+                    <OverrideForm
+                      qi={qi}
+                      initialPoints={String(pts ?? '')}
+                      examId={exam.id}
+                      studentUid={submission.student_uid}
+                      token={token}
+                      onDone={() => { setOpenOverrideIdx(null); onRefresh(); }}
+                    />
                   ) : (
-                    <button onClick={() => { setOverrideIdx(qi); setOverridePoints(String(pts ?? '')); setOverrideNote(''); }}
+                    <button onClick={() => setOpenOverrideIdx(qi)}
                       className="mt-2 text-xs text-muted-foreground hover:text-primary underline">
                       ✏️ שנה ניקוד
                     </button>
@@ -426,6 +466,9 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
   const [tab, setTab] = useState<'students' | 'exams'>('students');
   const [exams, setExams] = useState<ClassExam[]>([]);
   const [submissions, setSubmissions] = useState<Record<string, Submission[]>>({});
+  const [visibleSubmissions, setVisibleSubmissions] = useState<Set<string>>(new Set());
+  const [renamingClass, setRenamingClass] = useState(false);
+  const [renameValue, setRenameValue] = useState(cls.name);
   const [loading, setLoading] = useState(false);
   const [showCreateExam, setShowCreateExam] = useState(false);
   const [editExam, setEditExam] = useState<ClassExam | null>(null);
@@ -456,6 +499,11 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
     const r = await fetch(`${API()}/class-exams/${examId}/submissions`, { headers: authH(token) });
     const d = await r.json();
     setSubmissions(prev => ({ ...prev, [examId]: d.submissions ?? [] }));
+    setVisibleSubmissions(prev => new Set([...prev, examId]));
+  };
+
+  const hideSubmissions = (examId: string) => {
+    setVisibleSubmissions(prev => { const s = new Set(prev); s.delete(examId); return s; });
   };
 
   const createExam = async () => {
@@ -515,6 +563,17 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
     setTimeout(() => setCodeCopied(false), 2000);
   };
 
+  const saveRename = async () => {
+    const name = renameValue.trim();
+    if (!name || name === cls.name) { setRenamingClass(false); return; }
+    await fetch(`${API()}/classes/${cls.id}`, {
+      method: 'PATCH', headers: jsonH(token), body: JSON.stringify({ name }),
+    });
+    cls.name = name;
+    setRenamingClass(false);
+    onRefresh();
+  };
+
   return (
     <div className="space-y-6" dir="rtl">
       {confirm && <Confirm msg={confirm.msg} onOk={() => { confirm.action(); setConfirm(null); }} onCancel={() => setConfirm(null)} />}
@@ -551,7 +610,27 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
           <Icon path="M15 18l-6-6 6-6" /> חזרה לכיתות
         </button>
         <div className="flex-1">
-          <h2 className="text-2xl font-bold text-foreground">{cls.name}</h2>
+          {renamingClass ? (
+            <div className="flex items-center gap-2">
+              <input
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') setRenamingClass(false); }}
+                autoFocus
+                className="text-xl font-bold border-b-2 border-primary bg-transparent focus:outline-none text-foreground w-48"
+              />
+              <button onClick={saveRename} className="text-xs px-2 py-1 rounded-lg bg-primary text-primary-foreground">שמור</button>
+              <button onClick={() => setRenamingClass(false)} className="text-xs px-2 py-1 rounded-lg border border-border">ביטול</button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 group">
+              <h2 className="text-2xl font-bold text-foreground">{cls.name}</h2>
+              <button onClick={() => { setRenameValue(cls.name); setRenamingClass(true); }}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
+                <Icon path="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </button>
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">{cls.students?.length ?? 0} תלמידים · נוצרה {fmt(cls.created_at)}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -594,6 +673,16 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                   <p className="text-xs text-muted-foreground truncate">{s.email}</p>
                 </div>
                 <p className="text-xs text-muted-foreground flex-shrink-0">הצטרף {fmt(s.joined_at)}</p>
+                <button
+                  onClick={() => setConfirm({ msg: `להסיר את "${s.name}" מהכיתה?`, action: async () => {
+                    await fetch(`${API()}/classes/${cls.id}/students/${s.uid}`, { method: 'DELETE', headers: authH(token) });
+                    onRefresh();
+                  }})}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
+                  title="הסר תלמיד"
+                >
+                  <Icon path="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                </button>
               </div>
             ))
           )}
@@ -678,10 +767,12 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                       <p className="text-xs text-muted-foreground">{exam.questions.length} שאלות · {exam.num_variants} גרסה/ות · נוצרה {fmt(exam.created_at)}</p>
                     </div>
                     <div className="flex gap-2 flex-wrap">
-                      <button onClick={() => setGeneratingExam(exam)}
-                        className="px-3 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-medium hover:bg-primary/10 transition-colors">
-                        ✨ צור שאלות עם AI
-                      </button>
+                      {exam.questions.length === 0 && (
+                        <button onClick={() => setGeneratingExam(exam)}
+                          className="px-3 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-medium hover:bg-primary/10 transition-colors">
+                          ✨ צור שאלות עם AI
+                        </button>
+                      )}
                       <button onClick={() => setEditExam(exam)}
                         className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-muted transition-colors">
                         ✏️ עריכת שאלות
@@ -710,9 +801,14 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                   )}
 
                   {/* Submissions */}
-                  {subs && (
+                  {subs && visibleSubmissions.has(exam.id) && (
                     <div className="mt-3 pt-3 border-t border-border space-y-2">
-                      <p className="text-xs font-semibold text-foreground">הגשות ({subs.length}/{cls.students?.length ?? 0})</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-foreground">הגשות ({subs.length}/{cls.students?.length ?? 0})</p>
+                        <button onClick={() => hideSubmissions(exam.id)} className="text-xs text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted transition-colors">
+                          <Icon path="M18 6 6 18M6 6l12 12" />
+                        </button>
+                      </div>
                       {subs.length === 0 ? (
                         <p className="text-xs text-muted-foreground">אין הגשות עדיין</p>
                       ) : (

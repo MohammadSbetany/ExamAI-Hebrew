@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback} from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { listExams, deleteExam, saveExam, updateExam, type ExamRecord } from '@/lib/examsApi';
+import { listExams, deleteExam, updateExam, type ExamRecord } from '@/lib/examsApi';
 import { gradeLocally } from '@/utils/gradingUtils';
-import { exportBlankPdf, exportGradedPdf, exportBlankDocx, exportGradedDocx } from '@/lib/exportUtils';
+import ExportMenu from '@/components/ExportMenu';
 import type { Question, GradeResult } from '@/types/questions';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -77,7 +77,6 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
   const [gradeResult, setGradeResult] = useState<GradeResult | null>(exam.grade_result);
   const [isGrading, setIsGrading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [exportLoading, setExportLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const questions: Question[] = exam.questions;
@@ -87,71 +86,6 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
   const handleAnswerChange = (i: number, val: string) => {
     setAnswers(prev => { const a = [...prev]; a[i] = val; return a; });
   };
-
-  // ── Export Dropdown ───────────────────────────────────────────────────────────
-
-interface ExportDropdownProps {
-  label: string;
-  variant: 'blank' | 'graded';
-  onExport: (fmt: 'pdf' | 'docx') => void;
-  loading: string | null;
-}
-
-const ExportDropdown = ({ label, variant, onExport, loading }: ExportDropdownProps) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const isLoading = loading?.startsWith(variant) ?? false;
-  const isGraded = variant === 'graded';
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        disabled={isLoading}
-        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border transition-all disabled:opacity-50 ${
-          isGraded
-            ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
-            : 'border-border text-muted-foreground hover:text-foreground hover:border-primary/40'
-        }`}
-      >
-        {isLoading
-          ? <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
-          : <DownloadIcon />}
-        {label}
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.15s' }}>
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full mt-1.5 w-36 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden">
-          {(['pdf', 'docx'] as const).map(fmt => (
-            <button
-              key={fmt}
-              onClick={() => { onExport(fmt); setOpen(false); }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors"
-            >
-              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${fmt === 'pdf' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                {fmt.toUpperCase()}
-              </span>
-              {fmt === 'pdf' ? 'קובץ PDF' : 'קובץ Word'}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
   const handleGrade = async () => {
     setIsGrading(true);
@@ -193,22 +127,6 @@ const ExportDropdown = ({ label, variant, onExport, loading }: ExportDropdownPro
     }
   };
 
-  const handleExport = async (format: 'pdf' | 'docx', type: 'blank' | 'graded') => {
-    setExportLoading(`${type}-${format}`);
-    try {
-      if (type === 'blank') {
-        if (format === 'pdf') await exportBlankPdf(questions);
-        else await exportBlankDocx(questions);
-      } else {
-        if (!gradeResult) return;
-        if (format === 'pdf') await exportGradedPdf(questions, gradeResult);
-        else await exportGradedDocx(questions, gradeResult);
-      }
-    } finally {
-      setExportLoading(null);
-    }
-  };
-
   const pct = gradeResult ? Math.round((gradeResult.score / questions.length) * 100) : null;
   const colors = pct !== null ? pctColor(pct) : null;
 
@@ -223,19 +141,9 @@ const ExportDropdown = ({ label, variant, onExport, loading }: ExportDropdownPro
 
         {/* Export buttons */}
         <div className="flex items-center gap-2">
-          <ExportDropdown
-            label="ייצוא בחינה"
-            variant="blank"
-            onExport={fmt => handleExport(fmt, 'blank')}
-            loading={exportLoading}
-          />
+          <ExportMenu questions={questions} gradeResult={gradeResult} variant="blank" />
           {gradeResult && (
-            <ExportDropdown
-              label="דוח ציון"
-              variant="graded"
-              onExport={fmt => handleExport(fmt, 'graded')}
-              loading={exportLoading}
-            />
+            <ExportMenu questions={questions} gradeResult={gradeResult} variant="graded" />
           )}
         </div>
       </div>

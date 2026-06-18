@@ -129,6 +129,18 @@ async def list_classes(user=Depends(verify_token)):
         logger.error("List classes error | user=%s error=%s", user.get("uid"), str(e))
         return {"classes": []}
 
+@app.patch("/classes/{class_id}")
+async def rename_class_endpoint(class_id: str, data: dict, user=Depends(verify_token)):
+    from class_manager import get_class, _db
+    cls = get_class(class_id)
+    if not cls or cls.get("teacher_uid") != user.get("uid"):
+        raise HTTPException(status_code=403, detail="אין הרשאה")
+    name = (data.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="שם הכיתה לא יכול להיות ריק")
+    _db().collection("classes").document(class_id).update({"name": name})
+    return {"ok": True, "name": name}
+
 @app.delete("/classes/{class_id}")
 async def delete_class_endpoint(class_id: str, user=Depends(verify_token)):
     try:

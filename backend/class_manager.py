@@ -365,13 +365,25 @@ def delete_class_exam(teacher_uid: str, exam_id: str) -> None:
     db.collection("class_exams").document(exam_id).delete()
 
 
+def _rebuild_variants(exam: dict, questions: list) -> dict:
+    """Rebuild shuffled variants from the master question list."""
+    num_variants = max(1, min(int(exam.get("num_variants", 1)), 10))
+    variants = {}
+    for vi in range(num_variants):
+        shuffled = questions.copy()
+        random.shuffle(shuffled)
+        variants[str(vi)] = shuffled
+    return variants
+
+
 def add_question(teacher_uid: str, exam_id: str, question: dict) -> None:
     exam = get_class_exam(exam_id)
     if not exam or exam["teacher_uid"] != teacher_uid:
         raise PermissionError("אין הרשאה")
     questions = exam.get("questions", [])
     questions.append(question)
-    _db().collection("class_exams").document(exam_id).update({"questions": questions})
+    variants = _rebuild_variants(exam, questions)
+    _db().collection("class_exams").document(exam_id).update({"questions": questions, "variants": variants})
 
 
 def delete_question(teacher_uid: str, exam_id: str, question_index: int) -> None:
@@ -381,7 +393,8 @@ def delete_question(teacher_uid: str, exam_id: str, question_index: int) -> None
     questions = exam.get("questions", [])
     if 0 <= question_index < len(questions):
         questions.pop(question_index)
-    _db().collection("class_exams").document(exam_id).update({"questions": questions})
+    variants = _rebuild_variants(exam, questions)
+    _db().collection("class_exams").document(exam_id).update({"questions": questions, "variants": variants})
 
 
 # ── Student submissions ───────────────────────────────────────────────────────

@@ -76,15 +76,17 @@ const addPdfFooter = (doc: jsPDF, pageNum: number) => {
   setFont(doc);
   doc.setTextColor(148, 163, 184);
   doc.setR2L(false);
-  doc.text(`ExamAI Hebrew · ${new Date().toLocaleDateString('he-IL')}`, PDF_MARGIN, h - 6);
+  doc.text(`ExamAI Hebrew | ${new Date().toLocaleDateString('he-IL')}`, PDF_MARGIN, h - 6);
   doc.text(String(pageNum), PDF_WIDTH - PDF_MARGIN, h - 6, { align: 'right' });
   doc.setR2L(true);
+  doc.setTextColor(30, 41, 59);
 };
 
 const checkNewPage = (doc: jsPDF, y: number, needed = 20): number => {
   if (y + needed > doc.internal.pageSize.height - 20) {
     doc.addPage();
     addPdfFooter(doc, (doc.internal as unknown as { getCurrentPageInfo: () => { pageNumber: number } }).getCurrentPageInfo().pageNumber);
+    doc.setR2L(true);
     return 20;
   }
   return y;
@@ -102,8 +104,9 @@ export const exportBlankPdf = async (questions: Question[]) => {
   questions.forEach((q, i) => {
     doc.setFontSize(11);
     setFont(doc, 'normal');
-    const lines = doc.splitTextToSize(q.question, PDF_CONTENT_WIDTH - 12);
-    const questionH = Math.max(10, 4 + lines.length * 6);
+    const lines = doc.splitTextToSize(q.question, PDF_CONTENT_WIDTH - 16);
+    const lineHeight = 6;
+    const questionH = Math.max(11, lines.length * lineHeight + 5);
     const answerH = q.options
       ? Object.keys(q.options).length * 7 + 4
       : q.answer === 'כן' || q.answer === 'לא'
@@ -115,10 +118,13 @@ export const exportBlankPdf = async (questions: Question[]) => {
     doc.roundedRect(PDF_MARGIN, y, PDF_CONTENT_WIDTH, questionH, 2, 2, 'F');
     setFont(doc, 'bold');
     doc.setTextColor(37, 99, 235);
-    doc.text(`${i + 1}`, PDF_MARGIN + 4, y + 7);
+    doc.text(`${i + 1}`, PDF_MARGIN + 4, y + 6.5);
     doc.setTextColor(30, 41, 59);
     setFont(doc, 'normal');
-    doc.text(lines, PDF_WIDTH - PDF_MARGIN - 4, y + 7, { align: 'right' });
+    doc.text(q.question, PDF_WIDTH - PDF_MARGIN - 4, y + 6.5, {
+      align: 'right',
+      maxWidth: PDF_CONTENT_WIDTH - 16,
+    });
     y += questionH + 4;
 
     if (q.options) {
@@ -182,7 +188,7 @@ export const exportGradedPdf = async (questions: Question[], gradeResult: GradeR
     doc.setFontSize(10);
     setFont(doc, 'normal');
     const qLines = doc.splitTextToSize(q.question, PDF_CONTENT_WIDTH - 24);
-    const questionH = 8 + (qLines.length - 1) * 5;
+    const questionH = Math.max(9, qLines.length * 5 + 3);
     y = checkNewPage(doc, y, questionH + 20);
 
     doc.setFillColor(...bgColor);
@@ -193,7 +199,10 @@ export const exportGradedPdf = async (questions: Question[], gradeResult: GradeR
     doc.text(`${i + 1}`, PDF_MARGIN + 4, y + 5.5);
     doc.text(`${fb.points}/1`, PDF_WIDTH - PDF_MARGIN - 4, y + 5.5, { align: 'right' });
     setFont(doc, 'normal');
-    doc.text(qLines, PDF_WIDTH - PDF_MARGIN - 16, y + 5.5, { align: 'right' });
+    doc.text(q.question, PDF_WIDTH - PDF_MARGIN - 16, y + 5, {
+      align: 'right',
+      maxWidth: PDF_CONTENT_WIDTH - 24,
+    });
     y += questionH + 2;
 
     doc.setFontSize(9);
@@ -202,13 +211,20 @@ export const exportGradedPdf = async (questions: Question[], gradeResult: GradeR
     const answerText = answerLabel + q.answer;
     const answerLines = doc.splitTextToSize(answerText, PDF_CONTENT_WIDTH);
     y = checkNewPage(doc, y, answerLines.length * 5 + 4);
-    doc.text(answerLines, PDF_WIDTH - PDF_MARGIN - 4, y + 4, { align: 'right' });
+    doc.text(answerText, PDF_WIDTH - PDF_MARGIN - 4, y + 4, {
+      align: 'right',
+      maxWidth: PDF_CONTENT_WIDTH,
+    });
     y += answerLines.length * 5 + 4;
 
     if (fb.explanation) {
       const expLines = doc.splitTextToSize(fb.explanation, PDF_CONTENT_WIDTH);
       doc.setTextColor(100, 116, 139);
-      doc.text(expLines, PDF_WIDTH - PDF_MARGIN - 4, y + 4, { align: 'right' });
+      y = checkNewPage(doc, y, expLines.length * 5 + 4);
+      doc.text(fb.explanation, PDF_WIDTH - PDF_MARGIN - 4, y + 4, {
+        align: 'right',
+        maxWidth: PDF_CONTENT_WIDTH,
+      });
       y += expLines.length * 5 + 4;
     }
     y += 4;
@@ -222,6 +238,15 @@ export const exportGradedPdf = async (questions: Question[], gradeResult: GradeR
 const hebrewRun = (text: string, opts: Record<string, unknown> = {}) =>
   new TextRun({ text: sanitize(text), font: 'Arial', rightToLeft: true, ...opts } as ConstructorParameters<typeof TextRun>[0]);
 
+// Every Hebrew paragraph is RTL + bidirectional to prevent letters/punctuation flipping
+const hebrewPara = (children: TextRun[], opts: Record<string, unknown> = {}) =>
+  new Paragraph({
+    children,
+    alignment: AlignmentType.RIGHT,
+    bidirectional: true,
+    ...opts,
+  } as ConstructorParameters<typeof Paragraph>[0]);
+
 const hrLine = () =>
   new Paragraph({
     border: { bottom: { color: 'CBD5E1', style: BorderStyle.SINGLE, size: 1 } },
@@ -230,46 +255,42 @@ const hrLine = () =>
 
 export const exportBlankDocx = async (questions: Question[]) => {
   const children: Paragraph[] = [
-    new Paragraph({
-      children: [hebrewRun('בחינה', { bold: true, size: 36, color: 'FFFFFF' })],
-      alignment: AlignmentType.RIGHT,
+    hebrewPara([hebrewRun('בחינה', { bold: true, size: 36, color: 'FFFFFF' })], {
       shading: { type: ShadingType.SOLID, color: '2563EB', fill: '2563EB' },
       spacing: { after: 320 },
     }),
   ];
 
   questions.forEach((q, i) => {
-    children.push(new Paragraph({
-      children: [
+    children.push(hebrewPara(
+      [
         hebrewRun(`${i + 1}. `, { bold: true, color: '2563EB', size: 24 }),
         hebrewRun(q.question, { bold: true, size: 24 }),
       ],
-      alignment: AlignmentType.RIGHT,
-      shading: { type: ShadingType.SOLID, color: 'EFF6FF', fill: 'EFF6FF' },
-      spacing: { before: 160, after: 80 },
-    }));
+      {
+        shading: { type: ShadingType.SOLID, color: 'EFF6FF', fill: 'EFF6FF' },
+        spacing: { before: 160, after: 80 },
+      }
+    ));
 
     if (q.options) {
       Object.entries(q.options).forEach(([key, val]) =>
-        children.push(new Paragraph({
-          children: [hebrewRun(`${val}  .${key}`, { size: 22, color: '475569' })],
-          alignment: AlignmentType.RIGHT,
-          spacing: { after: 60 },
-        }))
+        children.push(hebrewPara(
+          [hebrewRun(`${val}  .${key}`, { size: 22, color: '475569' })],
+          { spacing: { after: 60 } }
+        ))
       );
     } else if (q.answer === 'כן' || q.answer === 'לא') {
-      children.push(new Paragraph({
-        children: [hebrewRun('☐ כן    ☐ לא', { size: 22, color: '475569' })],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 80 },
-      }));
+      children.push(hebrewPara(
+        [hebrewRun('☐ כן    ☐ לא', { size: 22, color: '475569' })],
+        { spacing: { after: 80 } }
+      ));
     } else {
       for (let l = 0; l < 3; l++) {
-        children.push(new Paragraph({
-          children: [hebrewRun('_'.repeat(80), { color: 'CBD5E1', size: 18 })],
-          alignment: AlignmentType.RIGHT,
-          spacing: { after: 60 },
-        }));
+        children.push(hebrewPara(
+          [hebrewRun('_'.repeat(80), { color: 'CBD5E1', size: 18 })],
+          { spacing: { after: 60 } }
+        ));
       }
     }
     children.push(hrLine());
@@ -290,21 +311,15 @@ export const exportGradedDocx = async (questions: Question[], gradeResult: Grade
   const scoreTextColor = pct >= 80 ? '166534' : pct >= 60 ? '854D0E' : 'B91C1C';
 
   const children: Paragraph[] = [
-    new Paragraph({
-      children: [hebrewRun('דוח ציון', { bold: true, size: 36, color: 'FFFFFF' })],
-      alignment: AlignmentType.RIGHT,
+    hebrewPara([hebrewRun('דוח ציון', { bold: true, size: 36, color: 'FFFFFF' })], {
       shading: { type: ShadingType.SOLID, color: '2563EB', fill: '2563EB' },
       spacing: { after: 80 },
     }),
-    new Paragraph({
-      children: [hebrewRun(new Date().toLocaleDateString('he-IL'), { size: 22, color: 'FFFFFF' })],
-      alignment: AlignmentType.RIGHT,
+    hebrewPara([hebrewRun(new Date().toLocaleDateString('he-IL'), { size: 22, color: 'FFFFFF' })], {
       shading: { type: ShadingType.SOLID, color: '2563EB', fill: '2563EB' },
       spacing: { after: 200 },
     }),
-    new Paragraph({
-      children: [hebrewRun(`ציון סופי: ${gradeResult.score} / ${questions.length} (${pct}%)`, { bold: true, size: 28, color: scoreTextColor })],
-      alignment: AlignmentType.RIGHT,
+    hebrewPara([hebrewRun(`ציון סופי: ${gradeResult.score} / ${questions.length} (${pct}%)`, { bold: true, size: 28, color: scoreTextColor })], {
       shading: { type: ShadingType.SOLID, color: scoreColor, fill: scoreColor },
       spacing: { before: 120, after: 320 },
     }),
@@ -320,59 +335,49 @@ export const exportGradedDocx = async (questions: Question[], gradeResult: Grade
     const icon = isCorrect ? '✓' : isPartial ? '~' : '✗';
 
     children.push(
-      new Paragraph({
-        children: [hebrewRun(`${icon} שאלה ${i + 1} — ${fb.points}/1`, { bold: true, size: 24, color: textColor })],
-        alignment: AlignmentType.RIGHT,
+      hebrewPara([hebrewRun(`${icon} שאלה ${i + 1} — ${fb.points}/1`, { bold: true, size: 24, color: textColor })], {
         shading: { type: ShadingType.SOLID, color: bg, fill: bg },
         spacing: { before: 160, after: 80 },
       }),
-      new Paragraph({
-        children: [hebrewRun(q.question, { size: 22, bold: true })],
-        alignment: AlignmentType.RIGHT,
+      hebrewPara([hebrewRun(q.question, { size: 22, bold: true })], {
         spacing: { after: 80 },
       }),
-      new Paragraph({
-        children: [
+      hebrewPara(
+        [
           hebrewRun('תשובה נכונה: ', { bold: true, size: 20, color: '166534' }),
           hebrewRun(q.answer, { size: 20, color: '166534' }),
         ],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 60 },
-      }),
+        { spacing: { after: 60 } }
+      ),
     );
 
     if (fb.explanation) {
-      children.push(new Paragraph({
-        children: [hebrewRun(fb.explanation, { size: 20, color: '64748B', italics: true })],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 60 },
-      }));
+      children.push(hebrewPara(
+        [hebrewRun(fb.explanation, { size: 20, color: '64748B', italics: true })],
+        { spacing: { after: 60 } }
+      ));
     }
 
     if (fb.covered_points?.length > 0) {
-      children.push(new Paragraph({
-        children: [hebrewRun('נקודות שכוסו:', { bold: true, size: 20, color: '166534' })],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 40 },
-      }));
-      fb.covered_points.forEach(p => children.push(new Paragraph({
-        children: [hebrewRun(`✓ ${p}`, { size: 20, color: '166534' })],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 40 },
-      })));
+      children.push(hebrewPara(
+        [hebrewRun('נקודות שכוסו:', { bold: true, size: 20, color: '166534' })],
+        { spacing: { after: 40 } }
+      ));
+      fb.covered_points.forEach(p => children.push(hebrewPara(
+        [hebrewRun(`✓ ${p}`, { size: 20, color: '166534' })],
+        { spacing: { after: 40 } }
+      )));
     }
 
     if (fb.missed_points?.length > 0) {
-      children.push(new Paragraph({
-        children: [hebrewRun('נקודות חסרות:', { bold: true, size: 20, color: 'B91C1C' })],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 40 },
-      }));
-      fb.missed_points.forEach(p => children.push(new Paragraph({
-        children: [hebrewRun(`✗ ${p}`, { size: 20, color: 'B91C1C' })],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 40 },
-      })));
+      children.push(hebrewPara(
+        [hebrewRun('נקודות חסרות:', { bold: true, size: 20, color: 'B91C1C' })],
+        { spacing: { after: 40 } }
+      ));
+      fb.missed_points.forEach(p => children.push(hebrewPara(
+        [hebrewRun(`✗ ${p}`, { size: 20, color: 'B91C1C' })],
+        { spacing: { after: 40 } }
+      )));
     }
 
     children.push(hrLine());

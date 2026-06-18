@@ -5,8 +5,8 @@ import type { Question, GradeResult } from '@/types/questions';
 
 // ── Mock export functions ─────────────────────────────────────────────────────
 vi.mock('@/lib/exportUtils', () => ({
-  exportBlankPdf: vi.fn(),
-  exportGradedPdf: vi.fn(),
+  exportBlankPdf: vi.fn().mockResolvedValue(undefined),
+  exportGradedPdf: vi.fn().mockResolvedValue(undefined),
   exportBlankDocx: vi.fn().mockResolvedValue(undefined),
   exportGradedDocx: vi.fn().mockResolvedValue(undefined),
 }));

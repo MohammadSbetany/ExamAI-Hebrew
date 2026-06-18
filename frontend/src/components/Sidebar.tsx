@@ -188,91 +188,96 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
     { label: 'סטטיסטיקות כיתה', path: '/class-stats', icon: <IconStats /> },
   ];
 
-  const sidebarContent = (
-    <div className="flex flex-col h-full">
+  const renderSidebarContent = (isMobile = false) => {
+    const isCollapsed = isMobile ? false : collapsed;
+    return (
+      <div className="flex flex-col h-full">
 
-      {/* Logo + collapse toggle */}
-      <div className={`flex items-center h-16 px-4 border-b border-border flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
-        {!collapsed && (
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+        {/* Logo + collapse toggle */}
+        <div className={`flex items-center h-16 px-4 border-b border-border flex-shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+          {!isCollapsed && (
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+                <img src="/favicon.ico" alt="ExamAI" className="w-4 h-4 object-contain" />
+              </div>
+              <span className="font-bold text-base text-foreground tracking-tight">ExamAI</span>
+            </div>
+          )}
+          {isCollapsed && (
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <img src="/favicon.ico" alt="ExamAI" className="w-4 h-4 object-contain" />
             </div>
-            <span className="font-bold text-base text-foreground tracking-tight">ExamAI</span>
-          </div>
-        )}
-        {collapsed && (
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <img src="/favicon.ico" alt="ExamAI" className="w-4 h-4 object-contain" />
-          </div>
-        )}
-        <button
-          onClick={() => setCollapsed(c => !c)}
-          className={`hidden md:flex w-7 h-7 rounded-lg items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors ${collapsed ? 'mt-0' : ''}`}
-          title={collapsed ? 'הרחב סרגל צד' : 'כווץ סרגל צד'}
-        >
-          <IconChevron open={!collapsed} />
-        </button>
-      </div>
-
-      {/* Nav items — scrollable */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 space-y-0.5">
-
-        <SectionLabel label="ראשי" collapsed={collapsed} />
-        {mainItems.map(item => (
-          <SidebarNavItem key={item.path} item={item} collapsed={collapsed} />
-        ))}
-
-        {resolvedIsTeacher && (
-          <>
-            <SectionLabel label="מורה" collapsed={collapsed} />
-            {teacherItems.map(item => (
-              <SidebarNavItem key={item.path} item={item} collapsed={collapsed} />
-            ))}
-          </>
-        )}
-      </nav>
-
-      {/* Bottom pinned */}
-      <div className="flex-shrink-0 border-t border-border px-2 py-3 space-y-0.5">
-        <SidebarNavItem item={{ label: 'הגדרות', path: '/settings', icon: <IconSettings /> }} collapsed={collapsed} />
-
-        {/* User profile */}
-<div
-  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mt-1 cursor-pointer hover:bg-accent transition-colors group ${collapsed ? 'justify-center' : ''}`}
-  onClick={e => { e.stopPropagation(); setShowProfile(p => !p); }}
-  title="פרופיל"
->
-  <div className="relative flex-shrink-0">
-    <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary font-semibold text-sm">
-      {user?.name?.charAt(0) ?? '?'}
-    </div>
-    <div className="absolute bottom-0 left-0 w-2.5 h-2.5 rounded-full bg-success border-2 border-card" />
-  </div>
-  {!collapsed && (
-    <div className="flex-1 min-w-0">
-      <p className="text-sm font-medium text-foreground truncate">{user?.name ?? ''}</p>
-      <p className="text-xs text-muted-foreground truncate">{user?.role === 'teacher' ? 'מורה' : 'תלמיד'}</p>
-    </div>
-  )}
-</div>
-      {/* Profile popover */}
-        {showProfile && !collapsed && (
-          <div className="mx-2 mb-2 p-3 bg-muted rounded-xl border border-border space-y-2 text-sm" onClick={e => e.stopPropagation()}>
-            <p className="font-semibold text-foreground truncate">{user?.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-            <p className="text-xs text-muted-foreground">{user?.role === 'teacher' ? 'מורה' : 'תלמיד'}</p>
+          )}
+          {!isMobile && (
             <button
-              onClick={logout}
-              className="w-full mt-1 py-1.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-colors"
+              onClick={() => setCollapsed(c => !c)}
+              className="hidden md:flex w-7 h-7 rounded-lg items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              title={isCollapsed ? 'הרחב סרגל צד' : 'כווץ סרגל צד'}
             >
-              התנתק
+              <IconChevron open={!isCollapsed} />
             </button>
+          )}
+        </div>
+
+        {/* Nav items — scrollable */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 space-y-0.5">
+          <SectionLabel label="ראשי" collapsed={isCollapsed} />
+          {mainItems.map(item => (
+            <SidebarNavItem key={item.path} item={item} collapsed={isCollapsed} />
+          ))}
+
+          {resolvedIsTeacher && (
+            <>
+              <SectionLabel label="מורה" collapsed={isCollapsed} />
+              {teacherItems.map(item => (
+                <SidebarNavItem key={item.path} item={item} collapsed={isCollapsed} />
+              ))}
+            </>
+          )}
+        </nav>
+
+        {/* Bottom pinned */}
+        <div className="flex-shrink-0 border-t border-border px-2 py-3 space-y-0.5">
+          <SidebarNavItem item={{ label: 'הגדרות', path: '/settings', icon: <IconSettings /> }} collapsed={isCollapsed} />
+
+          {/* User profile */}
+          <div
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mt-1 cursor-pointer hover:bg-accent transition-colors group ${isCollapsed ? 'justify-center' : ''}`}
+            onClick={e => { e.stopPropagation(); setShowProfile(p => !p); }}
+            title="פרופיל"
+          >
+            <div className="relative flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary font-semibold text-sm">
+                {user?.name?.charAt(0) ?? '?'}
+              </div>
+              <div className="absolute bottom-0 left-0 w-2.5 h-2.5 rounded-full bg-success border-2 border-card" />
+            </div>
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{user?.name ?? ''}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.role === 'teacher' ? 'מורה' : 'תלמיד'}</p>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Profile popover — always shown when open (not gated on collapsed) */}
+          {showProfile && !isCollapsed && (
+            <div className="mx-2 mb-2 p-3 bg-muted rounded-xl border border-border space-y-2 text-sm" onClick={e => e.stopPropagation()}>
+              <p className="font-semibold text-foreground truncate">{user?.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+              <p className="text-xs text-muted-foreground">{user?.role === 'teacher' ? 'מורה' : 'תלמיד'}</p>
+              <button
+                onClick={logout}
+                className="w-full mt-1 py-1.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-colors"
+              >
+                התנתק
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <>
@@ -286,23 +291,23 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
         `}
         style={{ direction: 'rtl' }}
       >
-        {sidebarContent}
+        {renderSidebarContent(false)}
       </aside>
 
       {/* ── Mobile top bar ── */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-card border-b border-border flex items-center justify-between px-4" style={{ direction: 'rtl' }}>
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-card border-b border-border flex items-center px-4 gap-3" style={{ direction: 'rtl' }}>
+        <button
+          onClick={() => setMobileOpen(o => !o)}
+          className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-accent transition-colors flex-shrink-0"
+        >
+          {mobileOpen ? <IconClose /> : <IconMenu />}
+        </button>
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
             <img src="/favicon.ico" alt="ExamAI" className="w-4 h-4 object-contain" />
           </div>
           <span className="font-bold text-sm text-foreground">ExamAI</span>
         </div>
-        <button
-          onClick={() => setMobileOpen(o => !o)}
-          className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-accent transition-colors"
-        >
-          {mobileOpen ? <IconClose /> : <IconMenu />}
-        </button>
       </div>
 
       {/* ── Mobile drawer overlay ── */}
@@ -313,18 +318,18 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
         />
       )}
 
-      {/* ── Mobile drawer ── */}
+      {/* ── Mobile drawer — always renders full (uncollapsed) content ── */}
       <aside
         className={`
-          md:hidden fixed top-14 right-0 bottom-0 z-40 w-[260px]
+          md:hidden fixed top-14 right-0 bottom-0 z-40 w-72 max-w-[80vw]
           bg-card border-l border-border
           transform transition-transform duration-200 ease-in-out
           ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}
         `}
         style={{ direction: 'rtl' }}
-        onClick={() => setMobileOpen(false)}
+        onClick={e => e.stopPropagation()}
       >
-        {sidebarContent}
+        {renderSidebarContent(true)}
       </aside>
     </>
   );
