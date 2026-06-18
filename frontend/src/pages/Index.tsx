@@ -3,6 +3,8 @@ import { saveExam } from '@/lib/examsApi';
 import FileUpload from '@/components/FileUpload';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import QuestionsList from '@/components/QuestionsList';
+import DistributionBar from '@/components/DistributionBar';
+import { rescaleCounts } from '@/utils/distribution';
 import ErrorMessage from '@/components/ErrorMessage';
 import { useAuth } from '@/context/AuthContext';
 import type { Question, GradeResult } from '@/types/questions';
@@ -29,8 +31,9 @@ const Index = () => {
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const handleGradeRef = useRef<(() => Promise<void>) | null>(null);
   const [timeMode, setTimeMode] = useState<'manual' | 'ai'>('ai');
-  const [difficultyDist, setDifficultyDist] = useState({ easy: 30, medium: 50, hard: 20 });
-  const [formatCounts, setFormatCounts] = useState({ yesno: 3, multiple: 4, open: 3 });
+  // Mixed-mode distributions as counts that sum to questionCount: [a, b, c]
+  const [typeCounts, setTypeCounts] = useState<number[]>([1, 3, 1]);   // yesno, multiple, open
+  const [levelCounts, setLevelCounts] = useState<number[]>([1, 3, 1]); // easy, medium, hard
   const [recommendedTime, setRecommendedTime] = useState<number | null>(null);
   const [appMode, setAppMode] = useState<'generate' | 'import'>('generate');
   const [savedExamId, setSavedExamId] = useState<string | null>(null);
@@ -40,6 +43,12 @@ const Index = () => {
     setSelectedFiles(files);
     setError(null);
   };
+
+  // Keep the mixed-mode distributions summing to the chosen question count
+  useEffect(() => {
+    setTypeCounts(prev => rescaleCounts(prev, questionCount));
+    setLevelCounts(prev => rescaleCounts(prev, questionCount));
+  }, [questionCount]);
 
   /** Total timer duration in seconds as set by the manual inputs */
   const timerTotalSeconds = timerHours * 3600 + timerMinutes * 60 + timerSeconds;
@@ -144,8 +153,19 @@ const Index = () => {
       formData.append('difficulty', difficulty);
       formData.append('time_mode', timeMode);
       if (timeMode === 'manual') formData.append('manual_minutes', String(Math.ceil(timerTotalSeconds / 60)));
-      if (difficulty === 'merged') formData.append('difficulty_dist', JSON.stringify(difficultyDist));
-      if (questionType === 'merged') formData.append('format_counts', JSON.stringify(formatCounts));
+      if (difficulty === 'merged') {
+        const t = Math.max(1, questionCount);
+        formData.append('difficulty_dist', JSON.stringify({
+          easy: Math.round((levelCounts[0] / t) * 100),
+          medium: Math.round((levelCounts[1] / t) * 100),
+          hard: Math.round((levelCounts[2] / t) * 100),
+        }));
+      }
+      if (questionType === 'merged') {
+        formData.append('format_counts', JSON.stringify({
+          yesno: typeCounts[0], multiple: typeCounts[1], open: typeCounts[2],
+        }));
+      }
       console.log("Starting upload for:", selectedFiles.map(f => f.name).join(', '));
 
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/upload`, {
@@ -206,8 +226,8 @@ const Index = () => {
     setActiveQuestionType('open');
     setRecommendedTime(null);
     setTimeMode('ai');
-    setDifficultyDist({ easy: 30, medium: 50, hard: 20 });
-    setFormatCounts({ yesno: 3, multiple: 4, open: 3 });
+    setLevelCounts([1, 3, 1]);
+    setTypeCounts([1, 3, 1]);
     setAppMode('generate');
     setSavedExamId(null);
     stopTimer();
@@ -368,8 +388,26 @@ const Index = () => {
                 </button>
               ))}
             </div>
+
+            {/* Mixed types — how many questions of each format */}
+            {questionType === 'merged' && (
+              <div className="mt-3 p-4 bg-muted/40 rounded-xl border border-border">
+                <p className="text-sm font-medium text-foreground mb-3">כמה שאלות מכל סוג? (סה״כ {questionCount})</p>
+                <DistributionBar
+                  total={questionCount}
+                  segments={[
+                    { key: 'yesno', label: 'כן/לא', color: 'bg-blue-500' },
+                    { key: 'multiple', label: 'רב ברירה', color: 'bg-violet-500' },
+                    { key: 'open', label: 'פתוחות', color: 'bg-emerald-500' },
+                  ]}
+                  counts={typeCounts}
+                  onChange={setTypeCounts}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
           </div>
-          
+
           {/* Question Count */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
@@ -432,6 +470,24 @@ const Index = () => {
             <p className="text-xs text-muted-foreground mt-2 text-center">
               השאלות מותאמות לרמות טקסונומיית בלום
             </p>
+
+            {/* Mixed difficulty — how many questions of each level */}
+            {difficulty === 'merged' && (
+              <div className="mt-3 p-4 bg-muted/40 rounded-xl border border-border">
+                <p className="text-sm font-medium text-foreground mb-3">כמה שאלות בכל רמת קושי? (סה״כ {questionCount})</p>
+                <DistributionBar
+                  total={questionCount}
+                  segments={[
+                    { key: 'easy', label: 'קל', color: 'bg-emerald-500' },
+                    { key: 'medium', label: 'בינוני', color: 'bg-amber-500' },
+                    { key: 'hard', label: 'קשה', color: 'bg-rose-500' },
+                  ]}
+                  counts={levelCounts}
+                  onChange={setLevelCounts}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
           </div>
           </>)}
 
