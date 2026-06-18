@@ -477,6 +477,12 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
   const [confirm, setConfirm] = useState<{ msg: string; action: () => void } | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
 
+  // Add student by email
+  const [addEmail, setAddEmail] = useState('');
+  const [addingStudent, setAddingStudent] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addSuccess, setAddSuccess] = useState<string | null>(null);
+
   // Create exam form
   const [examTitle, setExamTitle] = useState('');
   const [numVariants, setNumVariants] = useState(1);
@@ -574,6 +580,32 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
     onRefresh();
   };
 
+  const addStudentByEmail = async () => {
+    const email = addEmail.trim();
+    if (!email || addingStudent) return;
+    setAddingStudent(true);
+    setAddError(null);
+    setAddSuccess(null);
+    try {
+      const r = await fetch(`${API()}/classes/${cls.id}/add-student-by-email`, {
+        method: 'POST', headers: jsonH(token), body: JSON.stringify({ email }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setAddError(d.detail || 'שגיאה בהוספת התלמיד'); return; }
+      // Reflect the new student immediately, then refresh from the server
+      if (d.student) {
+        cls.students = [...(cls.students ?? []), { ...d.student, joined_at: new Date().toISOString() }];
+      }
+      setAddSuccess(`${d.student?.name ?? email} נוסף/ה לכיתה`);
+      setAddEmail('');
+      onRefresh();
+    } catch {
+      setAddError('שגיאה בהוספת התלמיד');
+    } finally {
+      setAddingStudent(false);
+    }
+  };
+
   return (
     <div className="space-y-6" dir="rtl">
       {confirm && <Confirm msg={confirm.msg} onOk={() => { confirm.action(); setConfirm(null); }} onCancel={() => setConfirm(null)} />}
@@ -656,6 +688,33 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
       {/* Students tab */}
       {tab === 'students' && (
         <div className="space-y-3">
+          {/* Add student by email */}
+          <div className="bg-card border border-border rounded-xl p-4">
+            <label className="text-sm font-semibold text-foreground mb-2 block">הוספת תלמיד לפי אימייל</label>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={addEmail}
+                onChange={e => { setAddEmail(e.target.value); setAddError(null); setAddSuccess(null); }}
+                onKeyDown={e => { if (e.key === 'Enter') addStudentByEmail(); }}
+                placeholder="student@example.com"
+                dir="ltr"
+                className="flex-1 px-3 py-2 rounded-xl border border-input bg-background text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <button
+                onClick={addStudentByEmail}
+                disabled={addingStudent || !addEmail.trim()}
+                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+              >
+                {addingStudent ? <Spinner /> : <Icon path="M12 5v14M5 12h14" />}
+                הוסף
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">המשתמש חייב להיות רשום במערכת עם כתובת אימייל זו.</p>
+            {addError && <p className="text-xs text-destructive mt-2">{addError}</p>}
+            {addSuccess && <p className="text-xs text-green-600 mt-2">✓ {addSuccess}</p>}
+          </div>
+
           {cls.students.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <p className="text-4xl mb-3">👥</p>
