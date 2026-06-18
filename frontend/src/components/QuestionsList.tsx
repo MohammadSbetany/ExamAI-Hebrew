@@ -141,11 +141,13 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
 
                           {/* Correct answer — shown for all question types */}
                           <p className="text-sm font-medium text-slate-800">
-                            התשובה הנכונה: <span className="text-green-700">{question.answer}</span>
+                            התשובה הנכונה: <span className="text-green-700">
+                              {question.answer}{effectiveType === 'multiple' && question.options?.[question.answer] ? `. ${question.options[question.answer]}` : ''}
+                            </span>
                           </p>
 
                           {/* Explanation */}
-                          <p className="text-xs text-slate-600 leading-relaxed">{feedback.explanation}</p>
+                          {feedback.explanation && <p className="text-xs text-slate-600 leading-relaxed">{feedback.explanation}</p>}
 
                           {/* Covered points — open questions only */}
                           {effectiveType === 'open' && feedback.covered_points?.length > 0 && (
