@@ -80,14 +80,31 @@ def _is_student_in_class(class_doc: dict, student_uid: str) -> bool:
 
 
 def _ensure_assignment(exam: dict, student_uid: str) -> int:
+    """
+    Hand out forms with a cursor that advances the moment each new student OPENS
+    the exam (regardless of whether they submit): the 1st student to open gets
+    form 0, the 2nd gets form 1, … and once the forms run out it wraps back to
+    form 0. A student keeps the same form on later visits. Uses the real number
+    of forms (len of variants).
+    """
+    variants = exam.get("variants") or {}
+    num_variants = max(1, len(variants) if variants else int(exam.get("num_variants", 1)))
+
     assignments = exam.get("assignments", {}) or {}
-    if student_uid in assignments:
-        return int(assignments[student_uid])
-    num_variants = max(1, int(exam.get("num_variants", 1)))
-    variant_idx = len(assignments) % num_variants
+    existing = assignments.get(student_uid)
+    if existing is not None and 0 <= int(existing) < num_variants:
+        return int(existing)
+
+    # New student opening the exam — take the next form and advance the cursor.
+    cursor = int(exam.get("variant_cursor", len(assignments)))
+    variant_idx = cursor % num_variants
     assignments[student_uid] = variant_idx
-    _db().collection("class_exams").document(exam["id"]).update({"assignments": assignments})
+    _db().collection("class_exams").document(exam["id"]).update({
+        "assignments": assignments,
+        "variant_cursor": cursor + 1,
+    })
     exam["assignments"] = assignments
+    exam["variant_cursor"] = cursor + 1
     return variant_idx
 
 
@@ -338,6 +355,36 @@ def update_exam_questions(teacher_uid: str, exam_id: str, questions: list, quest
         "questions": questions,
         "variants": variants,
         "assignments": assignments,
+    }
+    if question_type:
+        update_data["question_type"] = question_type
+    _db().collection("class_exams").document(exam_id).update(update_data)
+
+
+def set_exam_variants(teacher_uid: str, exam_id: str, variants: dict, question_type: str | None = None) -> None:
+    """
+    Store a distinct question set per form/variant (not shuffles of one master list).
+    `variants` maps a variant index (as a string) to that form's list of questions.
+    """
+    exam = get_class_exam(exam_id)
+    if not exam or exam["teacher_uid"] != teacher_uid:
+        raise PermissionError("אין הרשאה")
+
+    # Normalise keys to "0".."n-1", preserving numeric order
+    keys = sorted((variants or {}).keys(), key=lambda k: int(k))
+    norm = {str(i): list(variants[k]) for i, k in enumerate(keys)}
+    if not norm:
+        norm = {"0": []}
+    num_variants = len(norm)
+
+    # Reset the form cursor and assignments so forms are handed out fresh
+    # (1st student to open → form 0, 2nd → form 1, …) as students open the exam.
+    update_data = {
+        "variants": norm,
+        "questions": norm["0"],   # representative form (counts / fallbacks)
+        "num_variants": num_variants,
+        "assignments": {},
+        "variant_cursor": 0,
     }
     if question_type:
         update_data["question_type"] = question_type
