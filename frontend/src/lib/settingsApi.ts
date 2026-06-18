@@ -9,7 +9,7 @@ export interface UserSettings {
   dyslexicFont: boolean;
   highContrast: boolean;
   // Export
-  defaultExportFormat: 'pdf' | 'docx';
+  defaultExportFormat: 'docx';
   // Notifications
   notifyNewExam: boolean;
   notifyGrading: boolean;
@@ -31,7 +31,7 @@ export const defaultSettings: UserSettings = {
   language: 'he',
   dyslexicFont: false,
   highContrast: false,
-  defaultExportFormat: 'pdf',
+  defaultExportFormat: 'docx',
   notifyNewExam: true,
   notifyGrading: true,
   notifySystem: false,

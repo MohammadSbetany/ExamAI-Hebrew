@@ -23,7 +23,7 @@ vi.mock('@/lib/settingsApi', () => ({
   applyDirection: vi.fn(),
   defaultSettings: {
     theme: 'light', language: 'he', dyslexicFont: false, highContrast: false,
-    defaultExportFormat: 'pdf', notifyNewExam: true, notifyGrading: true,
+    defaultExportFormat: 'docx', notifyNewExam: true, notifyGrading: true,
     notifySystem: false, fieldOfStudy: '', yearOfStudy: '', institution: '',
     title: '', department: '', officeHours: '', autoPublish: false, classSignature: '',
   },
@@ -240,7 +240,7 @@ describe('Settings — tabs and structure', () => {
     fetchSettings = vi.mocked(api.fetchSettings);
     fetchSettings.mockResolvedValue({
       theme: 'light', language: 'he', dyslexicFont: false, highContrast: false,
-      defaultExportFormat: 'pdf', notifyNewExam: true, notifyGrading: true,
+      defaultExportFormat: 'docx', notifyNewExam: true, notifyGrading: true,
       notifySystem: false, fieldOfStudy: '', yearOfStudy: '', institution: '',
       title: '', department: '', officeHours: '', autoPublish: false, classSignature: '',
     });

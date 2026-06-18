@@ -1,4 +1,3 @@
-import jsPDF from 'jspdf';
 import {
   Document, Packer, Paragraph, TextRun, AlignmentType,
   BorderStyle, ShadingType,
@@ -8,229 +7,9 @@ import type { Question, GradeResult } from '@/types/questions';
 
 const sanitize = (text: string) => (text || '').replace(/\r/g, '');
 
-const buildFilename = (type: 'blank' | 'graded', score?: number, ext = 'pdf') => {
-  if (type === 'graded' && score !== undefined) return `Exam_Graded_${score}.${ext}`;
-  return `Exam_Blank.${ext}`;
-};
-
-// ── Font loading ──────────────────────────────────────────────────────────────
-
-let fontBase64: { regular: string; bold: string } | null = null;
-
-const loadHebrewFont = async (doc: jsPDF) => {
-  if (!fontBase64) {
-    const toBase64 = async (url: string): Promise<string> => {
-      const blob = await (await fetch(url)).blob();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const result = reader.result;
-          if (typeof result === 'string') { resolve(result); return; }
-          reject(new Error('Failed to read font as data URL.'));
-        };
-        reader.onerror = () => reject(reader.error ?? new Error('Failed to read font.'));
-        reader.readAsDataURL(blob);
-      });
-      return dataUrl.split(',', 2)[1] ?? '';
-    };
-    try {
-      fontBase64 = {
-        regular: await toBase64('/fonts/Heebo-Regular.ttf'),
-        bold: await toBase64('/fonts/Heebo-Bold.ttf'),
-      };
-    } catch {
-      console.warn('Hebrew font could not be loaded.');
-      return;
-    }
-  }
-  doc.addFileToVFS('Heebo-Regular.ttf', fontBase64.regular);
-  doc.addFont('Heebo-Regular.ttf', 'Heebo', 'normal');
-  doc.addFileToVFS('Heebo-Bold.ttf', fontBase64.bold);
-  doc.addFont('Heebo-Bold.ttf', 'Heebo', 'bold');
-};
-// ── PDF helpers ───────────────────────────────────────────────────────────────
-
-const PDF_MARGIN = 20;
-const PDF_WIDTH = 210;
-const PDF_CONTENT_WIDTH = PDF_WIDTH - PDF_MARGIN * 2;
-
-const setFont = (doc: jsPDF, style: 'normal' | 'bold' = 'normal') =>
-  doc.setFont(fontBase64 ? 'Heebo' : 'helvetica', style);
-
-const addPdfHeader = (doc: jsPDF, title: string) => {
-  doc.setFillColor(37, 99, 235);
-  doc.rect(0, 0, PDF_WIDTH, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(15);
-  setFont(doc, 'bold');
-  doc.text(title, PDF_WIDTH - PDF_MARGIN, 14, { align: 'right' });
-  doc.setTextColor(30, 41, 59);
-  return 32;
-};
-
-const addPdfFooter = (doc: jsPDF, pageNum: number) => {
-  const h = doc.internal.pageSize.height;
-  doc.setDrawColor(203, 213, 225);
-  doc.line(PDF_MARGIN, h - 12, PDF_WIDTH - PDF_MARGIN, h - 12);
-  doc.setFontSize(8);
-  setFont(doc);
-  doc.setTextColor(148, 163, 184);
-  doc.setR2L(false);
-  doc.text(`ExamAI Hebrew | ${new Date().toLocaleDateString('he-IL')}`, PDF_MARGIN, h - 6);
-  doc.text(String(pageNum), PDF_WIDTH - PDF_MARGIN, h - 6, { align: 'right' });
-  doc.setR2L(true);
-  doc.setTextColor(30, 41, 59);
-};
-
-const checkNewPage = (doc: jsPDF, y: number, needed = 20): number => {
-  if (y + needed > doc.internal.pageSize.height - 20) {
-    doc.addPage();
-    addPdfFooter(doc, (doc.internal as unknown as { getCurrentPageInfo: () => { pageNumber: number } }).getCurrentPageInfo().pageNumber);
-    doc.setR2L(true);
-    return 20;
-  }
-  return y;
-};
-
-// ── PDF exports ───────────────────────────────────────────────────────────────
-
-export const exportBlankPdf = async (questions: Question[]) => {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  await loadHebrewFont(doc);
-  doc.setR2L(true);
-  let y = addPdfHeader(doc, 'בחינה');
-  addPdfFooter(doc, 1);
-
-  questions.forEach((q, i) => {
-    doc.setFontSize(11);
-    setFont(doc, 'normal');
-    const lines = doc.splitTextToSize(q.question, PDF_CONTENT_WIDTH - 16);
-    const lineHeight = 6;
-    const questionH = Math.max(11, lines.length * lineHeight + 5);
-    const answerH = q.options
-      ? Object.keys(q.options).length * 7 + 4
-      : q.answer === 'כן' || q.answer === 'לא'
-      ? 12
-      : 31;
-    y = checkNewPage(doc, y, questionH + answerH + 8);
-
-    doc.setFillColor(239, 246, 255);
-    doc.roundedRect(PDF_MARGIN, y, PDF_CONTENT_WIDTH, questionH, 2, 2, 'F');
-    setFont(doc, 'bold');
-    doc.setTextColor(37, 99, 235);
-    doc.text(`${i + 1}`, PDF_MARGIN + 4, y + 6.5);
-    doc.setTextColor(30, 41, 59);
-    setFont(doc, 'normal');
-    doc.text(q.question, PDF_WIDTH - PDF_MARGIN - 4, y + 6.5, {
-      align: 'right',
-      maxWidth: PDF_CONTENT_WIDTH - 16,
-    });
-    y += questionH + 4;
-
-    if (q.options) {
-      Object.entries(q.options).forEach(([key, val]) => {
-        y = checkNewPage(doc, y, 8);
-        doc.setFontSize(10);
-        doc.setTextColor(71, 85, 105);
-        doc.text(`.${key}  ${val}`, PDF_WIDTH - PDF_MARGIN - 4, y + 5, { align: 'right' });
-        y += 7;
-      });
-      y += 4;
-    } else if (q.answer === 'כן' || q.answer === 'לא') {
-      doc.setFontSize(10);
-      doc.setTextColor(71, 85, 105);
-      doc.rect(PDF_WIDTH - PDF_MARGIN - 24, y, 8, 6);
-      doc.text('כן', PDF_WIDTH - PDF_MARGIN - 14, y + 5, { align: 'right' });
-      doc.rect(PDF_WIDTH - PDF_MARGIN - 40, y, 8, 6);
-      doc.text('לא', PDF_WIDTH - PDF_MARGIN - 30, y + 5, { align: 'right' });
-      y += 12;
-    } else {
-      for (let l = 0; l < 3; l++) {
-        y = checkNewPage(doc, y, 8);
-        doc.setDrawColor(203, 213, 225);
-        doc.line(PDF_MARGIN, y + 6, PDF_WIDTH - PDF_MARGIN, y + 6);
-        y += 9;
-      }
-      y += 4;
-    }
-  });
-
-  doc.save(buildFilename('blank', undefined, 'pdf'));
-};
-
-export const exportGradedPdf = async (questions: Question[], gradeResult: GradeResult) => {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  await loadHebrewFont(doc);
-  doc.setR2L(true);
-  if (questions.length === 0) return;
-  const pct = Math.round((gradeResult.score / questions.length) * 100);
-  let y = addPdfHeader(doc, `דוח ציון  ${gradeResult.score}/${questions.length} )${pct}%(`);
-  addPdfFooter(doc, 1);
-
-  const scoreColor: [number, number, number] =
-    pct >= 80 ? [220, 252, 231] : pct >= 60 ? [254, 249, 195] : [254, 226, 226];
-  doc.setFillColor(...scoreColor);
-  doc.roundedRect(PDF_MARGIN, y, PDF_CONTENT_WIDTH, 14, 3, 3, 'F');
-  doc.setFontSize(12);
-  setFont(doc, 'bold');
-  doc.setTextColor(pct >= 80 ? 22 : pct >= 60 ? 133 : 185, pct >= 80 ? 101 : pct >= 60 ? 77 : 28, pct >= 80 ? 52 : pct >= 60 ? 14 : 26);
-  doc.text(`ציון סופי ${gradeResult.score} / ${questions.length} )${pct}%(`, PDF_WIDTH - PDF_MARGIN - 4, y + 9, { align: 'right' });
-  y += 22;
-
-  const feedbackCount = Math.min(questions.length, gradeResult.feedback.length);
-  gradeResult.feedback.slice(0, feedbackCount).forEach((fb, i) => {
-    const q = questions[i];
-    const isCorrect = fb.points === 1;
-    const isPartial = fb.points === 0.5;
-    const bgColor: [number, number, number] = isCorrect ? [220, 252, 231] : isPartial ? [254, 249, 195] : [254, 226, 226];
-    const borderColor: [number, number, number] = isCorrect ? [134, 239, 172] : isPartial ? [253, 224, 71] : [252, 165, 165];
-
-    doc.setFontSize(10);
-    setFont(doc, 'normal');
-    const qLines = doc.splitTextToSize(q.question, PDF_CONTENT_WIDTH - 24);
-    const questionH = Math.max(9, qLines.length * 5 + 3);
-    y = checkNewPage(doc, y, questionH + 20);
-
-    doc.setFillColor(...bgColor);
-    doc.setDrawColor(...borderColor);
-    doc.roundedRect(PDF_MARGIN, y, PDF_CONTENT_WIDTH, questionH, 2, 2, 'FD');
-    setFont(doc, 'bold');
-    doc.setTextColor(30, 41, 59);
-    doc.text(`${i + 1}`, PDF_MARGIN + 4, y + 5.5);
-    doc.text(`${fb.points}/1`, PDF_WIDTH - PDF_MARGIN - 4, y + 5.5, { align: 'right' });
-    setFont(doc, 'normal');
-    doc.text(q.question, PDF_WIDTH - PDF_MARGIN - 16, y + 5, {
-      align: 'right',
-      maxWidth: PDF_CONTENT_WIDTH - 24,
-    });
-    y += questionH + 2;
-
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    const answerLabel = 'תשובה נכונה: ';
-    const answerText = answerLabel + q.answer;
-    const answerLines = doc.splitTextToSize(answerText, PDF_CONTENT_WIDTH);
-    y = checkNewPage(doc, y, answerLines.length * 5 + 4);
-    doc.text(answerText, PDF_WIDTH - PDF_MARGIN - 4, y + 4, {
-      align: 'right',
-      maxWidth: PDF_CONTENT_WIDTH,
-    });
-    y += answerLines.length * 5 + 4;
-
-    if (fb.explanation) {
-      const expLines = doc.splitTextToSize(fb.explanation, PDF_CONTENT_WIDTH);
-      doc.setTextColor(100, 116, 139);
-      y = checkNewPage(doc, y, expLines.length * 5 + 4);
-      doc.text(fb.explanation, PDF_WIDTH - PDF_MARGIN - 4, y + 4, {
-        align: 'right',
-        maxWidth: PDF_CONTENT_WIDTH,
-      });
-      y += expLines.length * 5 + 4;
-    }
-    y += 4;
-  });
-
-  doc.save(buildFilename('graded', gradeResult.score, 'pdf'));
+const buildFilename = (type: 'blank' | 'graded', score?: number) => {
+  if (type === 'graded' && score !== undefined) return `Exam_Graded_${score}.docx`;
+  return `Exam_Blank.docx`;
 };
 
 // ── DOCX ──────────────────────────────────────────────────────────────────────
@@ -298,10 +77,17 @@ export const exportBlankDocx = async (questions: Question[]) => {
 
   const doc = new Document({
     sections: [{ children }],
-    styles: { default: { document: { run: { font: 'Arial', rightToLeft: true } } } },
+    styles: {
+      default: {
+        document: {
+          run: { font: 'Arial', rightToLeft: true },
+          paragraph: { alignment: AlignmentType.RIGHT },
+        },
+      },
+    },
   });
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, buildFilename('blank', undefined, 'docx'));
+  saveAs(blob, buildFilename('blank'));
 };
 
 export const exportGradedDocx = async (questions: Question[], gradeResult: GradeResult) => {
@@ -385,8 +171,15 @@ export const exportGradedDocx = async (questions: Question[], gradeResult: Grade
 
   const doc = new Document({
     sections: [{ children }],
-    styles: { default: { document: { run: { font: 'Arial', rightToLeft: true } } } },
+    styles: {
+      default: {
+        document: {
+          run: { font: 'Arial', rightToLeft: true },
+          paragraph: { alignment: AlignmentType.RIGHT },
+        },
+      },
+    },
   });
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, buildFilename('graded', gradeResult.score, 'docx'));
+  saveAs(blob, buildFilename('graded', gradeResult.score));
 };

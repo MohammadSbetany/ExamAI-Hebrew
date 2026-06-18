@@ -5,8 +5,6 @@ import type { Question, GradeResult } from '@/types/questions';
 
 // ── Mock export functions ─────────────────────────────────────────────────────
 vi.mock('@/lib/exportUtils', () => ({
-  exportBlankPdf: vi.fn().mockResolvedValue(undefined),
-  exportGradedPdf: vi.fn().mockResolvedValue(undefined),
   exportBlankDocx: vi.fn().mockResolvedValue(undefined),
   exportGradedDocx: vi.fn().mockResolvedValue(undefined),
 }));
@@ -31,39 +29,10 @@ describe('ExportMenu — blank variant', () => {
     expect(screen.getByText('ייצוא בחינה')).toBeInTheDocument();
   });
 
-  it('opens dropdown when clicked', () => {
-    render(<ExportMenu questions={mockQuestions} gradeResult={null} variant="blank" />);
-    fireEvent.click(screen.getByText('ייצוא בחינה'));
-    expect(screen.getByText('קובץ PDF')).toBeInTheDocument();
-    expect(screen.getByText('קובץ Word')).toBeInTheDocument();
-  });
-
-  it('closes dropdown when clicking outside', () => {
-    render(
-      <div>
-        <ExportMenu questions={mockQuestions} gradeResult={null} variant="blank" />
-        <div data-testid="outside">outside</div>
-      </div>
-    );
-    fireEvent.click(screen.getByText('ייצוא בחינה'));
-    expect(screen.getByText('קובץ PDF')).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByTestId('outside'));
-    expect(screen.queryByText('קובץ PDF')).not.toBeInTheDocument();
-  });
-
-  it('calls exportBlankPdf when PDF option clicked', async () => {
-    const { exportBlankPdf } = await import('@/lib/exportUtils');
-    render(<ExportMenu questions={mockQuestions} gradeResult={null} variant="blank" />);
-    fireEvent.click(screen.getByText('ייצוא בחינה'));
-    fireEvent.click(screen.getByText('קובץ PDF'));
-    expect(exportBlankPdf).toHaveBeenCalledWith(mockQuestions);
-  });
-
-  it('calls exportBlankDocx when Word option clicked', async () => {
+  it('calls exportBlankDocx when button clicked', async () => {
     const { exportBlankDocx } = await import('@/lib/exportUtils');
     render(<ExportMenu questions={mockQuestions} gradeResult={null} variant="blank" />);
     fireEvent.click(screen.getByText('ייצוא בחינה'));
-    fireEvent.click(screen.getByText('קובץ Word'));
     expect(exportBlankDocx).toHaveBeenCalledWith(mockQuestions);
   });
 });
@@ -76,27 +45,17 @@ describe('ExportMenu — graded variant', () => {
     expect(screen.getByText('הורד דוח ציון')).toBeInTheDocument();
   });
 
-  it('calls exportGradedPdf when PDF option clicked', async () => {
-    const { exportGradedPdf } = await import('@/lib/exportUtils');
-    render(<ExportMenu questions={mockQuestions} gradeResult={mockGradeResult} variant="graded" />);
-    fireEvent.click(screen.getByText('הורד דוח ציון'));
-    fireEvent.click(screen.getByText('קובץ PDF'));
-    expect(exportGradedPdf).toHaveBeenCalledWith(mockQuestions, mockGradeResult);
-  });
-
-  it('calls exportGradedDocx when Word option clicked', async () => {
+  it('calls exportGradedDocx when button clicked', async () => {
     const { exportGradedDocx } = await import('@/lib/exportUtils');
     render(<ExportMenu questions={mockQuestions} gradeResult={mockGradeResult} variant="graded" />);
     fireEvent.click(screen.getByText('הורד דוח ציון'));
-    fireEvent.click(screen.getByText('קובץ Word'));
     expect(exportGradedDocx).toHaveBeenCalledWith(mockQuestions, mockGradeResult);
   });
 
   it('does not call graded export when gradeResult is null', async () => {
-    const { exportGradedPdf } = await import('@/lib/exportUtils');
+    const { exportGradedDocx } = await import('@/lib/exportUtils');
     render(<ExportMenu questions={mockQuestions} gradeResult={null} variant="graded" />);
     fireEvent.click(screen.getByText('הורד דוח ציון'));
-    fireEvent.click(screen.getByText('קובץ PDF'));
-    expect(exportGradedPdf).not.toHaveBeenCalled();
+    expect(exportGradedDocx).not.toHaveBeenCalled();
   });
 });
