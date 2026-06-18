@@ -184,7 +184,7 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
     : studentItems;
 
   const teacherItems: NavItem[] = [
-    { label: 'ניהול תלמידים', path: '/students', icon: <IconStudents /> },
+    { label: 'ניהול כיתות', path: '/students', icon: <IconStudents /> },
     { label: 'סטטיסטיקות כיתה', path: '/class-stats', icon: <IconStats /> },
   ];
 

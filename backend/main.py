@@ -168,6 +168,49 @@ async def add_student_endpoint(class_id: str, data: dict, user=Depends(verify_to
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/classes/{class_id}/add-student-by-email")
+async def add_student_by_email_endpoint(class_id: str, data: dict, user=Depends(verify_token)):
+    """Add a registered user to a class by their email address."""
+    from firebase_admin import auth as fb_auth, firestore as fs
+    cls = get_class(class_id)
+    if not cls or cls.get("teacher_uid") != user.get("uid"):
+        raise HTTPException(status_code=403, detail="אין הרשאה")
+
+    email = (data.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=422, detail="כתובת אימייל היא שדה חובה")
+
+    try:
+        student = fb_auth.get_user_by_email(email)
+    except fb_auth.UserNotFoundError:
+        raise HTTPException(status_code=404, detail="לא נמצא משתמש רשום עם כתובת אימייל זו")
+    except ValueError:
+        raise HTTPException(status_code=422, detail="כתובת אימייל לא תקינה")
+
+    if student.uid == user.get("uid"):
+        raise HTTPException(status_code=400, detail="לא ניתן להוסיף את עצמך ככיתה")
+    if any(s.get("uid") == student.uid for s in cls.get("students", [])):
+        raise HTTPException(status_code=409, detail="התלמיד כבר רשום לכיתה")
+
+    # Resolve display name: auth profile → users doc → email prefix
+    name = student.display_name
+    if not name:
+        try:
+            doc = fs.client().collection("users").document(student.uid).get()
+            if doc.exists:
+                name = (doc.to_dict() or {}).get("name")
+        except Exception:
+            name = None
+    if not name:
+        name = email.split("@")[0]
+
+    student_email = student.email or email
+    try:
+        add_student_to_class(class_id, student.uid, name, student_email)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "student": {"uid": student.uid, "name": name, "email": student_email}}
+
 @app.delete("/classes/{class_id}/students/{student_uid}")
 async def remove_student_endpoint(class_id: str, student_uid: str, user=Depends(verify_token)):
     try:

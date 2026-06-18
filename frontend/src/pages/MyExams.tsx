@@ -194,6 +194,24 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
           const effectiveType = questionType === 'merged' ? (q.type || 'open') : questionType;
           const qBg = pts === 1 ? 'border-green-200 bg-green-50' : pts === 0.5 ? 'border-yellow-200 bg-yellow-50' : pts === 0 ? 'border-red-200 bg-red-50' : 'border-border bg-card';
 
+          // After grading, objective options highlight the correct answer (green)
+          // and the student's wrong pick (red); before grading, the selected one.
+          const optionClass = (opt: string) => {
+            if (fb) {
+              // Yes/No: only color the student's own pick (green if right, red if
+              // wrong) so both buttons aren't highlighted at once.
+              if (effectiveType === 'yesno') {
+                if (opt !== answers[i]) return 'border-slate-300 text-slate-600';
+                return opt === q.answer ? 'border-green-500 bg-green-100 text-green-700' : 'border-red-400 bg-red-100 text-red-700';
+              }
+              // Multiple choice: mark the correct option green and a wrong pick red.
+              if (opt === q.answer) return 'border-green-500 bg-green-100 text-green-700';
+              if (opt === answers[i]) return 'border-red-400 bg-red-100 text-red-700';
+              return 'border-slate-300 text-slate-600';
+            }
+            return answers[i] === opt ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50';
+          };
+
           return (
             <li key={i} className={`border rounded-2xl p-5 transition-all ${qBg}`}>
               <div className="flex items-start gap-3 mb-4">
@@ -226,7 +244,7 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
                 <div className="flex gap-3">
                   {['כן', 'לא'].map(opt => (
                     <button key={opt} onClick={() => handleAnswerChange(i, opt)} disabled={!!gradeResult || isGrading}
-                      className={`px-8 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${answers[i] === opt ? 'border-primary bg-primary/10 text-primary' : fb ? 'border-slate-300 text-slate-600' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
+                      className={`px-8 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${optionClass(opt)}`}>
                       {opt}
                     </button>
                   ))}
@@ -237,29 +255,27 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
                 <div className="space-y-2">
                   {['א', 'ב', 'ג', 'ד'].map(opt => (
                     <button key={opt} onClick={() => handleAnswerChange(i, opt)} disabled={!!gradeResult || isGrading}
-                      className={`w-full text-right px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${answers[i] === opt ? 'border-primary bg-primary/10 text-primary' : fb ? 'border-slate-300 text-slate-600' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
+                      className={`w-full text-right px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${optionClass(opt)}`}>
                       <span className="font-bold ml-2">{opt}.</span> {q.options?.[opt] || ''}
                     </button>
                   ))}
                 </div>
               )}
 
-              {/* Feedback */}
-              {fb && (
+              {/* Feedback — open questions only (objective answers are shown on the option buttons) */}
+              {fb && effectiveType === 'open' && (
                 <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
                   <p className="text-sm font-semibold text-slate-800">
-                    התשובה הנכונה: <span className="text-green-700 font-normal">
-                      {q.answer}{effectiveType === 'multiple' && q.options?.[q.answer] ? `. ${q.options[q.answer]}` : ''}
-                    </span>
+                    התשובה הנכונה: <span className="text-green-700 font-normal">{q.answer}</span>
                   </p>
                   {fb.explanation && <p className="text-xs text-slate-600 leading-relaxed">{fb.explanation}</p>}
-                  {effectiveType === 'open' && fb.covered_points?.length > 0 && (
+                  {fb.covered_points?.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold text-green-700 mb-1">נקודות שכוסו:</p>
                       {fb.covered_points.map((p, j) => <p key={j} className="text-xs text-green-600">✓ {p}</p>)}
                     </div>
                   )}
-                  {effectiveType === 'open' && fb.missed_points?.length > 0 && (
+                  {fb.missed_points?.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold text-red-700 mb-1">נקודות חסרות:</p>
                       {fb.missed_points.map((p, j) => <p key={j} className="text-xs text-red-600">✗ {p}</p>)}

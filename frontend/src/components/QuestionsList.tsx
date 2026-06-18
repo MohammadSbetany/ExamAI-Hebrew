@@ -83,6 +83,23 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                 {/* Determine the effective type for this question */}
                 {(() => {
                   const effectiveType = questionType === 'merged' ? (question.type || 'open') : questionType;
+                  // After grading, objective options highlight the correct answer (green)
+                  // and the student's wrong pick (red); before grading, the selected one.
+                  const optionClass = (option: string) => {
+                    if (feedback) {
+                      // Yes/No: only color the student's own pick (green if right, red if
+                      // wrong) so both buttons aren't highlighted at once.
+                      if (effectiveType === 'yesno') {
+                        if (option !== answers[index]) return 'border-slate-300 text-slate-600';
+                        return option === question.answer ? 'border-green-500 bg-green-100 text-green-700' : 'border-red-400 bg-red-100 text-red-700';
+                      }
+                      // Multiple choice: mark the correct option green and a wrong pick red.
+                      if (option === question.answer) return 'border-green-500 bg-green-100 text-green-700';
+                      if (option === answers[index]) return 'border-red-400 bg-red-100 text-red-700';
+                      return 'border-slate-300 text-slate-600';
+                    }
+                    return answers[index] === option ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50';
+                  };
                   return (
                     <>
                       {/* Open question */}
@@ -105,10 +122,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                               key={option}
                               onClick={() => onAnswerChange(index, option)}
                               disabled={!!gradeResult || isGrading}
-                              className={`px-6 py-2 rounded-xl border-2 text-sm font-medium transition-all
-                                ${answers[index] === option
-                                  ? 'border-primary bg-primary/10 text-primary'
-                                  : 'border-border text-muted-foreground hover:border-primary/50'}`}
+                              className={`px-6 py-2 rounded-xl border-2 text-sm font-medium transition-all ${optionClass(option)}`}
                             >
                               {option}
                             </button>
@@ -124,10 +138,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                               key={option}
                               onClick={() => onAnswerChange(index, option)}
                               disabled={!!gradeResult || isGrading}
-                              className={`w-full text-right px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all
-                                ${answers[index] === option
-                                  ? 'border-primary bg-primary/10 text-primary'
-                                  : 'border-border text-muted-foreground hover:border-primary/50'}`}
+                              className={`w-full text-right px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all ${optionClass(option)}`}
                             >
                               {option}. {question.options?.[option] || ''}
                             </button>
@@ -135,22 +146,21 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                         </div>
                       )}
 
-                      {/* Per-question feedback shown right after the answer */}
-                      {feedback && (
+                      {/* Per-question feedback — open questions only
+                          (objective answers are shown on the option buttons) */}
+                      {feedback && effectiveType === 'open' && (
                         <div className="mt-3 space-y-1 text-right" dir="rtl">
 
-                          {/* Correct answer — shown for all question types */}
+                          {/* Model answer */}
                           <p className="text-sm font-medium text-slate-800">
-                            התשובה הנכונה: <span className="text-green-700">
-                              {question.answer}{effectiveType === 'multiple' && question.options?.[question.answer] ? `. ${question.options[question.answer]}` : ''}
-                            </span>
+                            התשובה הנכונה: <span className="text-green-700">{question.answer}</span>
                           </p>
 
                           {/* Explanation */}
                           {feedback.explanation && <p className="text-xs text-slate-600 leading-relaxed">{feedback.explanation}</p>}
 
-                          {/* Covered points — open questions only */}
-                          {effectiveType === 'open' && feedback.covered_points?.length > 0 && (
+                          {/* Covered points */}
+                          {feedback.covered_points?.length > 0 && (
                             <div className="mt-1">
                               <p className="text-xs font-medium text-green-700">נקודות שכוסו בתשובה:</p>
                               {feedback.covered_points.map((point: string, i: number) => (
@@ -159,8 +169,8 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                             </div>
                           )}
 
-                          {/* Missed points — open questions only */}
-                          {effectiveType === 'open' && feedback.missed_points?.length > 0 && (
+                          {/* Missed points */}
+                          {feedback.missed_points?.length > 0 && (
                             <div className="mt-1">
                               <p className="text-xs font-medium text-red-700">נקודות חסרות בתשובה:</p>
                               {feedback.missed_points.map((point: string, i: number) => (
