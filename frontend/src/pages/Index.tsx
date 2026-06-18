@@ -4,7 +4,6 @@ import FileUpload from '@/components/FileUpload';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import QuestionsList from '@/components/QuestionsList';
 import ErrorMessage from '@/components/ErrorMessage';
-import AdvancedSettings from '@/components/AdvancedSettings';
 import { useAuth } from '@/context/AuthContext';
 import type { Question, GradeResult } from '@/types/questions';
 import { gradeLocally } from '@/utils/gradingUtils';
@@ -434,18 +433,6 @@ const Index = () => {
               השאלות מותאמות לרמות טקסונומיית בלום
             </p>
           </div>
-
-          {/* Advanced Settings (difficulty distribution + format counts for merged modes) */}
-          <AdvancedSettings
-            questionType={questionType}
-            difficulty={difficulty}
-            questionCount={questionCount}
-            difficultyDist={difficultyDist}
-            onDifficultyDistChange={setDifficultyDist}
-            formatCounts={formatCounts}
-            onFormatCountsChange={setFormatCounts}
-            disabled={isLoading}
-          />
           </>)}
 
           {/* Recommended time banner */}

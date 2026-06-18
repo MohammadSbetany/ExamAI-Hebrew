@@ -64,13 +64,13 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
               <span className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-sm font-semibold text-primary">
                 {index + 1}
               </span>
-              <div className="flex-1">
+              <div className="flex-1 text-right" dir="rtl">
 
                 {/* Question text + points badge */}
                 <div className="flex justify-between items-start mb-3">
-                  <p className="text-foreground leading-relaxed">{question.question}</p>
+                  <p className={`leading-relaxed ${feedback ? 'text-slate-800' : 'text-foreground'}`}>{question.question}</p>
                   {feedback && (
-                    <span className={`ml-3 flex-shrink-0 text-sm font-bold px-2 py-1 rounded-lg ${
+                    <span className={`mr-3 flex-shrink-0 text-sm font-bold px-2 py-1 rounded-lg ${
                       points === 1 ? 'bg-green-100 text-green-700' :
                       points === 0.5 ? 'bg-yellow-100 text-yellow-700' :
                       'bg-red-100 text-red-700'
@@ -137,15 +137,15 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
 
                       {/* Per-question feedback shown right after the answer */}
                       {feedback && (
-                        <div className="mt-3 space-y-1">
+                        <div className="mt-3 space-y-1 text-right" dir="rtl">
 
                           {/* Correct answer — shown for all question types */}
-                          <p className="text-sm font-medium text-foreground">
+                          <p className="text-sm font-medium text-slate-800">
                             התשובה הנכונה: <span className="text-green-700">{question.answer}</span>
                           </p>
 
                           {/* Explanation */}
-                          <p className="text-xs text-muted-foreground">{feedback.explanation}</p>
+                          <p className="text-xs text-slate-600 leading-relaxed">{feedback.explanation}</p>
 
                           {/* Covered points — open questions only */}
                           {effectiveType === 'open' && feedback.covered_points?.length > 0 && (
