@@ -11,8 +11,6 @@ vi.mock('@/lib/examsApi', () => ({
   saveExam: vi.fn(),
 }));
 vi.mock('@/lib/exportUtils', () => ({
-  exportBlankPdf: vi.fn(),
-  exportGradedPdf: vi.fn(),
   exportBlankDocx: vi.fn(),
   exportGradedDocx: vi.fn(),
 }));
@@ -333,7 +331,7 @@ describe('ProtectedRoute — teacher guard', () => {
 
 describe('ExportMenu component', () => {
   it('renders export dropdown trigger', async () => {
-    const { exportBlankPdf, exportBlankDocx } = await import('@/lib/exportUtils');
+    const { exportBlankDocx } = await import('@/lib/exportUtils');
     const { default: ExportMenu } = await import('@/components/ExportMenu');
     const mockQuestions = [{ question: 'מה?', answer: 'תשובה' }];
     render(

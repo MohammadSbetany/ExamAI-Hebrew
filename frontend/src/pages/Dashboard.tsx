@@ -227,17 +227,25 @@ const TeacherDashboard = ({ user, exams }: { user: { name: string; token: string
   useEffect(() => {
     const load = async () => {
       try {
-        const [classesRes, examsRes] = await Promise.all([
-          fetch(`${API()}/classes`, { headers: authH(user.token) }).then(r => r.json()),
-          fetch(`${API()}/teacher/shared-exams`, { headers: authH(user.token) }).then(r => r.json()),
-        ]);
-        const sharedExams = examsRes.exams ?? [];
-        const allClasses = classesRes.classes ?? [];
-        const totalStudents = allClasses.reduce((sum: number, c: { students?: { uid: string }[] }) => sum + (c.students?.length ?? 0), 0);
+        const classesRes = await fetch(`${API()}/classes`, { headers: authH(user.token) }).then(r => r.json());
+        const allClasses: { id: string; students?: { uid: string }[] }[] = classesRes.classes ?? [];
+        const totalStudents = allClasses.reduce((sum, c) => sum + (c.students?.length ?? 0), 0);
+
+        // Fetch class exams for all classes to get accurate active-exam count
+        const examCounts = await Promise.all(
+          allClasses.map(c =>
+            fetch(`${API()}/classes/${c.id}/exams`, { headers: authH(user.token) })
+              .then(r => r.ok ? r.json() : { exams: [] })
+              .then(d => (d.exams ?? []).filter((e: { visible: boolean }) => e.visible !== false).length)
+              .catch(() => 0)
+          )
+        );
+        const activeExams = examCounts.reduce((s, n) => s + n, 0);
+
         setTeacherData({
           totalStudents,
-          activeExams: sharedExams.filter((e: { visible: boolean }) => e.visible !== false).length,
-          classAverage: null, // expensive to compute — show in Stats tab
+          activeExams,
+          classAverage: null,
           recentSubmissions: 0,
           strugglingStudents: [],
         });

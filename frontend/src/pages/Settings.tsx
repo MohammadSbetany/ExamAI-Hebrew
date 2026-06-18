@@ -173,11 +173,11 @@ const Settings = () => {
         return;
       }
 
-      const { exportBlankPdf } = await import('@/lib/exportUtils');
+      const { exportBlankDocx } = await import('@/lib/exportUtils');
 
       for (const exam of exams) {
         if (Array.isArray(exam.questions) && exam.questions.length > 0) {
-          await exportBlankPdf(exam.questions);
+          await exportBlankDocx(exam.questions);
           // Small delay between downloads to avoid browser blocking
           await new Promise(res => setTimeout(res, 500));
         }
@@ -353,10 +353,10 @@ const Settings = () => {
                           className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none h-20 focus:outline-none focus:ring-2 focus:ring-primary/30" />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">חתימה לייצוא PDF</label>
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">חתימה לייצוא Word</label>
                         <TextInput value={settings.classSignature} onChange={v => setSettings(s => ({ ...s, classSignature: v }))}
                           placeholder={'קורס: אלגוריתמים | מרצה: ד"ר כהן | סמסטר א׳'} />
-                        <p className="text-xs text-muted-foreground mt-1">יופיע בכותרת התחתונה של כל קובץ PDF מיוצא.</p>
+                        <p className="text-xs text-muted-foreground mt-1">יופיע בכותרת התחתונה של כל קובץ Word מיוצא.</p>
                       </div>
                     </div>
                     <button onClick={() => { handleToggle('officeHours', settings.officeHours); handleToggle('classSignature', settings.classSignature); }}
@@ -378,10 +378,10 @@ const Settings = () => {
             {activeTab === 'privacy' && (
               <>
                 <Section title="ייצוא נתונים">
-                  <Row label="הורד את כל הנתונים שלי" sub="כולל כל הבחינות, תשובות וציונים בפורמט PDF">
+                  <Row label="הורד את כל הנתונים שלי" sub="כולל כל הבחינות, תשובות וציונים בפורמט Word">
                     <button onClick={handleExportData}
                       className="px-4 py-2 rounded-xl border-2 border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
-                      הורד PDF
+                      הורד Word
                     </button>
                   </Row>
                 </Section>

@@ -373,7 +373,18 @@ const Index = () => {
           
           {/* Question Count */}
           <div className="mb-6">
-            <p className="text-sm font-medium text-foreground mb-3">מספר השאלות: {questionCount}</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium text-foreground">מספר השאלות</p>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={questionCount}
+                onChange={e => setQuestionCount(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                disabled={isLoading}
+                className="w-16 px-2 py-1 rounded-lg border border-input bg-background text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
             <input
               type="range"
               min={1}

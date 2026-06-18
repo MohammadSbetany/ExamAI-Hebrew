@@ -50,13 +50,12 @@ const ExportMenu = ({ questions, gradeResult, variant }: ExportMenuProps) => {
     setLoading(format);
     setOpen(false);
     try {
-      if (variant === 'blank') {
-        if (format === 'pdf') await exportBlankPdf(questions);
-        else await exportBlankDocx(questions);
+      if (format === 'pdf') {
+        if (variant === 'blank') await exportBlankPdf(questions);
+        else { if (!gradeResult) return; await exportGradedPdf(questions, gradeResult); }
       } else {
-        if (!gradeResult) return;
-        if (format === 'pdf') await exportGradedPdf(questions, gradeResult);
-        else await exportGradedDocx(questions, gradeResult);
+        if (variant === 'blank') await exportBlankDocx(questions);
+        else { if (!gradeResult) return; await exportGradedDocx(questions, gradeResult); }
       }
     } finally {
       setLoading(null);
