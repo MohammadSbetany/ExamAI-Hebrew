@@ -93,7 +93,7 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
     try {
       // Local grading for simple types
       if (questionType === 'multiple' || questionType === 'yesno') {
-        const result = gradeLocally(questions, answers, questionType as 'multiple' | 'yesno');
+        const result = gradeLocally(questions, answers);
         setGradeResult(result);
         await persistGrade(result);
         return;
@@ -192,7 +192,7 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
           const fb = gradeResult?.feedback[i];
           const pts = fb?.points;
           const effectiveType = questionType === 'merged' ? (q.type || 'open') : questionType;
-          const qBg = pts === 1 ? 'border-green-200 bg-green-50/50' : pts === 0.5 ? 'border-yellow-200 bg-yellow-50/50' : pts === 0 ? 'border-red-200 bg-red-50/50' : 'border-border bg-card';
+          const qBg = pts === 1 ? 'border-green-200 bg-green-50' : pts === 0.5 ? 'border-yellow-200 bg-yellow-50' : pts === 0 ? 'border-red-200 bg-red-50' : 'border-border bg-card';
 
           return (
             <li key={i} className={`border rounded-2xl p-5 transition-all ${qBg}`}>
@@ -201,7 +201,7 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
                   {i + 1}
                 </span>
                 <div className="flex-1 flex justify-between items-start gap-2">
-                  <p className="text-foreground leading-relaxed font-medium">{q.question}</p>
+                  <p className={`leading-relaxed font-medium ${fb ? 'text-slate-800' : 'text-foreground'}`}>{q.question}</p>
                   {fb && (
                     <span className={`flex-shrink-0 text-sm font-bold px-2.5 py-1 rounded-lg ${pts === 1 ? 'bg-green-100 text-green-700' : pts === 0.5 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
                       {pts}/1
@@ -226,7 +226,7 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
                 <div className="flex gap-3">
                   {['כן', 'לא'].map(opt => (
                     <button key={opt} onClick={() => handleAnswerChange(i, opt)} disabled={!!gradeResult || isGrading}
-                      className={`px-8 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${answers[i] === opt ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
+                      className={`px-8 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${answers[i] === opt ? 'border-primary bg-primary/10 text-primary' : fb ? 'border-slate-300 text-slate-600' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
                       {opt}
                     </button>
                   ))}
@@ -237,7 +237,7 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
                 <div className="space-y-2">
                   {['א', 'ב', 'ג', 'ד'].map(opt => (
                     <button key={opt} onClick={() => handleAnswerChange(i, opt)} disabled={!!gradeResult || isGrading}
-                      className={`w-full text-right px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${answers[i] === opt ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
+                      className={`w-full text-right px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${answers[i] === opt ? 'border-primary bg-primary/10 text-primary' : fb ? 'border-slate-300 text-slate-600' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
                       <span className="font-bold ml-2">{opt}.</span> {q.options?.[opt] || ''}
                     </button>
                   ))}
@@ -247,10 +247,12 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
               {/* Feedback */}
               {fb && (
                 <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
-                  <p className="text-sm font-semibold text-foreground">
-                    התשובה הנכונה: <span className="text-green-700 font-normal">{q.answer}</span>
+                  <p className="text-sm font-semibold text-slate-800">
+                    התשובה הנכונה: <span className="text-green-700 font-normal">
+                      {q.answer}{effectiveType === 'multiple' && q.options?.[q.answer] ? `. ${q.options[q.answer]}` : ''}
+                    </span>
                   </p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{fb.explanation}</p>
+                  {fb.explanation && <p className="text-xs text-slate-600 leading-relaxed">{fb.explanation}</p>}
                   {effectiveType === 'open' && fb.covered_points?.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold text-green-700 mb-1">נקודות שכוסו:</p>

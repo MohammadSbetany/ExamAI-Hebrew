@@ -41,7 +41,7 @@ describe('gradeLocally — edge cases', () => {
   it('handles single question correctly', async () => {
     const { gradeLocally } = await import('@/utils/gradingUtils');
     const questions = [{ question: 'שאלה?', answer: 'כן' }];
-    const result = gradeLocally(questions, ['כן'], 'yesno');
+    const result = gradeLocally(questions, ['כן']);
     expect(result.score).toBe(1);
     expect(result.feedback).toHaveLength(1);
   });
@@ -51,7 +51,7 @@ describe('gradeLocally — edge cases', () => {
     const questions = [
       { question: 'מה?', answer: 'א', options: { א: 'נכון', ב: 'לא', ג: 'לא', ד: 'לא' } },
     ];
-    const result = gradeLocally(questions, ['ד'], 'multiple');
+    const result = gradeLocally(questions, ['ד']);
     expect(result.score).toBe(0);
     expect(result.feedback[0].correct).toBe(false);
   });
@@ -62,7 +62,7 @@ describe('gradeLocally — edge cases', () => {
       { question: 'א?', answer: 'כן' },
       { question: 'ב?', answer: 'לא' },
     ];
-    const result = gradeLocally(questions, ['כן', 'כן'], 'yesno');
+    const result = gradeLocally(questions, ['כן', 'כן']);
     expect(result.feedback[0].points).toBe(1);
     expect(result.feedback[1].points).toBe(0);
   });
@@ -72,7 +72,7 @@ describe('gradeLocally — edge cases', () => {
     const questions = Array(5).fill(null).map((_, i) => ({
       question: `שאלה ${i}?`, answer: 'כן'
     }));
-    const result = gradeLocally(questions, Array(5).fill('כן'), 'yesno');
+    const result = gradeLocally(questions, Array(5).fill('כן'));
     expect(result.feedback).toHaveLength(5);
   });
 });

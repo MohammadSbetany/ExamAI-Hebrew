@@ -12,40 +12,41 @@ describe('Local grading — Yes/No', () => {
   ];
 
   it('gives full score when all answers are correct', () => {
-    const result = gradeLocally(questions, ['כן', 'לא', 'כן'], 'yesno');
+    const result = gradeLocally(questions, ['כן', 'לא', 'כן']);
     expect(result.score).toBe(3);
     expect(result.feedback.every(f => f.correct)).toBe(true);
   });
 
   it('gives zero score when all answers are wrong', () => {
-    const result = gradeLocally(questions, ['לא', 'כן', 'לא'], 'yesno');
+    const result = gradeLocally(questions, ['לא', 'כן', 'לא']);
     expect(result.score).toBe(0);
     expect(result.feedback.every(f => !f.correct)).toBe(true);
   });
 
   it('gives partial score for mixed answers', () => {
-    const result = gradeLocally(questions, ['כן', 'כן', 'כן'], 'yesno');
+    const result = gradeLocally(questions, ['כן', 'כן', 'כן']);
     expect(result.score).toBe(2);
   });
 
-  it('shows correct explanation for wrong answer', () => {
-    const result = gradeLocally(questions, ['לא', 'לא', 'כן'], 'yesno');
-    expect(result.feedback[0].explanation).toContain('כן');
+  it('leaves explanation empty for wrong answer (answer shown separately in UI)', () => {
+    const result = gradeLocally(questions, ['לא', 'לא', 'כן']);
+    expect(result.feedback[0].explanation).toBe('');
     expect(result.feedback[0].correct).toBe(false);
   });
 
-  it('shows success explanation for correct answer', () => {
-    const result = gradeLocally(questions, ['כן', 'לא', 'כן'], 'yesno');
-    expect(result.feedback[0].explanation).toBe('תשובה נכונה!');
+  it('leaves explanation empty for correct answer', () => {
+    const result = gradeLocally(questions, ['כן', 'לא', 'כן']);
+    expect(result.feedback[0].explanation).toBe('');
+    expect(result.feedback[0].correct).toBe(true);
   });
 
   it('trims whitespace from answers before comparing', () => {
-    const result = gradeLocally(questions, ['כן ', ' לא', ' כן '], 'yesno');
+    const result = gradeLocally(questions, ['כן ', ' לא', ' כן ']);
     expect(result.score).toBe(3);
   });
 
   it('returns empty covered_points and missed_points', () => {
-    const result = gradeLocally(questions, ['כן', 'לא', 'כן'], 'yesno');
+    const result = gradeLocally(questions, ['כן', 'לא', 'כן']);
     result.feedback.forEach(f => {
       expect(f.covered_points).toEqual([]);
       expect(f.missed_points).toEqual([]);
@@ -63,34 +64,34 @@ describe('Local grading — Multiple Choice', () => {
   ];
 
   it('gives full score when all answers are correct', () => {
-    const result = gradeLocally(questions, ['א', 'ג', 'ד'], 'multiple');
+    const result = gradeLocally(questions, ['א', 'ג', 'ד']);
     expect(result.score).toBe(3);
   });
 
   it('gives zero score when all answers are wrong', () => {
-    const result = gradeLocally(questions, ['ב', 'א', 'ב'], 'multiple');
+    const result = gradeLocally(questions, ['ב', 'א', 'ב']);
     expect(result.score).toBe(0);
   });
 
   it('gives partial score for mixed answers', () => {
-    const result = gradeLocally(questions, ['א', 'א', 'ד'], 'multiple');
+    const result = gradeLocally(questions, ['א', 'א', 'ד']);
     expect(result.score).toBe(2);
   });
 
-  it('includes option text in wrong answer explanation', () => {
-    const result = gradeLocally(questions, ['ב', 'ג', 'ד'], 'multiple');
-    expect(result.feedback[0].explanation).toContain('א');
-    expect(result.feedback[0].explanation).toContain('אפשרות א');
+  it('leaves explanation empty for wrong answer (answer shown separately in UI)', () => {
+    const result = gradeLocally(questions, ['ב', 'ג', 'ד']);
+    expect(result.feedback[0].explanation).toBe('');
+    expect(result.feedback[0].correct).toBe(false);
   });
 
   it('handles empty answer as wrong', () => {
-    const result = gradeLocally(questions, ['', 'ג', 'ד'], 'multiple');
+    const result = gradeLocally(questions, ['', 'ג', 'ד']);
     expect(result.feedback[0].correct).toBe(false);
     expect(result.score).toBe(2);
   });
 
   it('score equals number of correct answers', () => {
-    const result = gradeLocally(questions, ['א', 'ג', 'ד'], 'multiple');
+    const result = gradeLocally(questions, ['א', 'ג', 'ד']);
     const correctCount = result.feedback.filter(f => f.correct).length;
     expect(result.score).toBe(correctCount);
   });

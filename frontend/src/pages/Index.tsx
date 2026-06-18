@@ -232,7 +232,7 @@ const Index = () => {
     try {
       // Yes/No and Multiple choice — grade locally ONLY in generate mode
       if (appMode === 'generate' && (activeQuestionType === 'multiple' || activeQuestionType === 'yesno')) {
-        setGradeResult(gradeLocally(questions, answers, activeQuestionType as 'multiple' | 'yesno'));
+        setGradeResult(gradeLocally(questions, answers));
         return;
       }
 
