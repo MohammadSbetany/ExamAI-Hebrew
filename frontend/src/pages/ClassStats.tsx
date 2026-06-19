@@ -25,7 +25,6 @@ interface Analytics {
   grade_distribution: { label: string; count: number }[];
   ai_recommendations: AIRecommendation[] | null;
 }
-interface SharedExamItem { id: string; title: string; created_at: string; }
 interface ExamSummary {
   exam_id: string; title: string; created_at: string;
   total_submissions: number; graded_count: number;
@@ -51,11 +50,11 @@ interface ClassAnalytics {
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
 const successColor = (rate: number) => {
-  if (rate >= 75) return { bg: 'bg-green-100', text: 'text-green-700', bar: '#22c55e' };
-  if (rate >= 50) return { bg: 'bg-yellow-100', text: 'text-yellow-700', bar: '#eab308' };
-  return { bg: 'bg-red-100', text: 'text-red-700', bar: '#ef4444' };
+  if (rate >= 75) return { bg: 'bg-green-100', text: 'text-green-700 dark:text-green-400', bar: '#22c55e' };
+  if (rate >= 50) return { bg: 'bg-yellow-100', text: 'text-yellow-700 dark:text-yellow-400', bar: '#eab308' };
+  return { bg: 'bg-red-100', text: 'text-red-700 dark:text-red-400', bar: '#ef4444' };
 };
-const pctColor = (pct: number) => pct >= 80 ? 'text-green-700' : pct >= 60 ? 'text-yellow-700' : 'text-red-700';
+const pctColor = (pct: number) => pct >= 80 ? 'text-green-700 dark:text-green-400' : pct >= 60 ? 'text-yellow-700 dark:text-yellow-400' : 'text-red-700 dark:text-red-400';
 
 // ── Tooltips ──────────────────────────────────────────────────────────────────
 
@@ -148,10 +147,10 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
       {comparative && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { icon: '🏆', label: 'הבחינה הטובה ביותר', value: `${comparative.best_exam.avg}% ממוצע`, title: comparative.best_exam.title, color: 'border-green-200 bg-green-50' },
-            { icon: '⚠️', label: 'הבחינה הקשה ביותר', value: `${comparative.worst_exam.avg}% ממוצע`, title: comparative.worst_exam.title, color: 'border-red-200 bg-red-50' },
-            { icon: '❌', label: 'שיעור כישלון גבוה ביותר', value: `${comparative.highest_failure_exam.rate}% נכשלו`, title: comparative.highest_failure_exam.title, color: 'border-orange-200 bg-orange-50' },
-            { icon: '📊', label: 'פיזור ציונים גבוה ביותר', value: `סטיית תקן ${comparative.highest_std_exam.std}%`, title: comparative.highest_std_exam.title, color: 'border-blue-200 bg-blue-50' },
+            { icon: '🏆', label: 'הבחינה הטובה ביותר', value: `${comparative.best_exam.avg}% ממוצע`, title: comparative.best_exam.title, color: 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/40' },
+            { icon: '⚠️', label: 'הבחינה הקשה ביותר', value: `${comparative.worst_exam.avg}% ממוצע`, title: comparative.worst_exam.title, color: 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/40' },
+            { icon: '❌', label: 'שיעור כישלון גבוה ביותר', value: `${comparative.highest_failure_exam.rate}% נכשלו`, title: comparative.highest_failure_exam.title, color: 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/40' },
+            { icon: '📊', label: 'פיזור ציונים גבוה ביותר', value: `סטיית תקן ${comparative.highest_std_exam.std}%`, title: comparative.highest_std_exam.title, color: 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40' },
           ].map(({ icon, label, value, title, color }) => (
             <div key={label} className={`p-4 rounded-xl border-2 ${color}`}>
               <p className="text-xs text-muted-foreground mb-1">{icon} {label}</p>
@@ -187,7 +186,7 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
                   <td className={`py-3 px-3 font-bold ${e.avg_pct !== null ? pctColor(e.avg_pct) : 'text-muted-foreground'}`}>
                     {e.avg_pct !== null ? `${e.avg_pct}%` : '—'}
                   </td>
-                  <td className={`py-3 px-3 font-medium ${e.failure_rate !== null && e.failure_rate > 30 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                  <td className={`py-3 px-3 font-medium ${e.failure_rate !== null && e.failure_rate > 30 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
                     {e.failure_rate !== null ? `${e.failure_rate}%` : '—'}
                   </td>
                   <td className="py-3 px-3 text-muted-foreground">
@@ -217,71 +216,55 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
 const ClassStats = () => {
   const { user } = useAuth();
 
-  // View mode: 'exam' or 'class'
-  const [viewMode, setViewMode] = useState<'exam' | 'class'>('class');
-
-  // Shared exams (analytics system)
-  const [sharedExams, setSharedExams] = useState<SharedExamItem[]>([]);
-  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
-  const [examSource, setExamSource] = useState<'shared' | 'class'>('shared');
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
-
-  // Classes (class_manager system)
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [classAnalytics, setClassAnalytics] = useState<ClassAnalytics | null>(null);
+
+  // Drill-down into a specific exam — reached only from inside a class
+  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [listsLoading, setListsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Load both lists on mount
+  // Load the teacher's classes on mount
   useEffect(() => {
     if (!user?.token) return;
     setListsLoading(true);
-    Promise.all([
-      fetch(`${API()}/classes`, { headers: { Authorization: `Bearer ${user.token}` } }).then(r => r.json()),
-      fetch(`${API()}/teacher/shared-exams`, { headers: { Authorization: `Bearer ${user.token}` } }).then(r => r.json()),
-    ])
-      .then(([classesData, examsData]) => {
-        setClasses((classesData.classes ?? []).filter((c: ClassItem & { teacher_uid?: string }) => c.id && c.name));
-        setSharedExams((examsData.exams ?? []).filter((e: SharedExamItem) => e.id && e.title));
-      })
-      .catch(() => setError('שגיאה בטעינת הנתונים'))
+    fetch(`${API()}/classes`, { headers: { Authorization: `Bearer ${user.token}` } })
+      .then(r => r.json())
+      .then(d => setClasses((d.classes ?? []).filter((c: ClassItem & { teacher_uid?: string }) => c.id && c.name)))
+      .catch(() => setError('שגיאה בטעינת הכיתות'))
       .finally(() => setListsLoading(false));
   }, [user?.token]);
 
-  // Load specific exam analytics
+  // Load class analytics when a class is selected
   useEffect(() => {
-    if (!selectedExamId || !user?.token || viewMode !== 'exam') return;
-    setLoading(true); setAnalytics(null); setError(null);
-    const endpoint = examSource === 'class'
-      ? `${API()}/teacher/analytics/class-exam/${selectedExamId}`
-      : `${API()}/teacher/analytics/${selectedExamId}`;
-    fetch(endpoint, { headers: { Authorization: `Bearer ${user.token}` } })
-      .then(r => r.json()).then(setAnalytics)
-      .catch(() => setError('שגיאה בטעינת הנתונים'))
-      .finally(() => setLoading(false));
-  }, [selectedExamId, user?.token, viewMode, examSource]);
-
-  // Load class analytics
-  useEffect(() => {
-    if (!selectedClassId || !user?.token || viewMode !== 'class') return;
+    if (!selectedClassId || !user?.token) return;
     setLoading(true); setClassAnalytics(null); setError(null);
     fetch(`${API()}/teacher/analytics/class/${selectedClassId}`, { headers: { Authorization: `Bearer ${user.token}` } })
       .then(r => r.json()).then(setClassAnalytics)
       .catch(() => setError('שגיאה בטעינת נתוני הכיתה'))
       .finally(() => setLoading(false));
-  }, [selectedClassId, user?.token, viewMode]);
+  }, [selectedClassId, user?.token]);
 
-  // Drill down from class view into specific exam
-  const handleDrillDown = (examId: string) => {
-    setExamSource('class');
-    setViewMode('exam');
-    setSelectedExamId(examId);
-  };
+  // Load a specific exam's analytics when drilled into one
+  useEffect(() => {
+    if (!selectedExamId || !user?.token) return;
+    setLoading(true); setAnalytics(null); setError(null);
+    fetch(`${API()}/teacher/analytics/class-exam/${selectedExamId}`, { headers: { Authorization: `Bearer ${user.token}` } })
+      .then(r => r.json()).then(setAnalytics)
+      .catch(() => setError('שגיאה בטעינת הנתונים'))
+      .finally(() => setLoading(false));
+  }, [selectedExamId, user?.token]);
 
+  const selectClass = (id: string) => { setSelectedExamId(null); setAnalytics(null); setSelectedClassId(id); };
+  const handleDrillDown = (examId: string) => setSelectedExamId(examId);
+  const backToClass = () => { setSelectedExamId(null); setAnalytics(null); };
+
+  const selectedClass = classes.find(c => c.id === selectedClassId) ?? null;
   const filteredStudents = (analytics?.submissions ?? []).filter(s =>
     s.student_name.toLowerCase().includes(search.toLowerCase())
   );
@@ -293,74 +276,56 @@ const ClassStats = () => {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-foreground mb-1">סטטיסטיקות כיתה</h1>
-          <p className="text-muted-foreground">ניתוח ביצועי תלמידים — לפי כיתה או בחינה ספציפית</p>
+          <p className="text-muted-foreground">בחר כיתה לסקירת ביצועים — להעמקה בבחינה ספציפית, היכנס לכיתה ובחר אותה מהמטריצה</p>
         </div>
 
         {error && <div className="mb-6 px-4 py-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">{error}</div>}
 
-        {/* Selector */}
-        <div className="bg-card border border-border rounded-2xl p-5 mb-6">
-          <div className="flex gap-2 mb-4">
-            <button
-              onClick={() => setViewMode('class')}
-              className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${viewMode === 'class' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}
-            >
-              צפייה כיתתית
-            </button>
-            <button
-              onClick={() => { setViewMode('exam'); setExamSource('shared'); }}
-              className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${viewMode === 'exam' && examSource === 'shared' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}
-            >
-              בחינה ספציפית
-            </button>
+        {/* Class picker — hidden while drilled into a specific exam */}
+        {!selectedExamId && (
+          <div className="bg-card border border-border rounded-2xl p-5 mb-6">
+            <p className="text-sm font-semibold text-foreground mb-3">בחר כיתה</p>
+            {listsLoading ? (
+              <div className="flex justify-center py-4"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+            ) : classes.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">אין כיתות עדיין. צור כיתה בדף ניהול הכיתות.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {classes.map(cls => (
+                  <button key={cls.id} onClick={() => selectClass(cls.id)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${selectedClassId === cls.id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
+                    {cls.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          {listsLoading ? (
-            <div className="flex justify-center py-4"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
-          ) : viewMode === 'class' ? (
-            classes.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">אין כיתות עדיין. צור כיתה בדף ניהול התלמידים.</p>
-            ) : (
-              <>
-                <p className="text-sm font-semibold text-foreground mb-3">בחר כיתה</p>
-                <div className="flex flex-wrap gap-2">
-                  {classes.map(cls => (
-                    <button key={cls.id} onClick={() => setSelectedClassId(cls.id)}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${selectedClassId === cls.id && viewMode === 'class' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
-                      {cls.name}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )
-          ) : (
-            sharedExams.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">אין בחינות משותפות עדיין.</p>
-            ) : (
-              <>
-                <p className="text-sm font-semibold text-foreground mb-3">בחר בחינה</p>
-                <div className="flex flex-wrap gap-2">
-                  {sharedExams.map(exam => (
-                    <button key={exam.id} onClick={() => { setSelectedExamId(exam.id); setExamSource('shared'); setViewMode('exam'); }}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${selectedExamId === exam.id && viewMode === 'exam' && examSource === 'shared' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
-                      {exam.title}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )
-          )}
-        </div>
+        )}
 
         {loading && <div className="flex justify-center py-20"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>}
 
-        {/* ── Class view ── */}
-        {viewMode === 'class' && classAnalytics && !loading && (
+        {/* Prompt to choose a class */}
+        {!selectedExamId && !selectedClassId && !listsLoading && classes.length > 0 && (
+          <div className="bg-card border border-border rounded-2xl p-12 text-center">
+            <div className="text-5xl mb-3">📊</div>
+            <p className="text-lg font-semibold text-foreground mb-1">בחר כיתה כדי להתחיל</p>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">תראה ממוצעים, מגמות ומטריצת בחינות. לחיצה על בחינה במטריצה תפתח ניתוח מעמיק שלה.</p>
+          </div>
+        )}
+
+        {/* ── Class overview ── */}
+        {!selectedExamId && selectedClassId && classAnalytics && !loading && (
           <ClassView classAnalytics={classAnalytics} onDrillDown={handleDrillDown} />
         )}
 
-        {/* ── Specific exam view ── */}
-        {viewMode === 'exam' && analytics && !loading && (
+        {/* ── Specific exam view (drill-down from a class) ── */}
+        {selectedExamId && analytics && !loading && (
           <>
+            <button onClick={backToClass}
+              className="mb-4 flex items-center gap-2 text-sm text-primary hover:underline font-medium">
+              ← חזרה לסקירת{selectedClass ? ` ${selectedClass.name}` : ' הכיתה'}
+            </button>
+
             {analytics.student_count === 0 ? (
               <div className="bg-card border border-border rounded-2xl p-10 text-center">
                 <p className="text-lg font-semibold text-foreground mb-2">אין נתונים עדיין</p>
@@ -368,13 +333,6 @@ const ClassStats = () => {
               </div>
             ) : (
               <>
-                {/* Back to class */}
-                {selectedClassId && (
-                  <button onClick={() => { setViewMode('class'); }}
-                    className="mb-4 flex items-center gap-1 text-sm text-primary hover:underline">
-                    ← חזרה לסקירת הכיתה
-                  </button>
-                )}
 
                 {/* Score stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
@@ -453,13 +411,13 @@ const ClassStats = () => {
                               const pct = da.total_answers ? Math.round((count / da.total_answers) * 100) : 0;
                               const isCorrect = key === da.correct_answer;
                               return (
-                                <div key={key} className={`p-3 rounded-xl border-2 ${isCorrect ? 'border-green-300 bg-green-50' : 'border-border bg-muted/30'}`}>
+                                <div key={key} className={`p-3 rounded-xl border-2 ${isCorrect ? 'border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950/40' : 'border-border bg-muted/30'}`}>
                                   <div className="flex items-center justify-between mb-1">
-                                    <span className={`text-xs font-bold ${isCorrect ? 'text-green-700' : 'text-muted-foreground'}`}>{key}</span>
-                                    {isCorrect && <span className="text-xs text-green-600">✓</span>}
+                                    <span className={`text-xs font-bold ${isCorrect ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground'}`}>{key}</span>
+                                    {isCorrect && <span className="text-xs text-green-600 dark:text-green-400">✓</span>}
                                   </div>
                                   <p className="text-xs text-foreground truncate mb-2">{val as string}</p>
-                                  <p className={`text-sm font-bold ${isCorrect ? 'text-green-700' : count > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{count} ({pct}%)</p>
+                                  <p className={`text-sm font-bold ${isCorrect ? 'text-green-700 dark:text-green-400' : count > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>{count} ({pct}%)</p>
                                 </div>
                               );
                             })}

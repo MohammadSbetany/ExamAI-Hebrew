@@ -19,9 +19,9 @@ const pct = (score: number | null, total: number) =>
   score !== null && total > 0 ? Math.round((score / total) * 100) : null;
 
 const scoreClr = (p: number) => {
-  if (p >= 80) return { bg: 'bg-green-100', text: 'text-green-700', ring: 'ring-green-300' };
-  if (p >= 60) return { bg: 'bg-yellow-100', text: 'text-yellow-700', ring: 'ring-yellow-300' };
-  return { bg: 'bg-red-100', text: 'text-red-700', ring: 'ring-red-300' };
+  if (p >= 80) return { bg: 'bg-green-100 dark:bg-green-900/40', text: 'text-green-700 dark:text-green-300', ring: 'ring-green-300' };
+  if (p >= 60) return { bg: 'bg-yellow-100 dark:bg-yellow-900/40', text: 'text-yellow-700 dark:text-yellow-300', ring: 'ring-yellow-300' };
+  return { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300', ring: 'ring-red-300' };
 };
 
 const greetingTime = () => {
@@ -100,8 +100,8 @@ const StudentDashboard = ({ user, exams }: { user: { name: string; token: string
       {/* Stat row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard value={exams.length} label="בחינות שמורות" color="text-primary" />
-        <StatCard value={gradedExams.length} label="עם ציון" color="text-green-600" />
-        <StatCard value={pendingExams.length} label="ממתינות לפתרון" color="text-yellow-600" />
+        <StatCard value={gradedExams.length} label="עם ציון" color="text-green-600 dark:text-green-400" />
+        <StatCard value={pendingExams.length} label="ממתינות לפתרון" color="text-yellow-600 dark:text-yellow-400" />
         <StatCard value={avgScore !== null ? `${avgScore}%` : '—'} label="ממוצע ציונים" color="text-foreground" />
       </div>
 
@@ -136,18 +136,18 @@ const StudentDashboard = ({ user, exams }: { user: { name: string; token: string
               onClick={() => navigate('/')}
             />
             <QuickActionCard
-              icon={<svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M12 6V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>}
-              label="כרטיסיות" sublabel="חזרה על מושגים" color="bg-purple-100"
+              icon={<svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M12 6V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>}
+              label="כרטיסיות" sublabel="חזרה על מושגים" color="bg-purple-100 dark:bg-purple-900/40"
               onClick={() => navigate('/flashcards')}
             />
             <QuickActionCard
-              icon={<svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
-              label="הבחינות שלי" sublabel={`${exams.length} בחינות שמורות`} color="bg-blue-100"
+              icon={<svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
+              label="הבחינות שלי" sublabel={`${exams.length} בחינות שמורות`} color="bg-blue-100 dark:bg-blue-900/40"
               onClick={() => navigate('/my-exams')}
             />
             <QuickActionCard
-              icon={<svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
-              label="הצטרף לכיתה" sublabel="קוד מהמורה" color="bg-green-100"
+              icon={<svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
+              label="הצטרף לכיתה" sublabel="קוד מהמורה" color="bg-green-100 dark:bg-green-900/40"
               onClick={() => navigate('/my-classes')}
             />
           </div>
@@ -192,14 +192,14 @@ const StudentDashboard = ({ user, exams }: { user: { name: string; token: string
           <div className="space-y-2">
             {pendingExams.slice(0, 3).map(exam => (
               <div key={exam.id} onClick={() => navigate('/my-exams')}
-                className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-amber-300 transition-all"
+                className="bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-amber-300 dark:hover:border-amber-700 transition-all"
               >
                 <span className="text-lg flex-shrink-0">⏳</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{exam.title}</p>
-                  <p className="text-xs text-amber-700">{exam.total} שאלות · {formatDate(exam.created_at)}</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400">{exam.total} שאלות · {formatDate(exam.created_at)}</p>
                 </div>
-                <span className="text-xs font-semibold text-amber-700 flex-shrink-0">פתור עכשיו ←</span>
+                <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex-shrink-0">פתור עכשיו ←</span>
               </div>
             ))}
           </div>
@@ -265,8 +265,8 @@ const TeacherDashboard = ({ user, exams }: { user: { name: string; token: string
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard value={teacherData?.totalStudents ?? 0} label="תלמידים רשומים" sub="בכיתה" color="text-primary" />
-          <StatCard value={teacherData?.activeExams ?? 0} label="בחינות פעילות" sub="גלויות לתלמידים" color="text-green-600" />
-          <StatCard value={exams.length} label="בחינות שיצרת" sub="כולל טיוטות" color="text-blue-600" />
+          <StatCard value={teacherData?.activeExams ?? 0} label="בחינות פעילות" sub="גלויות לתלמידים" color="text-green-600 dark:text-green-400" />
+          <StatCard value={exams.length} label="בחינות שיצרת" sub="כולל טיוטות" color="text-blue-600 dark:text-blue-400" />
           <StatCard value={teacherData?.classAverage !== null && teacherData?.classAverage !== undefined ? `${teacherData.classAverage}%` : '—'} label="ממוצע כיתתי" sub="ראה בסטטיסטיקות" color="text-foreground" />
         </div>
       )}
@@ -281,18 +281,18 @@ const TeacherDashboard = ({ user, exams }: { user: { name: string; token: string
             onClick={() => navigate('/')}
           />
           <QuickActionCard
-            icon={<svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
-            label="ניהול תלמידים" sublabel="רשימה ופעולות" color="bg-blue-100"
+            icon={<svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
+            label="ניהול תלמידים" sublabel="רשימה ופעולות" color="bg-blue-100 dark:bg-blue-900/40"
             onClick={() => navigate('/students')}
           />
           <QuickActionCard
-            icon={<svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}
-            label="סטטיסטיקות" sublabel="ביצועי הכיתה" color="bg-purple-100"
+            icon={<svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}
+            label="סטטיסטיקות" sublabel="ביצועי הכיתה" color="bg-purple-100 dark:bg-purple-900/40"
             onClick={() => navigate('/class-stats')}
           />
           <QuickActionCard
-            icon={<svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
-            label="הבחינות שלי" sublabel={`${exams.length} בחינות`} color="bg-green-100"
+            icon={<svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
+            label="הבחינות שלי" sublabel={`${exams.length} בחינות`} color="bg-green-100 dark:bg-green-900/40"
             onClick={() => navigate('/my-exams')}
           />
         </div>
@@ -315,7 +315,7 @@ const TeacherDashboard = ({ user, exams }: { user: { name: string; token: string
                   <p className="text-sm font-medium text-foreground truncate">{exam.title}</p>
                   <p className="text-xs text-muted-foreground">{exam.total} שאלות · {formatDate(exam.created_at)}</p>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-lg font-medium flex-shrink-0 ${exam.exam_type === 'digitized' ? 'bg-purple-100 text-purple-700' : 'bg-primary/10 text-primary'}`}>
+                <span className={`text-xs px-2 py-1 rounded-lg font-medium flex-shrink-0 ${exam.exam_type === 'digitized' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-primary/10 text-primary'}`}>
                   {exam.exam_type === 'digitized' ? 'דיגיטציה' : 'נוצרה'}
                 </span>
               </div>

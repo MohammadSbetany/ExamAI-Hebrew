@@ -272,7 +272,7 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
           </div>
           <div className="flex items-center gap-3">
             {score != null && (
-              <span className={`text-lg font-bold px-3 py-1 rounded-xl ${(score / total) >= 0.8 ? 'bg-green-100 text-green-700' : (score / total) >= 0.6 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+              <span className={`text-lg font-bold px-3 py-1 rounded-xl ${(score / total) >= 0.8 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : (score / total) >= 0.6 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'}`}>
                 {score}/{total}
               </span>
             )}
@@ -295,20 +295,20 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
             const answer = submission.answers[qi] || '';
             const override = submission.grade_overrides?.[String(qi)];
             const pts = f?.points ?? null;
-            const bg = pts === 1 ? 'border-green-200 bg-green-50' : pts === 0 ? 'border-red-200 bg-red-50' : pts !== null ? 'border-yellow-200 bg-yellow-50' : 'border-border bg-muted/30';
+            const bg = pts === 1 ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/40' : pts === 0 ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/40' : pts !== null ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/40' : 'border-border bg-muted/30';
 
             return (
               <div key={qi} className={`p-4 rounded-xl border-2 ${bg}`}>
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <p className="text-sm font-semibold text-foreground">{qi + 1}. {q.question}</p>
                   {pts !== null && (
-                    <span className={`text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0 ${pts === 1 ? 'bg-green-100 text-green-700' : pts === 0 ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0 ${pts === 1 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : pts === 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'}`}>
                       {pts}/1 {override ? '✏️' : ''}
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mb-1">תשובת התלמיד: <span className="text-foreground font-medium">{answer || '—'}</span></p>
-                <p className="text-xs text-muted-foreground mb-1">תשובה נכונה: <span className="text-green-700 font-medium">{q.answer}</span></p>
+                <p className="text-xs text-muted-foreground mb-1">תשובה נכונה: <span className="text-green-700 dark:text-green-400 font-medium">{q.answer}</span></p>
                 {f?.explanation && <p className="text-xs text-muted-foreground italic">{f.explanation}</p>}
 
                 {submission.grade_result && (
@@ -821,7 +821,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
             </div>
             <p className="text-xs text-muted-foreground mt-2">המשתמש חייב להיות רשום במערכת עם כתובת אימייל זו.</p>
             {addError && <p className="text-xs text-destructive mt-2">{addError}</p>}
-            {addSuccess && <p className="text-xs text-green-600 mt-2">✓ {addSuccess}</p>}
+            {addSuccess && <p className="text-xs text-green-600 dark:text-green-400 mt-2">✓ {addSuccess}</p>}
           </div>
 
           {cls.students.length === 0 ? (
@@ -946,7 +946,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                         ✏️ עריכת שאלות
                       </button>
                       <button onClick={() => toggleVisibility(exam)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${exam.visible ? 'border-green-300 bg-green-50 text-green-700' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${exam.visible ? 'border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
                         {exam.visible ? '👁 גלוי' : '🔒 מוסתר'}
                       </button>
                       <button onClick={() => { loadSubmissions(exam.id); }}
@@ -993,7 +993,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                                 <p className="text-xs text-muted-foreground">{fmtDT(sub.submitted_at)}</p>
                               </div>
                               {pct !== null ? (
-                                <span className={`text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0 ${pct >= 80 ? 'bg-green-100 text-green-700' : pct >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                <span className={`text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0 ${pct >= 80 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : pct >= 60 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'}`}>
                                   {sub.score}/{exam.questions.length} ({pct}%)
                                 </span>
                               ) : (

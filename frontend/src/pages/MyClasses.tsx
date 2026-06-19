@@ -42,7 +42,7 @@ const PreviousSubmission = ({ exam, submission, onBack }: {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{exam.title}</h1>
-            <p className="text-sm text-green-600 font-medium mt-0.5">✓ הוגשה ב-{fmtDT(submission.submitted_at)}</p>
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-0.5">✓ הוגשה ב-{fmtDT(submission.submitted_at)}</p>
           </div>
           <button onClick={onBack} className="px-4 py-2 rounded-xl border border-border text-sm hover:bg-muted">חזרה</button>
         </div>
@@ -60,14 +60,14 @@ const PreviousSubmission = ({ exam, submission, onBack }: {
         {exam.questions.map((q, i) => {
           const fb = submission.grade_result?.feedback?.[i];
           const pts = fb?.points ?? null;
-          const bg = pts === 1 ? 'border-green-200 bg-green-50' : pts === 0 ? 'border-red-200 bg-red-50' : pts !== null ? 'border-yellow-200 bg-yellow-50' : 'border-border bg-card';
+          const bg = pts === 1 ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/40' : pts === 0 ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/40' : pts !== null ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/40' : 'border-border bg-card';
           return (
             <div key={i} className={`p-5 rounded-2xl border-2 ${bg}`}>
               <div className="flex items-start gap-3 mb-3">
                 <span className="w-8 h-8 rounded-full bg-primary/10 text-primary text-sm font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
                 <p className="text-foreground font-medium">{q.question}</p>
                 {pts !== null && (
-                  <span className={`mr-auto flex-shrink-0 text-xs font-bold px-2 py-1 rounded-lg ${pts === 1 ? 'bg-green-100 text-green-700' : pts === 0 ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                  <span className={`mr-auto flex-shrink-0 text-xs font-bold px-2 py-1 rounded-lg ${pts === 1 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : pts === 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'}`}>
                     {pts}/1
                   </span>
                 )}
@@ -119,8 +119,8 @@ const ExamScreen = ({ exam, token, studentName, onDone }: {
     return (
       <div className="bg-background min-h-screen flex items-center justify-center p-4" dir="rtl">
         <div className="bg-card border border-border rounded-2xl p-10 max-w-md w-full text-center shadow-lg">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-16 h-16 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 13l4 4L19 7" />
             </svg>
           </div>
@@ -251,13 +251,13 @@ const ExamCard = ({ exam, onTake, isSubmitted, submission }: {
   const statusBadge = (
     <div className="flex gap-1 flex-wrap justify-end">
       {isSubmitted && (
-        <span className="text-xs px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700 font-medium">✓ הוגש</span>
+        <span className="text-xs px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">✓ הוגש</span>
       )}
       {{
         hidden:    <span className="text-xs px-2 py-0.5 rounded-lg bg-muted text-muted-foreground">מוסתר</span>,
-        scheduled: <span className="text-xs px-2 py-0.5 rounded-lg bg-yellow-100 text-yellow-700">ממתין לפתיחה</span>,
-        closed:    <span className="text-xs px-2 py-0.5 rounded-lg bg-red-100 text-red-700">נסגר</span>,
-        open:      <span className="text-xs px-2 py-0.5 rounded-lg bg-green-100 text-green-700">פתוח</span>,
+        scheduled: <span className="text-xs px-2 py-0.5 rounded-lg bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">ממתין לפתיחה</span>,
+        closed:    <span className="text-xs px-2 py-0.5 rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">נסגר</span>,
+        open:      <span className="text-xs px-2 py-0.5 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">פתוח</span>,
       }[status]}
     </div>
   );
@@ -278,7 +278,7 @@ const ExamCard = ({ exam, onTake, isSubmitted, submission }: {
         const totalQ = exam.questions?.length ?? 0;
         if (gradeResult && totalQ > 0) {
           const pct = Math.round((gradeResult.score / totalQ) * 100);
-          const clr = pct >= 80 ? 'text-green-700' : pct >= 60 ? 'text-yellow-700' : 'text-red-700';
+          const clr = pct >= 80 ? 'text-green-700 dark:text-green-400' : pct >= 60 ? 'text-yellow-700 dark:text-yellow-400' : 'text-red-700 dark:text-red-400';
           return (
             <p className={`text-xs font-semibold mb-1 ${clr}`}>
               ציון: {gradeResult.score}/{totalQ} ({pct}%)
@@ -307,7 +307,7 @@ const ExamCard = ({ exam, onTake, isSubmitted, submission }: {
         <button onClick={onTake}
           className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
             isSubmitted
-              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800'
               : 'bg-primary text-primary-foreground hover:bg-primary/90'
           }`}>
           {isSubmitted ? '👁 צפה בתשובותיך' : 'פתח בחינה →'}

@@ -13,9 +13,9 @@ const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric' });
 
 const pctColor = (pct: number) => {
-  if (pct >= 80) return { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200', ring: 'ring-green-400' };
-  if (pct >= 60) return { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200', ring: 'ring-yellow-400' };
-  return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', ring: 'ring-red-400' };
+  if (pct >= 80) return { bg: 'bg-green-100 dark:bg-green-900/40', text: 'text-green-700 dark:text-green-300', border: 'border-green-200 dark:border-green-800', ring: 'ring-green-400' };
+  if (pct >= 60) return { bg: 'bg-yellow-100 dark:bg-yellow-900/40', text: 'text-yellow-700 dark:text-yellow-300', border: 'border-yellow-200 dark:border-yellow-800', ring: 'ring-yellow-400' };
+  return { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300', border: 'border-red-200 dark:border-red-800', ring: 'ring-red-400' };
 };
 
 const typeLabel: Record<string, string> = {
@@ -175,8 +175,8 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
             {questions.length} שאלות
           </span>
           {gradeResult
-            ? <span className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 font-medium">✓ נבדק</span>
-            : <span className="text-xs px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium">⏳ ממתין לפתרון</span>
+            ? <span className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-medium">✓ נבדק</span>
+            : <span className="text-xs px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-medium">⏳ ממתין לפתרון</span>
           }
         </div>
       </div>
@@ -192,7 +192,7 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
           const fb = gradeResult?.feedback[i];
           const pts = fb?.points;
           const effectiveType = questionType === 'merged' ? (q.type || 'open') : questionType;
-          const qBg = pts === 1 ? 'border-green-200 bg-green-50' : pts === 0.5 ? 'border-yellow-200 bg-yellow-50' : pts === 0 ? 'border-red-200 bg-red-50' : 'border-border bg-card';
+          const qBg = pts === 1 ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/40' : pts === 0.5 ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/40' : pts === 0 ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/40' : 'border-border bg-card';
 
           // After grading, objective options highlight the correct answer (green)
           // and the student's wrong pick (red); before grading, the selected one.
@@ -201,13 +201,13 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
               // Yes/No: only color the student's own pick (green if right, red if
               // wrong) so both buttons aren't highlighted at once.
               if (effectiveType === 'yesno') {
-                if (opt !== answers[i]) return 'border-slate-300 text-slate-600';
-                return opt === q.answer ? 'border-green-500 bg-green-100 text-green-700' : 'border-red-400 bg-red-100 text-red-700';
+                if (opt !== answers[i]) return 'border-border text-muted-foreground';
+                return opt === q.answer ? 'border-green-500 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'border-red-400 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
               }
               // Multiple choice: mark the correct option green and a wrong pick red.
-              if (opt === q.answer) return 'border-green-500 bg-green-100 text-green-700';
-              if (opt === answers[i]) return 'border-red-400 bg-red-100 text-red-700';
-              return 'border-slate-300 text-slate-600';
+              if (opt === q.answer) return 'border-green-500 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
+              if (opt === answers[i]) return 'border-red-400 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
+              return 'border-border text-muted-foreground';
             }
             return answers[i] === opt ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50';
           };
@@ -219,9 +219,9 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
                   {i + 1}
                 </span>
                 <div className="flex-1 flex justify-between items-start gap-2">
-                  <p className={`leading-relaxed font-medium ${fb ? 'text-slate-800' : 'text-foreground'}`}>{q.question}</p>
+                  <p className="leading-relaxed font-medium text-foreground">{q.question}</p>
                   {fb && (
-                    <span className={`flex-shrink-0 text-sm font-bold px-2.5 py-1 rounded-lg ${pts === 1 ? 'bg-green-100 text-green-700' : pts === 0.5 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                    <span className={`flex-shrink-0 text-sm font-bold px-2.5 py-1 rounded-lg ${pts === 1 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : pts === 0.5 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'}`}>
                       {pts}/1
                     </span>
                   )}
@@ -265,20 +265,20 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
               {/* Feedback — open questions only (objective answers are shown on the option buttons) */}
               {fb && effectiveType === 'open' && (
                 <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
-                  <p className="text-sm font-semibold text-slate-800">
-                    התשובה הנכונה: <span className="text-green-700 font-normal">{q.answer}</span>
+                  <p className="text-sm font-semibold text-foreground">
+                    התשובה הנכונה: <span className="text-green-700 dark:text-green-400 font-normal">{q.answer}</span>
                   </p>
-                  {fb.explanation && <p className="text-xs text-slate-600 leading-relaxed">{fb.explanation}</p>}
+                  {fb.explanation && <p className="text-xs text-muted-foreground leading-relaxed">{fb.explanation}</p>}
                   {fb.covered_points?.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-green-700 mb-1">נקודות שכוסו:</p>
-                      {fb.covered_points.map((p, j) => <p key={j} className="text-xs text-green-600">✓ {p}</p>)}
+                      <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">נקודות שכוסו:</p>
+                      {fb.covered_points.map((p, j) => <p key={j} className="text-xs text-green-600 dark:text-green-400">✓ {p}</p>)}
                     </div>
                   )}
                   {fb.missed_points?.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-red-700 mb-1">נקודות חסרות:</p>
-                      {fb.missed_points.map((p, j) => <p key={j} className="text-xs text-red-600">✗ {p}</p>)}
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">נקודות חסרות:</p>
+                      {fb.missed_points.map((p, j) => <p key={j} className="text-xs text-red-600 dark:text-red-400">✗ {p}</p>)}
                     </div>
                   )}
                 </div>
