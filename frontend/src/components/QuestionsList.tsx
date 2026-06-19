@@ -54,9 +54,9 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
           const feedback = gradeResult?.feedback[index];
           const points = feedback?.points;
           const questionBg =
-            points === 1 ? 'bg-green-50 border-green-200' :
-            points === 0.5 ? 'bg-yellow-50 border-yellow-200' :
-            points === 0 ? 'bg-red-50 border-red-200' :
+            points === 1 ? 'bg-green-50 border-green-200 dark:bg-green-950/40 dark:border-green-800' :
+            points === 0.5 ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950/40 dark:border-yellow-800' :
+            points === 0 ? 'bg-red-50 border-red-200 dark:bg-red-950/40 dark:border-red-800' :
             'bg-card border-border';
 
           return (
@@ -68,12 +68,12 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
 
                 {/* Question text + points badge */}
                 <div className="flex justify-between items-start mb-3">
-                  <p className={`leading-relaxed ${feedback ? 'text-slate-800' : 'text-foreground'}`}>{question.question}</p>
+                  <p className="leading-relaxed text-foreground">{question.question}</p>
                   {feedback && (
                     <span className={`mr-3 flex-shrink-0 text-sm font-bold px-2 py-1 rounded-lg ${
-                      points === 1 ? 'bg-green-100 text-green-700' :
-                      points === 0.5 ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-red-100 text-red-700'
+                      points === 1 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                      points === 0.5 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' :
+                      'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
                     }`}>
                       {points} / 1
                     </span>
@@ -90,13 +90,13 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                       // Yes/No: only color the student's own pick (green if right, red if
                       // wrong) so both buttons aren't highlighted at once.
                       if (effectiveType === 'yesno') {
-                        if (option !== answers[index]) return 'border-slate-300 text-slate-600';
-                        return option === question.answer ? 'border-green-500 bg-green-100 text-green-700' : 'border-red-400 bg-red-100 text-red-700';
+                        if (option !== answers[index]) return 'border-border text-muted-foreground';
+                        return option === question.answer ? 'border-green-500 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'border-red-400 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
                       }
                       // Multiple choice: mark the correct option green and a wrong pick red.
-                      if (option === question.answer) return 'border-green-500 bg-green-100 text-green-700';
-                      if (option === answers[index]) return 'border-red-400 bg-red-100 text-red-700';
-                      return 'border-slate-300 text-slate-600';
+                      if (option === question.answer) return 'border-green-500 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
+                      if (option === answers[index]) return 'border-red-400 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
+                      return 'border-border text-muted-foreground';
                     }
                     return answers[index] === option ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50';
                   };
@@ -152,19 +152,19 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                         <div className="mt-3 space-y-1 text-right" dir="rtl">
 
                           {/* Model answer */}
-                          <p className="text-sm font-medium text-slate-800">
-                            התשובה הנכונה: <span className="text-green-700">{question.answer}</span>
+                          <p className="text-sm font-medium text-foreground">
+                            התשובה הנכונה: <span className="text-green-700 dark:text-green-400">{question.answer}</span>
                           </p>
 
                           {/* Explanation */}
-                          {feedback.explanation && <p className="text-xs text-slate-600 leading-relaxed">{feedback.explanation}</p>}
+                          {feedback.explanation && <p className="text-xs text-muted-foreground leading-relaxed">{feedback.explanation}</p>}
 
                           {/* Covered points */}
                           {feedback.covered_points?.length > 0 && (
                             <div className="mt-1">
-                              <p className="text-xs font-medium text-green-700">נקודות שכוסו בתשובה:</p>
+                              <p className="text-xs font-medium text-green-700 dark:text-green-400">נקודות שכוסו בתשובה:</p>
                               {feedback.covered_points.map((point: string, i: number) => (
-                                <p key={i} className="text-xs text-green-600">✓ {point}</p>
+                                <p key={i} className="text-xs text-green-600 dark:text-green-400">✓ {point}</p>
                               ))}
                             </div>
                           )}
@@ -172,9 +172,9 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                           {/* Missed points */}
                           {feedback.missed_points?.length > 0 && (
                             <div className="mt-1">
-                              <p className="text-xs font-medium text-red-700">נקודות חסרות בתשובה:</p>
+                              <p className="text-xs font-medium text-red-700 dark:text-red-400">נקודות חסרות בתשובה:</p>
                               {feedback.missed_points.map((point: string, i: number) => (
-                                <p key={i} className="text-xs text-red-600">✗ {point}</p>
+                                <p key={i} className="text-xs text-red-600 dark:text-red-400">✗ {point}</p>
                               ))}
                             </div>
                           )}

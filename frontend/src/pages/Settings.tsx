@@ -203,7 +203,7 @@ const Settings = () => {
             <p className="text-muted-foreground text-sm">נהל את פרופיל המשתמש והעדפותיך</p>
           </div>
           {saved && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-xl text-sm font-medium">
+            <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 rounded-xl text-sm font-medium">
               <span>✓</span> נשמר
             </div>
           )}
@@ -299,7 +299,7 @@ const Settings = () => {
                         className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                     </div>
                     {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
-                    {passwordSuccess && <p className="text-xs text-green-600">הסיסמה שונתה בהצלחה!</p>}
+                    {passwordSuccess && <p className="text-xs text-green-600 dark:text-green-400">הסיסמה שונתה בהצלחה!</p>}
                   </div>
                   <button onClick={handleChangePassword}
                     className="w-full py-2.5 rounded-xl border-2 border-border text-foreground text-sm font-medium hover:bg-muted transition-colors">
