@@ -5,19 +5,6 @@ import {
   defaultSettings, type UserSettings,
 } from '@/lib/settingsApi';
 
-// ── Toggle ────────────────────────────────────────────────────────────────────
-
-const Toggle = ({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) => (
-  <button
-    type="button"
-    onClick={() => !disabled && onChange(!checked)}
-    disabled={disabled}
-    className={`relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${checked ? 'bg-primary' : 'bg-muted'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-  >
-    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${checked ? 'right-1' : 'right-6'}`} />
-  </button>
-);
-
 // ── Section wrapper ───────────────────────────────────────────────────────────
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -64,7 +51,7 @@ const Select = ({ value, onChange, options }: {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 const Settings = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const isTeacher = user?.role === 'teacher';
 
   const [activeTab, setActiveTab] = useState<Tab>('account');
@@ -84,20 +71,13 @@ const Settings = () => {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  // Delete account
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
-
-
   // ── Nav tabs ──────────────────────────────────────────────────────────────────
 
-  type Tab = 'account' | 'appearance' | 'role' | 'privacy';
+  type Tab = 'account' | 'appearance';
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: 'account',    label: 'חשבון',     icon: '👤' },
-    { id: 'appearance', label: 'מראה',      icon: '🎨' },
-    ...(isTeacher ? [{ id: 'role' as Tab, label: 'הגדרות תפקיד', icon: '⚙️' }] : []),
-    { id: 'privacy',    label: 'פרטיות',    icon: '🔒' },
+    { id: 'account',    label: 'חשבון', icon: '👤' },
+    { id: 'appearance', label: 'מראה',  icon: '🎨' },
   ];
 
   useEffect(() => {
@@ -156,35 +136,6 @@ const Settings = () => {
       setTimeout(() => setPasswordSuccess(false), 3000);
     } catch {
       setPasswordError('הסיסמה הנוכחית שגויה');
-    }
-  };
-
-  const handleExportData = async () => {
-    if (!user?.token) return;
-    try {
-      const r = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/exams`, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      const data = await r.json();
-      const exams = data.exams ?? [];
-
-      if (exams.length === 0) {
-        alert('אין בחינות שמורות להורדה');
-        return;
-      }
-
-      const { exportBlankDocx } = await import('@/lib/exportUtils');
-
-      for (const exam of exams) {
-        if (Array.isArray(exam.questions) && exam.questions.length > 0) {
-          await exportBlankDocx(exam.questions);
-          // Small delay between downloads to avoid browser blocking
-          await new Promise(res => setTimeout(res, 500));
-        }
-      }
-    } catch (e) {
-      console.error('Export failed:', e);
-      alert('שגיאה בייצוא הנתונים');
     }
   };
 
@@ -251,10 +202,6 @@ const Settings = () => {
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1.5 block">תואר (ד"ר, פרופ')</label>
                           <TextInput value={profileFields.title ?? ''} onChange={v => setProfileFields(p => ({ ...p, title: v }))} placeholder={'ד"ר'}/>
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">מחלקה</label>
-                          <TextInput value={profileFields.department ?? ''} onChange={v => setProfileFields(p => ({ ...p, department: v }))} placeholder="מדעי המחשב" />
                         </div>
                       </>
                     ) : (
@@ -324,115 +271,9 @@ const Settings = () => {
                     </div>
                   </Row>
                 </Section>
-
-                <Section title="התראות">
-                  <Row label="בחינה חדשה הוקצתה" sub="התראה כשמורה שיתף איתך בחינה">
-                    <Toggle checked={settings.notifyNewExam} onChange={v => handleToggle('notifyNewExam', v)} />
-                  </Row>
-                  <Row label="בדיקה הושלמה" sub="התראה כשה-AI סיים לבדוק את תשובותיך">
-                    <Toggle checked={settings.notifyGrading} onChange={v => handleToggle('notifyGrading', v)} />
-                  </Row>
-                  <Row label="עדכוני מערכת" sub="התראות על תחזוקה ותכונות חדשות">
-                    <Toggle checked={settings.notifySystem} onChange={v => handleToggle('notifySystem', v)} />
-                  </Row>
-                </Section>
               </>
             )}
 
-            {/* ── Role settings tab ── */}
-            {activeTab === 'role' && (
-              isTeacher ? (
-                <>
-                  <Section title="זהות מקצועית">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">שעות קבלה (גלוי לתלמידים)</label>
-                        <textarea value={settings.officeHours} onChange={e => setSettings(s => ({ ...s, officeHours: e.target.value }))}
-                          onBlur={() => handleToggle('officeHours', settings.officeHours)}
-                          placeholder="ראשון 10:00–12:00, רביעי 14:00–16:00"
-                          className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none h-20 focus:outline-none focus:ring-2 focus:ring-primary/30" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">חתימה לייצוא Word</label>
-                        <TextInput value={settings.classSignature} onChange={v => setSettings(s => ({ ...s, classSignature: v }))}
-                          placeholder={'קורס: אלגוריתמים | מרצה: ד"ר כהן | סמסטר א׳'} />
-                        <p className="text-xs text-muted-foreground mt-1">יופיע בכותרת התחתונה של כל קובץ Word מיוצא.</p>
-                      </div>
-                    </div>
-                    <button onClick={() => { handleToggle('officeHours', settings.officeHours); handleToggle('classSignature', settings.classSignature); }}
-                      className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
-                      שמור הגדרות מורה
-                    </button>
-                  </Section>
-
-                  <Section title="ניהול כיתה">
-                    <Row label="פרסום אוטומטי" sub="בחינות חדשות יהיו גלויות מיד לתלמידים (ללא סקירה ידנית)">
-                      <Toggle checked={settings.autoPublish} onChange={v => handleToggle('autoPublish', v)} />
-                    </Row>
-                  </Section>
-                </>
-                ) : null
-            )}
-
-            {/* ── Privacy tab ── */}
-            {activeTab === 'privacy' && (
-              <>
-                <Section title="ייצוא נתונים">
-                  <Row label="הורד את כל הנתונים שלי" sub="כולל כל הבחינות, תשובות וציונים בפורמט Word">
-                    <button onClick={handleExportData}
-                      className="px-4 py-2 rounded-xl border-2 border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
-                      הורד Word
-                    </button>
-                  </Row>
-                </Section>
-
-                <Section title="התנתקות">
-                  <Row label="התנתק מהמכשיר הזה" sub="תועבר לדף ההתחברות">
-                    <button onClick={logout}
-                      className="px-4 py-2 rounded-xl border-2 border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
-                      התנתק
-                    </button>
-                  </Row>
-                </Section>
-
-                <Section title="אזור מסוכן">
-                  <Row label="מחיקת חשבון" sub="פעולה בלתי הפיכה — כל הנתונים יימחקו לצמיתות">
-                    <button onClick={() => setShowDeleteConfirm(true)}
-                      className="px-4 py-2 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors">
-                      מחק חשבון
-                    </button>
-                  </Row>
-
-                  {showDeleteConfirm && (
-                    <div className="mt-4 p-4 bg-destructive/5 border border-destructive/20 rounded-xl space-y-3">
-                      <p className="text-sm font-semibold text-destructive">אישור מחיקת חשבון</p>
-                      <p className="text-xs text-muted-foreground">הקלד <strong>מחק את החשבון שלי</strong> לאישור:</p>
-                      <input type="text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)}
-                        placeholder="מחק את החשבון שלי"
-                        className="w-full px-3 py-2 rounded-xl border border-destructive/40 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-destructive/30" />
-                      <div className="flex gap-2">
-                        <button
-                          disabled={deleteConfirmText !== 'מחק את החשבון שלי'}
-                          onClick={async () => {
-                            if (deleteConfirmText !== 'מחק את החשבון שלי') return;
-                            const { auth } = await import('@/lib/firebase');
-                            await auth.currentUser?.delete();
-                            await logout();
-                          }}
-                          className="flex-1 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-                        >
-                          מחק לצמיתות
-                        </button>
-                        <button onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
-                          className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">
-                          ביטול
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </Section>
-              </>
-            )}
           </div>
         </div>
       </div>

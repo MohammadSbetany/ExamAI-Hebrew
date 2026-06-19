@@ -262,14 +262,6 @@ describe('Settings — tabs and structure', () => {
     });
   });
 
-  it('renders privacy tab button', async () => {
-    const { default: Settings } = await import('@/pages/Settings');
-    render(<MemoryRouter><Settings /></MemoryRouter>);
-    await waitFor(() => {
-      expect(screen.getByText('פרטיות')).toBeInTheDocument();
-    });
-  });
-
   it('clicking appearance tab shows theme options', async () => {
     const { default: Settings } = await import('@/pages/Settings');
     render(<MemoryRouter><Settings /></MemoryRouter>);
