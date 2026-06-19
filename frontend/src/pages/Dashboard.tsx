@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import type { ExamRecord } from '@/lib/examsApi';
 import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
   ResponsiveContainer, Tooltip,
 } from 'recharts';
 
@@ -14,15 +14,6 @@ const authH = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
-
-const pct = (score: number | null, total: number) =>
-  score !== null && total > 0 ? Math.round((score / total) * 100) : null;
-
-const scoreClr = (p: number) => {
-  if (p >= 80) return { bg: 'bg-green-100 dark:bg-green-900/40', text: 'text-green-700 dark:text-green-300', ring: 'ring-green-300' };
-  if (p >= 60) return { bg: 'bg-yellow-100 dark:bg-yellow-900/40', text: 'text-yellow-700 dark:text-yellow-300', ring: 'ring-yellow-300' };
-  return { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300', ring: 'ring-red-300' };
-};
 
 const greetingTime = () => {
   const h = new Date().getHours();
@@ -48,8 +39,9 @@ const QuickActionCard = ({ icon, label, sublabel, onClick, color }: {
   </button>
 );
 
-const StatCard = ({ value, label, sub, color }: { value: string | number; label: string; sub?: string; color: string }) => (
-  <div className="bg-card border border-border rounded-2xl p-5">
+const StatCard = ({ value, label, sub, color, onClick }: { value: string | number; label: string; sub?: string; color: string; onClick?: () => void }) => (
+  <div onClick={onClick}
+    className={`bg-card border border-border rounded-2xl p-5 ${onClick ? 'cursor-pointer hover:border-primary/40 hover:shadow-md transition-all' : ''}`}>
     <p className={`text-3xl font-bold ${color} mb-1`}>{value}</p>
     <p className="text-sm font-medium text-foreground">{label}</p>
     {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
@@ -58,35 +50,83 @@ const StatCard = ({ value, label, sub, color }: { value: string | number; label:
 
 // ── Student dashboard ─────────────────────────────────────────────────────────
 
+interface StudentClassExam {
+  id: string;
+  classId?: string;
+  className?: string;
+  title: string;
+  questions?: unknown[];
+  created_at: string;
+  open_at: string | null;
+  close_at: string | null;
+  visible: boolean;
+  my_submission?: { submitted_at?: string; grade_result?: { score: number } | null } | null;
+}
+
+const isExamOpen = (e: StudentClassExam) => {
+  if (!e.visible) return false;
+  const now = Date.now();
+  if (e.open_at && now < new Date(e.open_at).getTime()) return false;
+  if (e.close_at && now > new Date(e.close_at).getTime()) return false;
+  return true;
+};
+
 const StudentDashboard = ({ user, exams }: { user: { name: string; token: string }; exams: ExamRecord[] }) => {
   const navigate = useNavigate();
+  const [classExams, setClassExams] = useState<StudentClassExam[]>([]);
+  const [loadingClass, setLoadingClass] = useState(true);
 
-  const gradedExams = exams.filter(e => e.grade_result !== null);
-  const pendingExams = exams.filter(e => e.grade_result === null);
+  // Pull every class exam (with the student's own submission) across all their classes
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const classesRes = await fetch(`${API()}/student/classes`, { headers: authH(user.token) }).then(r => r.json());
+        const classes = classesRes.classes ?? [];
+        const perClass = await Promise.all(
+          classes.map((c: { id: string; name: string }) =>
+            fetch(`${API()}/student/classes/${c.id}/exams`, { headers: authH(user.token) })
+              .then(r => (r.ok ? r.json() : { exams: [] }))
+              .then(d => (d.exams ?? []).map((e: StudentClassExam) => ({ ...e, classId: c.id, className: c.name })))
+              .catch(() => [])
+          )
+        );
+        setClassExams(perClass.flat());
+      } catch { /* silent */ } finally {
+        setLoadingClass(false);
+      }
+    };
+    load();
+  }, [user.token]);
 
-  const avgScore = gradedExams.length > 0
-    ? Math.round(gradedExams.reduce((sum, e) => sum + pct(e.score, e.total)!, 0) / gradedExams.length)
-    : null;
+  const examPct = (e: StudentClassExam): number | null => {
+    const total = e.questions?.length ?? 0;
+    const score = e.my_submission?.grade_result?.score;
+    return score != null && total > 0 ? Math.round((score / total) * 100) : null;
+  };
 
-  const recentExams = exams.slice(0, 3);
+  const graded = classExams.filter(e => e.my_submission?.grade_result);
+  const notSubmitted = classExams.filter(e => !e.my_submission);
+  const openToTake = notSubmitted.filter(isExamOpen);
 
-  // Bloom's radar from question types
-  const bloomData = [
-    { subject: 'זיכרון', score: gradedExams.filter(e => e.question_type === 'yesno').length > 0 ? Math.min(100, 60 + Math.random() * 30) : 40 },
-    { subject: 'הבנה', score: gradedExams.filter(e => e.question_type === 'open').length > 0 ? Math.min(100, 50 + Math.random() * 40) : 35 },
-    { subject: 'יישום', score: gradedExams.filter(e => e.question_type === 'multiple').length > 0 ? Math.min(100, 55 + Math.random() * 35) : 45 },
-    { subject: 'ניתוח', score: gradedExams.filter(e => e.question_type === 'merged').length > 0 ? Math.min(100, 45 + Math.random() * 40) : 30 },
-    { subject: 'הערכה', score: avgScore ? Math.min(100, avgScore * 0.9) : 25 },
-    { subject: 'יצירה', score: avgScore ? Math.min(100, avgScore * 0.75) : 20 },
-  ].map(d => ({ ...d, score: Math.round(d.score) }));
+  const gradedPcts = graded.map(examPct).filter((p): p is number => p !== null);
+  const avgScore = gradedPcts.length ? Math.round(gradedPcts.reduce((a, b) => a + b, 0) / gradedPcts.length) : null;
+
+  // Grades across all graded class exams, ordered by date
+  const trendData = graded
+    .map(e => ({ raw: e.my_submission?.submitted_at || e.created_at, score: examPct(e) }))
+    .filter((d): d is { raw: string; score: number } => d.score !== null)
+    .sort((a, b) => new Date(a.raw).getTime() - new Date(b.raw).getTime())
+    .map(d => ({ date: formatDate(d.raw), score: d.score }));
 
   const insight = avgScore !== null
     ? avgScore >= 80
-      ? `כל הכבוד! ממוצע הציונים שלך הוא ${avgScore}%. המשך כך!`
+      ? `כל הכבוד! ממוצע הציונים שלך בכיתות הוא ${avgScore}%. המשך כך!`
       : avgScore >= 60
-        ? `ממוצע הציונים שלך הוא ${avgScore}%. עוד קצת מאמץ ותגיע למעלה!`
-        : `ממוצע הציונים שלך הוא ${avgScore}%. אל תתייאש — תרגול מוביל לשיפור!`
-    : 'ברוך הבא! התחל לגשת לבחינות כדי לראות את ההתקדמות שלך כאן.';
+        ? `ממוצע הציונים שלך בכיתות הוא ${avgScore}%. עוד קצת מאמץ ותגיע למעלה!`
+        : `ממוצע הציונים שלך בכיתות הוא ${avgScore}%. אל תתייאש — תרגול מוביל לשיפור!`
+    : classExams.length > 0
+      ? 'יש לך בחינות בכיתות. פתור אותן כדי לראות את ההתקדמות שלך כאן.'
+      : 'ברוך הבא! הצטרף לכיתה כדי לראות את הבחינות והציונים שלך כאן.';
 
   return (
     <div className="space-y-6">
@@ -97,107 +137,92 @@ const StudentDashboard = ({ user, exams }: { user: { name: string; token: string
         <p className="text-sm text-muted-foreground leading-relaxed">{insight}</p>
       </div>
 
-      {/* Stat row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard value={exams.length} label="בחינות שמורות" color="text-primary" />
-        <StatCard value={gradedExams.length} label="עם ציון" color="text-green-600 dark:text-green-400" />
-        <StatCard value={pendingExams.length} label="ממתינות לפתרון" color="text-yellow-600 dark:text-yellow-400" />
-        <StatCard value={avgScore !== null ? `${avgScore}%` : '—'} label="ממוצע ציונים" color="text-foreground" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Bloom radar */}
-        <div className="bg-card border border-border rounded-2xl p-5">
-          <h2 className="text-base font-semibold text-foreground mb-4">חוזקות לפי רמות בלום</h2>
-          {gradedExams.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-              גש לבחינות כדי לראות את הפרופיל שלך
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <RadarChart data={bloomData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
-                <PolarGrid stroke="var(--border)" />
-                <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-                <Radar name="ציון" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.15} strokeWidth={2} />
-                <Tooltip formatter={(v: number) => [`${v}%`, 'רמה']} />
-              </RadarChart>
-            </ResponsiveContainer>
-          )}
+      {/* Stat row — based on class exams */}
+      {loadingClass ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1,2,3,4].map(i => <div key={i} className="bg-card border border-border rounded-2xl p-5 h-24 animate-pulse" />)}
         </div>
-
-        {/* Quick actions */}
-        <div>
-          <h2 className="text-base font-semibold text-foreground mb-4">פעולות מהירות</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <QuickActionCard
-              icon={<svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>}
-              label="יצירת בחינה" sublabel="צור שאלות חדשות" color="bg-primary/10"
-              onClick={() => navigate('/')}
-            />
-            <QuickActionCard
-              icon={<svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M12 6V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>}
-              label="כרטיסיות" sublabel="חזרה על מושגים" color="bg-purple-100 dark:bg-purple-900/40"
-              onClick={() => navigate('/flashcards')}
-            />
-            <QuickActionCard
-              icon={<svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
-              label="הבחינות שלי" sublabel={`${exams.length} בחינות שמורות`} color="bg-blue-100 dark:bg-blue-900/40"
-              onClick={() => navigate('/my-exams')}
-            />
-            <QuickActionCard
-              icon={<svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
-              label="הצטרף לכיתה" sublabel="קוד מהמורה" color="bg-green-100 dark:bg-green-900/40"
-              onClick={() => navigate('/my-classes')}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Recent exams */}
-      {recentExams.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-foreground">בחינות אחרונות</h2>
-            <button onClick={() => navigate('/my-exams')} className="text-xs text-primary hover:underline">הצג הכל</button>
-          </div>
-          <div className="space-y-2">
-            {recentExams.map(exam => {
-              const p = pct(exam.score, exam.total);
-              const c = p !== null ? scoreClr(p) : null;
-              return (
-                <div key={exam.id} onClick={() => navigate('/my-exams')}
-                  className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-all"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{exam.title}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(exam.created_at)}</p>
-                  </div>
-                  {p !== null && c ? (
-                    <span className={`text-sm font-bold px-3 py-1 rounded-xl flex-shrink-0 ${c.bg} ${c.text}`}>{p}%</span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground px-3 py-1 rounded-xl border border-dashed border-border flex-shrink-0">ממתין</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard value={classExams.length} label="בחינות בכיתות" color="text-primary" onClick={() => navigate('/my-classes')} />
+          <StatCard value={graded.length} label="נבדקו" sub="עם ציון" color="text-green-600 dark:text-green-400" />
+          <StatCard value={openToTake.length} label="ממתינות לפתרון" sub="פתוחות להגשה" color="text-yellow-600 dark:text-yellow-400" onClick={() => navigate('/my-classes')} />
+          <StatCard value={avgScore !== null ? `${avgScore}%` : '—'} label="ממוצע ציונים" color="text-foreground" />
         </div>
       )}
 
-      {/* Pending */}
-      {pendingExams.length > 0 && (
+      {/* Grades trend — full-width, own row, all classes by date */}
+      <div className="bg-card border border-border rounded-2xl p-5">
+        <h2 className="text-base font-semibold text-foreground mb-4">מגמת ציונים — כל הכיתות</h2>
+        {loadingClass ? (
+          <div className="flex items-center justify-center h-48"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+        ) : trendData.length < 2 ? (
+          <div className="flex items-center justify-center h-48 text-sm text-muted-foreground text-center px-4">
+            {trendData.length === 0
+              ? 'אין עדיין ציונים. פתור בחינות בכיתות כדי לראות מגמה.'
+              : 'פתור עוד בחינה כדי לראות מגמה לאורך זמן.'}
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={trendData} margin={{ top: 10, right: 15, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
+              <Tooltip formatter={(v: number) => [`${v}%`, 'ציון']} />
+              <Line type="monotone" dataKey="score" stroke="hsl(var(--primary))" strokeWidth={2.5}
+                dot={{ r: 4, fill: 'hsl(var(--primary))' }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Quick actions — own row */}
+      <div>
+        <h2 className="text-base font-semibold text-foreground mb-4">פעולות מהירות</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <QuickActionCard
+            icon={<svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>}
+            label="יצירת בחינה" sublabel="צור שאלות חדשות" color="bg-primary/10"
+            onClick={() => navigate('/')}
+          />
+          <QuickActionCard
+            icon={<svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M12 6V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>}
+            label="כרטיסיות" sublabel="חזרה על מושגים" color="bg-purple-100 dark:bg-purple-900/40"
+            onClick={() => navigate('/flashcards')}
+          />
+          <QuickActionCard
+            icon={<svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
+            label="הבחינות שלי" sublabel={`${exams.length} בחינות שמורות`} color="bg-blue-100 dark:bg-blue-900/40"
+            onClick={() => navigate('/my-exams')}
+          />
+          <QuickActionCard
+            icon={<svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
+            label="הכיתות שלי" sublabel="בחינות וציונים" color="bg-green-100 dark:bg-green-900/40"
+            onClick={() => navigate('/my-classes')}
+          />
+        </div>
+      </div>
+
+      {/* Open class exams to take */}
+      {openToTake.length > 0 && (
         <div>
-          <h2 className="text-base font-semibold text-foreground mb-3">ממתינות לפתרון ({pendingExams.length})</h2>
+          <h2 className="text-base font-semibold text-foreground mb-3">בחינות פתוחות להגשה ({openToTake.length})</h2>
           <div className="space-y-2">
-            {pendingExams.slice(0, 3).map(exam => (
-              <div key={exam.id} onClick={() => navigate('/my-exams')}
+            {openToTake.slice(0, 3).map(exam => (
+              <div key={exam.id} onClick={() => navigate('/my-classes', { state: { classId: exam.classId, examId: exam.id } })}
                 className="bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-amber-300 dark:hover:border-amber-700 transition-all"
               >
                 <span className="text-lg flex-shrink-0">⏳</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{exam.title}</p>
-                  <p className="text-xs text-amber-700 dark:text-amber-400">{exam.total} שאלות · {formatDate(exam.created_at)}</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{exam.title}</p>
+                    {exam.className && (
+                      <span className="text-[11px] font-medium text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-md flex-shrink-0 whitespace-nowrap">
+                        {exam.className}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-amber-700 dark:text-amber-400">{exam.questions?.length ?? 0} שאלות · {formatDate(exam.created_at)}</p>
                 </div>
                 <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex-shrink-0">פתור עכשיו ←</span>
               </div>
@@ -214,9 +239,7 @@ const StudentDashboard = ({ user, exams }: { user: { name: string; token: string
 interface TeacherData {
   totalStudents: number;
   activeExams: number;
-  classAverage: number | null;
-  recentSubmissions: number;
-  strugglingStudents: { name: string; pct: number }[];
+  submissionsToGrade: number;
 }
 
 const TeacherDashboard = ({ user, exams }: { user: { name: string; token: string }; exams: ExamRecord[] }) => {
@@ -227,19 +250,36 @@ const TeacherDashboard = ({ user, exams }: { user: { name: string; token: string
   useEffect(() => {
     const load = async () => {
       try {
-        const [classesRes, examsRes] = await Promise.all([
-          fetch(`${API()}/classes`, { headers: authH(user.token) }).then(r => r.json()),
-          fetch(`${API()}/teacher/shared-exams`, { headers: authH(user.token) }).then(r => r.json()),
-        ]);
-        const sharedExams = examsRes.exams ?? [];
+        const classesRes = await fetch(`${API()}/classes`, { headers: authH(user.token) }).then(r => r.json());
         const allClasses = classesRes.classes ?? [];
         const totalStudents = allClasses.reduce((sum: number, c: { students?: { uid: string }[] }) => sum + (c.students?.length ?? 0), 0);
+
+        // Gather all class exams, then count submissions still awaiting grading
+        const examsPerClass = await Promise.all(
+          allClasses.map((c: { id: string }) =>
+            fetch(`${API()}/classes/${c.id}/exams`, { headers: authH(user.token) })
+              .then(r => (r.ok ? r.json() : { exams: [] }))
+              .then(d => d.exams ?? [])
+              .catch(() => [])
+          )
+        );
+        const allClassExams = examsPerClass.flat() as { id: string; visible?: boolean }[];
+
+        const subsPerExam = await Promise.all(
+          allClassExams.map(e =>
+            fetch(`${API()}/class-exams/${e.id}/submissions`, { headers: authH(user.token) })
+              .then(r => (r.ok ? r.json() : { submissions: [] }))
+              .then(d => d.submissions ?? [])
+              .catch(() => [])
+          )
+        );
+        const submissionsToGrade = subsPerExam.flat()
+          .filter((s: { graded_by: string | null }) => !s.graded_by).length;
+
         setTeacherData({
           totalStudents,
-          activeExams: sharedExams.filter((e: { visible: boolean }) => e.visible !== false).length,
-          classAverage: null, // expensive to compute — show in Stats tab
-          recentSubmissions: 0,
-          strugglingStudents: [],
+          activeExams: allClassExams.filter(e => e.visible !== false).length,
+          submissionsToGrade,
         });
       } catch { /* silent */ } finally {
         setLoadingTeacher(false);
@@ -264,10 +304,10 @@ const TeacherDashboard = ({ user, exams }: { user: { name: string; token: string
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard value={teacherData?.totalStudents ?? 0} label="תלמידים רשומים" sub="בכיתה" color="text-primary" />
+          <StatCard value={teacherData?.totalStudents ?? 0} label="תלמידים רשומים" sub="בכל הכיתות" color="text-primary" />
           <StatCard value={teacherData?.activeExams ?? 0} label="בחינות פעילות" sub="גלויות לתלמידים" color="text-green-600 dark:text-green-400" />
           <StatCard value={exams.length} label="בחינות שיצרת" sub="כולל טיוטות" color="text-blue-600 dark:text-blue-400" />
-          <StatCard value={teacherData?.classAverage !== null && teacherData?.classAverage !== undefined ? `${teacherData.classAverage}%` : '—'} label="ממוצע כיתתי" sub="ראה בסטטיסטיקות" color="text-foreground" />
+          <StatCard value={teacherData?.submissionsToGrade ?? 0} label="ממתינות לבדיקה" sub="הגשות תלמידים" color="text-yellow-600 dark:text-yellow-400" onClick={() => navigate('/students')} />
         </div>
       )}
 

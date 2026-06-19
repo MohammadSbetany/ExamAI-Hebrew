@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import type { Question } from '@/types/questions';
 
@@ -319,8 +320,9 @@ const ExamCard = ({ exam, onTake, isSubmitted, submission }: {
 
 // ── Class Detail ──────────────────────────────────────────────────────────────
 
-const ClassDetail = ({ cls, token, studentName, onBack }: {
+const ClassDetail = ({ cls, token, studentName, onBack, initialExamId, onExamOpened }: {
   cls: StudentClass; token: string; studentName: string; onBack: () => void;
+  initialExamId?: string | null; onExamOpened?: () => void;
 }) => {
   const [exams, setExams] = useState<ClassExam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -373,6 +375,20 @@ const ClassDetail = ({ cls, token, studentName, onBack }: {
       setCheckingSubmission(false);
     }
   };
+
+  // Deep-link: auto-open a specific exam once its class's exams have loaded
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (autoOpenedRef.current || loading || !initialExamId) return;
+    const exam = exams.find(e => e.id === initialExamId);
+    if (exam) {
+      autoOpenedRef.current = true;
+      onExamOpened?.();
+      handleOpenExam(exam);
+    }
+    // handleOpenExam/onExamOpened intentionally omitted (guarded by ref)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, initialExamId, exams]);
 
   if (activeExam && previousSubmission) {
     return (
@@ -500,11 +516,14 @@ const JoinModal = ({ token, userName, onJoined, onClose }: {
 
 const MyClasses = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navState = (location.state ?? null) as { classId?: string; examId?: string } | null;
   const [classes, setClasses] = useState<StudentClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showJoin, setShowJoin] = useState(false);
   const [selectedClass, setSelectedClass] = useState<StudentClass | null>(null);
+  const [pendingExamId, setPendingExamId] = useState<string | null>(navState?.examId ?? null);
 
   const load = useCallback(async () => {
     if (!user?.token) return;
@@ -520,11 +539,22 @@ const MyClasses = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  // Deep-link from the dashboard: jump straight into the requested class
+  const autoSelectRef = useRef(false);
+  useEffect(() => {
+    if (autoSelectRef.current || !navState?.classId || classes.length === 0) return;
+    const cls = classes.find(c => c.id === navState.classId);
+    if (cls) { autoSelectRef.current = true; setSelectedClass(cls); }
+  }, [classes, navState]);
+
   if (selectedClass) {
     return (
       <div className="bg-background min-h-screen py-10 px-4">
         <div className="max-w-3xl mx-auto">
-          <ClassDetail cls={selectedClass} token={user?.token ?? ''} studentName={user?.name ?? 'תלמיד'} onBack={() => setSelectedClass(null)} />
+          <ClassDetail cls={selectedClass} token={user?.token ?? ''} studentName={user?.name ?? 'תלמיד'}
+            onBack={() => setSelectedClass(null)}
+            initialExamId={pendingExamId}
+            onExamOpened={() => setPendingExamId(null)} />
         </div>
       </div>
     );
