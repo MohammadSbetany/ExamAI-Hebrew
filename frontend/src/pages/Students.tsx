@@ -582,6 +582,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
   // Create exam form
   const [examTitle, setExamTitle] = useState('');
   const [numVariants, setNumVariants] = useState(1);
+  const [scheduled, setScheduled] = useState(false);
   const [openAt, setOpenAt] = useState('');
   const [closeAt, setCloseAt] = useState('');
   const [examComment, setExamComment] = useState('');
@@ -620,8 +621,8 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
         title: examTitle,
         questions: [],
         num_variants: numVariants,
-        open_at: openAt ? new Date(openAt).toISOString() : null,
-        close_at: closeAt ? new Date(closeAt).toISOString() : null,
+        open_at: scheduled && openAt ? new Date(openAt).toISOString() : null,
+        close_at: scheduled && closeAt ? new Date(closeAt).toISOString() : null,
         comment: examComment || null,
       }),
     });
@@ -633,7 +634,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
     const exam = await r.json();
     setExams(prev => [exam, ...prev]);
     setShowCreateExam(false);
-    setExamTitle(''); setNumVariants(1); setOpenAt(''); setCloseAt(''); setExamComment('');
+    setExamTitle(''); setNumVariants(1); setScheduled(false); setOpenAt(''); setCloseAt(''); setExamComment('');
     setGeneratingExam(exam); // open AI generation flow
   };
 
@@ -884,17 +885,30 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                   {numVariants === 1 ? 'כולם מקבלים את אותו טופס' : `${numVariants} טפסים שונים (שאלות שונות) מחולקים אקראית`}
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">פתיחה <span className="text-muted-foreground">(אופציונלי)</span></label>
-                  <input type="datetime-local" value={openAt} onChange={e => setOpenAt(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none" />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">סגירה <span className="text-muted-foreground">(אופציונלי)</span></label>
-                  <input type="datetime-local" value={closeAt} onChange={e => setCloseAt(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none" />
-                </div>
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={scheduled}
+                    onChange={e => { setScheduled(e.target.checked); if (!e.target.checked) { setOpenAt(''); setCloseAt(''); } }}
+                    className="w-4 h-4 accent-primary" />
+                  <span className="text-sm font-medium text-foreground">תזמון בחינה (זמני פתיחה וסגירה)</span>
+                </label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {scheduled ? 'קבע מתי הבחינה תיפתח ותיסגר.' : 'ללא תזמון — הבחינה זמינה מיד וללא מגבלת זמן.'}
+                </p>
+                {scheduled && (
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">פתיחה</label>
+                      <input type="datetime-local" dir="ltr" value={openAt} onChange={e => setOpenAt(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-left focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">סגירה</label>
+                      <input type="datetime-local" dir="ltr" value={closeAt} onChange={e => setCloseAt(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-left focus:outline-none" />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
