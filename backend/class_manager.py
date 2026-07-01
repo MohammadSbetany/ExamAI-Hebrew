@@ -262,6 +262,7 @@ def create_class_exam(
     open_at: str | None = None,
     close_at: str | None = None,
     comment = None,
+    question_type: str = "open",
 ) -> dict:
     """
     Create an exam for a class.
@@ -312,7 +313,7 @@ def create_class_exam(
         "close_at": close_at,
         "visible": True,
         "created_at": _now(),
-        "question_type": "open",
+        "question_type": question_type or "open",
         "teacher_comment": comment or "",
     }
     _db().collection("class_exams").document(exam_id).set(data)

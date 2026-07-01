@@ -3,6 +3,7 @@ import { saveExam } from '@/lib/examsApi';
 import FileUpload from '@/components/FileUpload';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import QuestionsList from '@/components/QuestionsList';
+import ShareExamModal from '@/components/ShareExamModal';
 import DistributionBar from '@/components/DistributionBar';
 import { rescaleCounts } from '@/utils/distribution';
 import ErrorMessage from '@/components/ErrorMessage';
@@ -37,6 +38,7 @@ const Index = () => {
   const [recommendedTime, setRecommendedTime] = useState<number | null>(null);
   const [savedExamId, setSavedExamId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   const handleFilesChange = (files: File[]) => {
     setSelectedFiles(files);
@@ -599,58 +601,60 @@ const Index = () => {
                 gradeResult={gradeResult}
               />
               
-              <div className="mt-8 flex gap-3">
-                {!savedExamId ? (
+              <div className="mt-8 space-y-3">
+                {/* Share with students — teachers only */}
+                {user?.role === 'teacher' && (
                   <button
-                    onClick={handleSave}
-                    disabled={isSaving || questions.length === 0}
-                    className="flex-1 py-3 px-6 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                    onClick={() => setShowShare(true)}
+                    className="w-full py-3 px-6 rounded-xl border-2 border-primary text-primary font-semibold hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
                   >
-                    {isSaving ? (
-                      <><span className="w-4 h-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />שומר...</>
-                    ) : (
-                      <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeWidth="2" strokeLinecap="round" /><polyline points="17 21 17 13 7 13 7 21" strokeWidth="2" strokeLinecap="round" /><polyline points="7 3 7 8 15 8" strokeWidth="2" strokeLinecap="round" /></svg>שמור בחינה</>
-                    )}
-                  </button>
-                ) : (
-                  <div className="flex-1 py-3 px-6 rounded-xl bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-medium flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="2" strokeLinecap="round" /></svg>
-                    נשמרה בהצלחה
-                  </div>
-                )}
-
-                {savedExamId && user?.role === 'teacher' && (
-                  <button
-                    onClick={async () => {
-                      if (!user?.token) return;
-                      await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/teacher/share-exam`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.token}` },
-                        body: JSON.stringify({
-                          title: selectedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') || 'בחינה',
-                          question_type: activeQuestionType,
-                          questions,
-                        }),
-                      });
-                      alert('הבחינה שותפה בהצלחה עם התלמידים!');
-                    }}
-                    className="w-full py-3 px-6 rounded-xl border-2 border-primary text-primary font-medium hover:bg-primary/5 transition-colors"
-                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     שתף בחינה עם תלמידים
                   </button>
                 )}
 
-                <button
-                  onClick={handleReset}
-                  className="flex-1 py-3 px-6 rounded-xl border-2 border-border text-foreground font-medium hover:bg-muted transition-colors"
-                >
-                  התחל מחדש
-                </button>
+                <div className="flex gap-3">
+                  {!savedExamId ? (
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving || questions.length === 0}
+                      className="flex-1 py-3 px-6 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {isSaving ? (
+                        <><span className="w-4 h-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />שומר...</>
+                      ) : (
+                        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeWidth="2" strokeLinecap="round" /><polyline points="17 21 17 13 7 13 7 21" strokeWidth="2" strokeLinecap="round" /><polyline points="7 3 7 8 15 8" strokeWidth="2" strokeLinecap="round" /></svg>שמור בחינה</>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="flex-1 py-3 px-6 rounded-xl bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-medium flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="2" strokeLinecap="round" /></svg>
+                      נשמרה בהצלחה
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleReset}
+                    className="flex-1 py-3 px-6 rounded-xl border-2 border-border text-foreground font-medium hover:bg-muted transition-colors"
+                  >
+                    התחל מחדש
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {showShare && user?.role === 'teacher' && user?.token && (
+        <ShareExamModal
+          questions={questions}
+          questionType={activeQuestionType}
+          token={user.token}
+          defaultTitle={selectedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') || 'בחינה'}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   );
 };
