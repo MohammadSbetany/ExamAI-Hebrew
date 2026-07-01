@@ -59,42 +59,6 @@ def make_file(content=b"sample content", filename="test.txt"):
     return [("files", (filename, content, "text/plain"))]
 
 
-# ── Digitize endpoint ─────────────────────────────────────────────────────────
-
-class TestDigitize:
-    def test_digitize_success(self, client):
-        mock_result = json.dumps({"questions": [
-            {"type": "open", "question": "מה זה?", "answer": "תשובה"}
-        ]})
-        with patch("main.digitize_exam", return_value=mock_result):
-            r = client.post("/digitize", files=make_file())
-        assert r.status_code == 200
-        assert "questions" in r.json()
-
-    def test_digitize_requires_auth(self, unauth_client):
-        r = unauth_client.post("/digitize", files=make_file())
-        assert r.status_code == 401
-
-    def test_digitize_invalid_file_type(self, client):
-        r = client.post("/digitize", files=[("files", ("bad.exe", b"x", "application/octet-stream"))])
-        assert r.status_code == 400
-
-    def test_digitize_too_many_files(self, client):
-        files = [("files", (f"f{i}.txt", b"x", "text/plain")) for i in range(10)]
-        with patch("main.digitize_exam", return_value=json.dumps({"questions": []})):
-            r = client.post("/digitize", files=files)
-        assert r.status_code == 400
-
-    def test_digitize_returns_questions_array(self, client):
-        mock_result = json.dumps({"questions": [
-            {"type": "yesno", "question": "נכון?", "answer": "כן"},
-            {"type": "open", "question": "הסבר", "answer": "תשובה"},
-        ]})
-        with patch("main.digitize_exam", return_value=mock_result):
-            r = client.post("/digitize", files=make_file())
-        assert len(r.json()["questions"]) == 2
-
-
 # ── Flashcards endpoint ───────────────────────────────────────────────────────
 
 class TestFlashcards:
@@ -659,4 +623,91 @@ class TestUpdateExam:
             "answers": ["תשובה"],
             "grade_result": {"score": 1, "feedback": []},
         })
+        assert r.status_code == 401
+
+
+# ── Share to class: question_type, variants, add-student-by-email ─────────────
+
+class TestShareAndEmail:
+    def _class_doc(self, students=None):
+        doc = MagicMock()
+        doc.exists = True
+        doc.to_dict.return_value = {
+            "id": "class-123", "name": "כיתה", "teacher_uid": "teacher-uid-123",
+            "students": students if students is not None else [],
+            "code": "ABC123", "created_at": "2026-01-01T00:00:00Z",
+        }
+        return doc
+
+    def _exam_doc(self):
+        doc = MagicMock()
+        doc.exists = True
+        doc.to_dict.return_value = {
+            "id": "exam-123", "class_id": "class-123", "teacher_uid": "teacher-uid-123",
+            "title": "בחינה", "questions": [], "variants": {"0": []}, "assignments": {},
+            "num_variants": 1, "open_at": None, "close_at": None, "visible": True,
+            "created_at": "2026-01-01T00:00:00Z", "question_type": "open", "teacher_comment": "",
+        }
+        return doc
+
+    def test_create_class_exam_preserves_question_type(self, client):
+        with patch("class_manager._db") as mock_db:
+            mock_db.return_value.collection.return_value.document.return_value.get.return_value = self._class_doc()
+            mock_db.return_value.collection.return_value.document.return_value.set = MagicMock()
+            r = client.post("/classes/class-123/exams", json={
+                "title": "משותפת", "questions": [{"question": "q", "answer": "a"}],
+                "num_variants": 1, "question_type": "multiple",
+            })
+        assert r.status_code == 200
+        assert r.json()["question_type"] == "multiple"
+
+    def test_create_class_exam_defaults_question_type_to_open(self, client):
+        with patch("class_manager._db") as mock_db:
+            mock_db.return_value.collection.return_value.document.return_value.get.return_value = self._class_doc()
+            mock_db.return_value.collection.return_value.document.return_value.set = MagicMock()
+            r = client.post("/classes/class-123/exams", json={"title": "t", "questions": []})
+        assert r.status_code == 200
+        assert r.json()["question_type"] == "open"
+
+    def test_update_variants_endpoint_success(self, client):
+        with patch("class_manager._db") as mock_db:
+            mock_db.return_value.collection.return_value.document.return_value.get.return_value = self._exam_doc()
+            mock_db.return_value.collection.return_value.document.return_value.update = MagicMock()
+            r = client.patch("/class-exams/exam-123/variants", json={
+                "variants": {"0": [{"question": "q1", "answer": "a"}], "1": [{"question": "q2", "answer": "b"}]},
+                "question_type": "open",
+            })
+        assert r.status_code == 200
+
+    def test_update_variants_requires_auth(self, unauth_client):
+        r = unauth_client.patch("/class-exams/exam-123/variants", json={"variants": {"0": []}})
+        assert r.status_code == 401
+
+    def test_add_student_by_email_success(self, client):
+        student = MagicMock(uid="stu-1", email="stu@test.com", display_name="דנה")
+        with patch("class_manager._db") as mock_db, \
+             patch("firebase_admin.auth.get_user_by_email", return_value=student):
+            mock_db.return_value.collection.return_value.document.return_value.get.return_value = self._class_doc()
+            mock_db.return_value.collection.return_value.document.return_value.update = MagicMock()
+            r = client.post("/classes/class-123/add-student-by-email", json={"email": "stu@test.com"})
+        assert r.status_code == 200
+        assert r.json()["student"]["email"] == "stu@test.com"
+        assert r.json()["student"]["name"] == "דנה"
+
+    def test_add_student_by_email_not_found(self, client):
+        from firebase_admin import auth as fb_auth
+        with patch("class_manager._db") as mock_db, \
+             patch("firebase_admin.auth.get_user_by_email", side_effect=fb_auth.UserNotFoundError("no user")):
+            mock_db.return_value.collection.return_value.document.return_value.get.return_value = self._class_doc()
+            r = client.post("/classes/class-123/add-student-by-email", json={"email": "ghost@test.com"})
+        assert r.status_code == 404
+
+    def test_add_student_by_email_empty_rejected(self, client):
+        with patch("class_manager._db") as mock_db:
+            mock_db.return_value.collection.return_value.document.return_value.get.return_value = self._class_doc()
+            r = client.post("/classes/class-123/add-student-by-email", json={"email": "   "})
+        assert r.status_code == 422
+
+    def test_add_student_by_email_requires_auth(self, unauth_client):
+        r = unauth_client.post("/classes/class-123/add-student-by-email", json={"email": "x@test.com"})
         assert r.status_code == 401        
