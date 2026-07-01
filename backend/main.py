@@ -246,6 +246,7 @@ async def create_exam_endpoint(class_id: str, data: dict, user=Depends(verify_to
             open_at=data.get("open_at"),
             close_at=data.get("close_at"),
             comment=data.get("comment"),
+            question_type=data.get("question_type", "open"),
         )
         return exam
     except PermissionError as e:
