@@ -35,7 +35,6 @@ const Index = () => {
   const [typeCounts, setTypeCounts] = useState<number[]>([1, 3, 1]);   // yesno, multiple, open
   const [levelCounts, setLevelCounts] = useState<number[]>([1, 3, 1]); // easy, medium, hard
   const [recommendedTime, setRecommendedTime] = useState<number | null>(null);
-  const [appMode, setAppMode] = useState<'generate' | 'import'>('generate');
   const [savedExamId, setSavedExamId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -84,53 +83,6 @@ const Index = () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, []);
-
-  const handleDigitize = async () => {
-    if (selectedFiles.length === 0) return;
-    setIsLoading(true);
-    setError(null);
-    setQuestions([]);
-    setAnswers([]);
-    setGradeResult(null);
-    setActiveQuestionType('merged');
-    // Clear any previous timer state before starting a new exam
-    stopTimer();
-    setTimeLeft(null);
-    setRecommendedTime(null);
-
-    try {
-      const formData = new FormData();
-      selectedFiles.forEach(file => formData.append('files', file));
-
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/backend'}/digitize`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${user?.token}` },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || `שגיאה בעיבוד הקובץ (${response.status})`);
-      }
-
-      const data = await response.json();
-      if (data?.error) throw new Error(data.error);
-      if (data?.questions && Array.isArray(data.questions)) {
-        setQuestions(data.questions);
-        // Start timer for import mode (manual timer only — digitize has no AI recommended_time)
-        if (timerEnabled) {
-          const total = timerTotalSeconds;
-          if (total >= 60) startTimer(total);
-        }
-      } else {
-        throw new Error('תשובה לא תקינה מהשרת');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'אירעה שגיאה בלתי צפויה');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleGenerate = async () => {
     if (selectedFiles.length === 0) return;
@@ -228,7 +180,6 @@ const Index = () => {
     setTimeMode('ai');
     setLevelCounts([1, 3, 1]);
     setTypeCounts([1, 3, 1]);
-    setAppMode('generate');
     setSavedExamId(null);
     stopTimer();
     setTimeLeft(null);
@@ -251,7 +202,7 @@ const Index = () => {
     stopTimer();
     try {
       // Yes/No and Multiple choice — grade locally ONLY in generate mode
-      if (appMode === 'generate' && (activeQuestionType === 'multiple' || activeQuestionType === 'yesno')) {
+      if (activeQuestionType === 'multiple' || activeQuestionType === 'yesno') {
         setGradeResult(gradeLocally(questions, answers));
         return;
       }
@@ -288,7 +239,7 @@ const Index = () => {
       const title = selectedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') || 'בחינה';
       const id = await saveExam(user.token, {
         title,
-        exam_type: appMode === 'import' ? 'digitized' : 'generated',
+        exam_type: 'generated',
         question_type: activeQuestionType,
         questions,
         answers,
@@ -310,46 +261,14 @@ const Index = () => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl mb-6">
             <img src="/favicon.ico" alt="ExamAI" className="w-8 h-8 object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-3">
-            {appMode === 'import' ? 'דיגיטציה של בחינה קיימת' : 'מערכת לייצור שאלות'}
-          </h1>
+          <h1 className="text-3xl font-bold text-foreground mb-3">מערכת לייצור שאלות</h1>
           <p className="text-muted-foreground text-lg max-w-md mx-auto">
-            {appMode === 'import'
-              ? 'העלה קובץ בחינה קיימת — ה-AI יחלץ את השאלות ויאפשר לך לפתור אותן באופן אינטראקטיבי'
-              : 'העלה קובץ עם חומר לימוד וקבל שאלות שנוצרות באופן אוטומטי'}
+            העלה קובץ עם חומר לימוד וקבל שאלות שנוצרות באופן אוטומטי
           </p>
         </header>
 
         {/* Main Card */}
         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 md:p-8">
-
-          {/* Mode Toggle */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-xl mb-6">
-            {[
-              { value: 'generate', label: '✨ יצירת שאלות' },
-              { value: 'import', label: '📄 ייבוא בחינה קיימת' },
-            ].map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => { setAppMode(value as 'generate' | 'import'); setQuestions([]); setGradeResult(null); setError(null); }}
-                disabled={isLoading}
-                className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                  appMode === value
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Import mode info banner */}
-          {appMode === 'import' && (
-            <div className="mb-6 px-4 py-3 bg-primary/5 border border-primary/20 rounded-xl text-sm text-primary">
-              העלה קובץ בחינה (PDF, DOCX, TXT). ה-AI יזהה את השאלות אוטומטית, יסווג אותן לפי סוג, ויאפשר לך לפתור ולקבל ציון.
-            </div>
-          )}
 
           {/* Upload Section */}
           <section className="mb-6">
@@ -359,9 +278,6 @@ const Index = () => {
               disabled={isLoading}
             />
           </section>
-
-          {/* Controls — only shown in generate mode */}
-          {appMode === 'generate' && (<>
 
           {/* Question Type Selector */}
           <div className="mb-6">
@@ -489,7 +405,6 @@ const Index = () => {
               </div>
             )}
           </div>
-          </>)}
 
           {/* Recommended time banner */}
           {recommendedTime && (
@@ -613,13 +528,13 @@ const Index = () => {
             </div>
           </div>
 
-          {/* Generate / Digitize Button */}
+          {/* Generate Button */}
           {(() => {
             const timerTooShort = timerEnabled && timeMode === 'manual' && timerTotalSeconds < 60;
             const isDisabled = selectedFiles.length === 0 || isLoading || timerTooShort;
             return (
               <button
-                onClick={appMode === 'import' ? handleDigitize : handleGenerate}
+                onClick={handleGenerate}
                 disabled={isDisabled}
                 className={`
                   w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200
@@ -630,7 +545,7 @@ const Index = () => {
                   }
                 `}
               >
-                {isLoading ? 'מעבד...' : appMode === 'import' ? 'חלץ שאלות מהבחינה' : 'יצירת שאלות'}
+                {isLoading ? 'מעבד...' : 'יצירת שאלות'}
               </button>
             );
           })()}
@@ -682,7 +597,6 @@ const Index = () => {
                 onSubmit={handleGrade}
                 isGrading={isGrading}
                 gradeResult={gradeResult}
-                isImported={appMode === 'import'}
               />
               
               <div className="mt-8 flex gap-3">
