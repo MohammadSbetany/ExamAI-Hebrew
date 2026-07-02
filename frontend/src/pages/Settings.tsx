@@ -53,7 +53,7 @@ const Select = ({ value, onChange, options }: {
 
 const Settings = () => {
   const { user } = useAuth();
-  const { t, i18n, changeLanguage, isRTL } = useTranslation();
+  const { t, isRTL } = useTranslation();
   const isTeacher = user?.role === 'teacher';
 
   const [activeTab, setActiveTab] = useState<Tab>('account');
@@ -267,16 +267,6 @@ const Settings = () => {
                       {[{ value: 'light', label: `☀️ ${t('settings.lightMode')}` }, { value: 'dark', label: `🌙 ${t('settings.darkMode')}` }].map(({ value, label }) => (
                         <button key={value} onClick={() => handleToggle('theme', value)}
                           className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${settings.theme === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </Row>
-                  <Row label={t('settings.language')} sub={t('settings.languageSub')}>
-                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-xl">
-                      {[{ value: 'he', label: 'עברית' }, { value: 'en', label: 'English' }].map(({ value, label }) => (
-                        <button key={value} onClick={() => changeLanguage(value)}
-                          className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${i18n.language === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
                           {label}
                         </button>
                       ))}
