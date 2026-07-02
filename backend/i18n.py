@@ -11,8 +11,10 @@ from functools import lru_cache
 
 from fastapi import Header
 
+# The app currently ships Hebrew only. To add another language later, add its
+# `backend/locales/<lang>.json` file and include its code in SUPPORTED.
 _LOCALES_DIR = os.path.join(os.path.dirname(__file__), "locales")
-SUPPORTED = {"he", "en"}
+SUPPORTED = {"he"}
 DEFAULT_LOCALE = "he"
 
 

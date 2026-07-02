@@ -1,9 +1,12 @@
 import i18n from 'i18next';
 import { initReactI18next, useTranslation as useI18nextTranslation } from 'react-i18next';
 import he from '@/locales/he.json';
-import en from '@/locales/en.json';
 
-// Languages that render right-to-left.
+// The app currently ships Hebrew only. To add another language later:
+//   1. add `src/locales/<lang>.json` (mirror of he.json)
+//   2. import it here and add it to `resources` below
+//   3. add its code to RTL_LANGS if it is right-to-left
+//   4. (optional) re-add a language switcher that calls changeLanguage()
 export const RTL_LANGS = ['he', 'ar'];
 export const isRtlLang = (lng: string) => RTL_LANGS.includes(lng);
 
@@ -14,10 +17,9 @@ i18n
   .init({
     resources: {
       he: { translation: he },
-      en: { translation: en },
     },
     lng: stored || 'he',        // default language
-    fallbackLng: 'en',          // fallback for missing keys
+    fallbackLng: 'he',          // fallback for missing keys
     interpolation: { escapeValue: false }, // React already escapes
   });
 
