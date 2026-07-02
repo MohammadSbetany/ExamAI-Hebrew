@@ -8,10 +8,12 @@ import DistributionBar from '@/components/DistributionBar';
 import { rescaleCounts } from '@/utils/distribution';
 import ErrorMessage from '@/components/ErrorMessage';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslation } from '@/lib/i18n';
 import type { Question, GradeResult } from '@/types/questions';
 import { gradeLocally } from '@/utils/gradingUtils';
 
 const Index = () => {
+  const { t, isRTL } = useTranslation();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,11 +110,11 @@ const Index = () => {
       formData.append('time_mode', timeMode);
       if (timeMode === 'manual') formData.append('manual_minutes', String(Math.ceil(timerTotalSeconds / 60)));
       if (difficulty === 'merged') {
-        const t = Math.max(1, questionCount);
+        const qTotal = Math.max(1, questionCount);
         formData.append('difficulty_dist', JSON.stringify({
-          easy: Math.round((levelCounts[0] / t) * 100),
-          medium: Math.round((levelCounts[1] / t) * 100),
-          hard: Math.round((levelCounts[2] / t) * 100),
+          easy: Math.round((levelCounts[0] / qTotal) * 100),
+          medium: Math.round((levelCounts[1] / qTotal) * 100),
+          hard: Math.round((levelCounts[2] / qTotal) * 100),
         }));
       }
       if (questionType === 'merged') {
@@ -158,11 +160,11 @@ const Index = () => {
         }
       } else {
         console.error("Unexpected JSON structure:", data);
-        throw new Error('תשובה לא תקינה מהשרת - המבנה שהתקבל אינו תקין');
+        throw new Error(t('examGenerator.invalidResponse'));
       }
     } catch (err) {
       console.error("Full catch-block error:", err);
-      setError(err instanceof Error ? err.message : 'אירעה שגיאה בלתי צפויה');
+      setError(err instanceof Error ? err.message : t('examGenerator.unexpectedError'));
     } finally {
       setIsLoading(false);
     }
@@ -225,7 +227,7 @@ const Index = () => {
       const data = await response.json();
       setGradeResult(data);
     } catch (err) {
-      setError('אירעה שגיאה בבדיקת התשובות');
+      setError(t('examGenerator.gradeError'));
     } finally {
       setIsGrading(false);
     }
@@ -238,7 +240,7 @@ const Index = () => {
     if (!user?.token || questions.length === 0) return;
     setIsSaving(true);
     try {
-      const title = selectedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') || 'בחינה';
+      const title = selectedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') || t('examGenerator.examFallback');
       const id = await saveExam(user.token, {
         title,
         exam_type: 'generated',
@@ -249,23 +251,23 @@ const Index = () => {
       });
       setSavedExamId(id);
     } catch {
-      setError('שגיאה בשמירת הבחינה');
+      setError(t('examsApi.saveError'));
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="bg-background py-12 px-4">
+    <div className="bg-background py-12 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <header className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl mb-6">
             <img src="/favicon.ico" alt="ExamAI" className="w-8 h-8 object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-3">מערכת לייצור שאלות</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-3">{t('examGenerator.title')}</h1>
           <p className="text-muted-foreground text-lg max-w-md mx-auto">
-            העלה קובץ עם חומר לימוד וקבל שאלות שנוצרות באופן אוטומטי
+            {t('examGenerator.subtitle')}
           </p>
         </header>
 
@@ -283,13 +285,13 @@ const Index = () => {
 
           {/* Question Type Selector */}
           <div className="mb-6">
-            <p className="text-sm font-medium text-foreground mb-3">סוג השאלות:</p>
+            <p className="text-sm font-medium text-foreground mb-3">{t('examGenerator.questionType')}</p>
             <div className="flex gap-3">
               {[
-                { value: 'open', label: 'שאלות פתוחות' },
-                { value: 'yesno', label: 'כן / לא' },
-                { value: 'multiple', label: 'רב ברירה' },
-                { value: 'merged', label: 'מיזוג' },
+                { value: 'open', label: t('examGenerator.typeOpen') },
+                { value: 'yesno', label: t('examGenerator.typeYesno') },
+                { value: 'multiple', label: t('examGenerator.typeMultiple') },
+                { value: 'merged', label: t('examGenerator.typeMerged') },
               ].map((type) => (
                 <button
                   key={type.value}
@@ -310,13 +312,13 @@ const Index = () => {
             {/* Mixed types — how many questions of each format */}
             {questionType === 'merged' && (
               <div className="mt-3 p-4 bg-muted/40 rounded-xl border border-border">
-                <p className="text-sm font-medium text-foreground mb-3">כמה שאלות מכל סוג? (סה״כ {questionCount})</p>
+                <p className="text-sm font-medium text-foreground mb-3">{t('examGenerator.mixedTypeTitle', { count: questionCount })}</p>
                 <DistributionBar
                   total={questionCount}
                   segments={[
-                    { key: 'yesno', label: 'כן/לא', color: 'bg-blue-500' },
-                    { key: 'multiple', label: 'רב ברירה', color: 'bg-violet-500' },
-                    { key: 'open', label: 'פתוחות', color: 'bg-emerald-500' },
+                    { key: 'yesno', label: t('examGenerator.segYesno'), color: 'bg-blue-500' },
+                    { key: 'multiple', label: t('examGenerator.segMultiple'), color: 'bg-violet-500' },
+                    { key: 'open', label: t('examGenerator.segOpen'), color: 'bg-emerald-500' },
                   ]}
                   counts={typeCounts}
                   onChange={setTypeCounts}
@@ -329,7 +331,7 @@ const Index = () => {
           {/* Question Count */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <p className="text-sm font-medium text-foreground">מספר השאלות</p>
+              <p className="text-sm font-medium text-foreground">{t('examGenerator.questionCount')}</p>
               <input
                 type="number"
                 min={1}
@@ -360,13 +362,13 @@ const Index = () => {
 
           {/* Difficulty Selector */}
           <div className="mb-6">
-            <p className="text-sm font-medium text-foreground mb-3">רמת הקושי:</p>
+            <p className="text-sm font-medium text-foreground mb-3">{t('examGenerator.difficulty')}</p>
             <div className="flex gap-3">
               {[
-                { value: 'easy', label: 'קל', bloom: 'זיכרון והבנה', bloomEn: "Bloom's L1–L2" },
-                { value: 'medium', label: 'בינוני', bloom: 'יישום וניתוח', bloomEn: "Bloom's L3–L4" },
-                { value: 'hard', label: 'קשה', bloom: 'הערכה ויצירה', bloomEn: "Bloom's L5–L6" },
-                { value: 'merged', label: 'מיזוג', bloom: 'כל הרמות', bloomEn: "Bloom's L1–L6 mixed" },
+                { value: 'easy', label: t('examGenerator.levelEasy'), bloom: t('examGenerator.bloomEasy'), bloomEn: "Bloom's L1–L2" },
+                { value: 'medium', label: t('examGenerator.levelMedium'), bloom: t('examGenerator.bloomMedium'), bloomEn: "Bloom's L3–L4" },
+                { value: 'hard', label: t('examGenerator.levelHard'), bloom: t('examGenerator.bloomHard'), bloomEn: "Bloom's L5–L6" },
+                { value: 'merged', label: t('examGenerator.levelMerged'), bloom: t('examGenerator.bloomMerged'), bloomEn: "Bloom's L1–L6 mixed" },
               ].map((level) => (
                 <button
                   key={level.value}
@@ -386,19 +388,19 @@ const Index = () => {
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-2 text-center">
-              השאלות מותאמות לרמות טקסונומיית בלום
+              {t('examGenerator.bloomNote')}
             </p>
 
             {/* Mixed difficulty — how many questions of each level */}
             {difficulty === 'merged' && (
               <div className="mt-3 p-4 bg-muted/40 rounded-xl border border-border">
-                <p className="text-sm font-medium text-foreground mb-3">כמה שאלות בכל רמת קושי? (סה״כ {questionCount})</p>
+                <p className="text-sm font-medium text-foreground mb-3">{t('examGenerator.mixedLevelTitle', { count: questionCount })}</p>
                 <DistributionBar
                   total={questionCount}
                   segments={[
-                    { key: 'easy', label: 'קל', color: 'bg-emerald-500' },
-                    { key: 'medium', label: 'בינוני', color: 'bg-amber-500' },
-                    { key: 'hard', label: 'קשה', color: 'bg-rose-500' },
+                    { key: 'easy', label: t('examGenerator.levelEasy'), color: 'bg-emerald-500' },
+                    { key: 'medium', label: t('examGenerator.levelMedium'), color: 'bg-amber-500' },
+                    { key: 'hard', label: t('examGenerator.levelHard'), color: 'bg-rose-500' },
                   ]}
                   counts={levelCounts}
                   onChange={setLevelCounts}
@@ -414,7 +416,7 @@ const Index = () => {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
               </svg>
-              זמן מומלץ לבחינה: <strong>{recommendedTime} דקות</strong>
+              {t('examGenerator.recommendedTimeLabel')} <strong>{t('examGenerator.minutesValue', { count: recommendedTime })}</strong>
             </div>
           )}
 
@@ -430,16 +432,16 @@ const Index = () => {
                     <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                   </svg>
                  <p className={`text-sm font-medium ${timerEnabled ? 'text-primary' : 'text-muted-foreground'}`}>
-                    הגבלת זמן לבחינה
+                    {t('examGenerator.timeLimit')}
                   </p>
                   {timerEnabled && timeMode === 'ai' && (
                     <span className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 px-2 py-0.5 rounded-full font-medium">✨ AI</span>
                   )}
                   {timerEnabled && timeMode === 'manual' && timerTotalSeconds >= 60 && (
                     <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                      {timerHours > 0 && `${timerHours}ש׳ `}
-                      {timerMinutes > 0 && `${timerMinutes}ד׳ `}
-                      {timerSeconds > 0 && `${timerSeconds}ש״`}
+                      {timerHours > 0 && `${t('examGenerator.hoursAbbr', { n: timerHours })} `}
+                      {timerMinutes > 0 && `${t('examGenerator.minutesAbbr', { n: timerMinutes })} `}
+                      {timerSeconds > 0 && `${t('examGenerator.secondsAbbr', { n: timerSeconds })}`}
                     </span>
                   )}
                 </div>
@@ -447,7 +449,7 @@ const Index = () => {
                   type="button"
                   role="switch"
                   aria-checked={timerEnabled}
-                  aria-label="הגבלת זמן לבחינה"
+                  aria-label={t('examGenerator.timeLimit')}
                   onClick={() => setTimerEnabled(t => !t)}
                   disabled={isLoading || (questions.length > 0 && !gradeResult)}
                   className={`relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${timerEnabled ? 'bg-primary' : 'bg-muted-foreground/30'} disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -463,8 +465,8 @@ const Index = () => {
                   {/* AI or Manual toggle */}
                   <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-xl">
                     {[
-                      { value: 'ai', label: '✨ הגדרה אוטומטית על ידי AI' },
-                      { value: 'manual', label: '⏱ הגדרה ידנית' },
+                      { value: 'ai', label: `✨ ${t('examGenerator.timeModeAi')}` },
+                      { value: 'manual', label: `⏱ ${t('examGenerator.timeModeManual')}` },
                     ].map(({ value, label }) => (
                       <button
                         key={value}
@@ -481,26 +483,26 @@ const Index = () => {
 
                   {gradeResult && timeLeft !== null && (
                     <div className="flex items-center justify-center gap-2 px-3 py-2 bg-muted rounded-lg">
-                      <span className="text-xs text-muted-foreground">הבחינה הוגשה בזמן:</span>
+                      <span className="text-xs text-muted-foreground">{t('examGenerator.submittedAt')}</span>
                       <span className="text-sm font-bold font-mono text-foreground tabular-nums">
                         {String(Math.floor(timeLeft / 3600)).padStart(2, '0')}:
                         {String(Math.floor((timeLeft % 3600) / 60)).padStart(2, '0')}:
                         {String(timeLeft % 60).padStart(2, '0')}
                       </span>
-                      <span className="text-xs text-muted-foreground">נותרו</span>
+                      <span className="text-xs text-muted-foreground">{t('examGenerator.remaining')}</span>
                     </div>
                   )}
                   {!gradeResult && timeMode === 'ai' ? (
                     <p className="text-xs text-muted-foreground bg-purple-50 border border-purple-200 dark:bg-purple-950/40 dark:border-purple-800 rounded-lg px-3 py-2 text-center">
-                      ה-AI יקבע את משך הזמן המומלץ בהתאם לרמת הקושי וכמות השאלות. הזמן יוצג לאחר יצירת הבחינה.
+                      {t('examGenerator.aiTimeHint')}
                     </p>
                   ) : !gradeResult ? (
                     <>
                       <div className="flex items-center justify-center gap-3">
                         {[
-                          { value: timerHours, onChange: (v: number) => setTimerHours(Math.max(0, Math.min(23, v))), max: 23, label: 'שעות' },
-                          { value: timerMinutes, onChange: (v: number) => setTimerMinutes(Math.max(0, Math.min(59, v))), max: 59, label: 'דקות' },
-                          { value: timerSeconds, onChange: (v: number) => setTimerSeconds(Math.max(0, Math.min(59, v))), max: 59, label: 'שניות' },
+                          { value: timerHours, onChange: (v: number) => setTimerHours(Math.max(0, Math.min(23, v))), max: 23, label: t('examGenerator.unitHours') },
+                          { value: timerMinutes, onChange: (v: number) => setTimerMinutes(Math.max(0, Math.min(59, v))), max: 59, label: t('examGenerator.unitMinutes') },
+                          { value: timerSeconds, onChange: (v: number) => setTimerSeconds(Math.max(0, Math.min(59, v))), max: 59, label: t('examGenerator.unitSeconds') },
                         ].map((field, i) => (
                           <div key={i} className="flex flex-col items-center gap-1.5">
                             <div className="flex items-center gap-1">
@@ -517,13 +519,13 @@ const Index = () => {
                         ))}
                       </div>
                       {timerTotalSeconds < 60 && (
-                        <p className="text-xs text-destructive text-center">הזמן המינימלי הוא דקה אחת</p>
+                        <p className="text-xs text-destructive text-center">{t('examGenerator.minTime')}</p>
                       )}
                     </>
                   ) : null}
 
                   <p className="text-xs text-muted-foreground text-center">
-                    הבחינה תוגש אוטומטית כשהזמן יסתיים
+                    {t('examGenerator.autoSubmit')}
                   </p>
                 </div>
               )}
@@ -547,7 +549,7 @@ const Index = () => {
                   }
                 `}
               >
-                {isLoading ? 'מעבד...' : 'יצירת שאלות'}
+                {isLoading ? t('examGenerator.processing') : t('examGenerator.generateButton')}
               </button>
             );
           })()}
@@ -588,7 +590,7 @@ const Index = () => {
                     {String(Math.floor((timeLeft % 3600) / 60)).padStart(2, '0')}:
                     {String(timeLeft % 60).padStart(2, '0')}
                   </span>
-                  {timeLeft <= 60 && <span className="text-xs text-destructive font-semibold">הזמן עומד להסתיים!</span>}
+                  {timeLeft <= 60 && <span className="text-xs text-destructive font-semibold">{t('examGenerator.timeAlmostUp')}</span>}
                 </div>
               )}
               <QuestionsList
@@ -609,7 +611,7 @@ const Index = () => {
                     className="w-full py-3 px-6 rounded-xl border-2 border-primary text-primary font-semibold hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    שתף בחינה עם תלמידים
+                    {t('examGenerator.shareWithStudents')}
                   </button>
                 )}
 
@@ -621,15 +623,15 @@ const Index = () => {
                       className="flex-1 py-3 px-6 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
                     >
                       {isSaving ? (
-                        <><span className="w-4 h-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />שומר...</>
+                        <><span className="w-4 h-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />{t('examGenerator.saving')}</>
                       ) : (
-                        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeWidth="2" strokeLinecap="round" /><polyline points="17 21 17 13 7 13 7 21" strokeWidth="2" strokeLinecap="round" /><polyline points="7 3 7 8 15 8" strokeWidth="2" strokeLinecap="round" /></svg>שמור בחינה</>
+                        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeWidth="2" strokeLinecap="round" /><polyline points="17 21 17 13 7 13 7 21" strokeWidth="2" strokeLinecap="round" /><polyline points="7 3 7 8 15 8" strokeWidth="2" strokeLinecap="round" /></svg>{t('examGenerator.saveExam')}</>
                       )}
                     </button>
                   ) : (
                     <div className="flex-1 py-3 px-6 rounded-xl bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-medium flex items-center justify-center gap-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="2" strokeLinecap="round" /></svg>
-                      נשמרה בהצלחה
+                      {t('examGenerator.savedSuccess')}
                     </div>
                   )}
 
@@ -637,7 +639,7 @@ const Index = () => {
                     onClick={handleReset}
                     className="flex-1 py-3 px-6 rounded-xl border-2 border-border text-foreground font-medium hover:bg-muted transition-colors"
                   >
-                    התחל מחדש
+                    {t('examGenerator.reset')}
                   </button>
                 </div>
               </div>
@@ -651,7 +653,7 @@ const Index = () => {
           questions={questions}
           questionType={activeQuestionType}
           token={user.token}
-          defaultTitle={selectedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') || 'בחינה'}
+          defaultTitle={selectedFiles.map(f => f.name.replace(/\.[^.]+$/, '')).join(', ') || t('examGenerator.examFallback')}
           onClose={() => setShowShare(false)}
         />
       )}

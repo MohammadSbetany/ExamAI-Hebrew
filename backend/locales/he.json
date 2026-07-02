@@ -1,0 +1,17 @@
+{
+  "errors": {
+    "permission": "אין הרשאה",
+    "classNotFound": "כיתה לא נמצאה",
+    "emailRequired": "כתובת אימייל היא שדה חובה",
+    "emailNotFound": "לא נמצא משתמש רשום עם כתובת אימייל זו",
+    "emailInvalid": "כתובת אימייל לא תקינה",
+    "cannotAddSelf": "לא ניתן להוסיף את עצמך ככיתה",
+    "alreadyEnrolled": "התלמיד כבר רשום לכיתה"
+  },
+  "alerts": {
+    "success": "הפעולה הושלמה בהצלחה",
+    "error": "אירעה שגיאה",
+    "validation": "קלט לא תקין",
+    "loading": "טוען..."
+  }
+}

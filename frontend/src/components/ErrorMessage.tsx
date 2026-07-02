@@ -1,9 +1,12 @@
+import { useTranslation } from '@/lib/i18n';
+
 interface ErrorMessageProps {
   message: string;
   onDismiss?: () => void;
 }
 
 const ErrorMessage = ({ message, onDismiss }: ErrorMessageProps) => {
+  const { t } = useTranslation();
   return (
     <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
       <div className="w-8 h-8 bg-destructive/20 rounded-full flex items-center justify-center flex-shrink-0">
@@ -22,7 +25,7 @@ const ErrorMessage = ({ message, onDismiss }: ErrorMessageProps) => {
         </svg>
       </div>
       <div className="flex-1">
-        <p className="font-medium text-destructive">שגיאה</p>
+        <p className="font-medium text-destructive">{t('common.error')}</p>
         <p className="text-sm text-destructive/80 mt-1">{message}</p>
       </div>
       {onDismiss && (

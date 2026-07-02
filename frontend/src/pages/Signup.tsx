@@ -1,21 +1,22 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, UserRole } from '@/context/AuthContext';
+import { useTranslation } from '@/lib/i18n';
 
-// ─── Firebase error → Hebrew message ─────────────────────────────────────────
+// ─── Firebase error code → i18n key ──────────────────────────────────────────
 
-const toHebrewError = (code: string): string => {
+const signupErrorKey = (code: string): string => {
   switch (code) {
     case 'auth/email-already-in-use':
-      return 'כתובת האימייל כבר בשימוש';
+      return 'auth.errEmailInUse';
     case 'auth/invalid-email':
-      return 'כתובת האימייל אינה תקינה';
+      return 'auth.errInvalidEmail';
     case 'auth/weak-password':
-      return 'הסיסמה חלשה מדי — השתמש ב-6 תווים לפחות';
+      return 'auth.errWeakPassword6';
     case 'auth/network-request-failed':
-      return 'בעיית חיבור לרשת. בדוק את החיבור לאינטרנט';
+      return 'auth.errNetwork';
     default:
-      return 'אירעה שגיאה. נסה שוב';
+      return 'auth.errGeneric';
   }
 };
 
@@ -24,6 +25,7 @@ const toHebrewError = (code: string): string => {
 const Signup = () => {
   const { signup } = useAuth();
   const navigate   = useNavigate();
+  const { t, isRTL } = useTranslation();
 
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
@@ -38,11 +40,11 @@ const Signup = () => {
     setError('');
 
     if (password !== confirm) {
-      setError('הסיסמאות אינן תואמות');
+      setError(t('auth.passwordMismatch'));
       return;
     }
     if (password.length < 6) {
-      setError('הסיסמה חלשה מדי — השתמש ב-6 תווים לפחות');
+      setError(t('auth.errWeakPassword6'));
       return;
     }
 
@@ -52,14 +54,14 @@ const Signup = () => {
       navigate('/dashboard');
     } catch (err) {
       const errorCode = (err as { code?: string })?.code ?? '';
-      setError(toHebrewError(errorCode));
+      setError(t(signupErrorKey(errorCode)));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10" dir="rtl">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10" dir={isRTL ? 'rtl' : 'ltr'}>
 
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -74,8 +76,8 @@ const Signup = () => {
           <div className="inline-flex items-center justify-center w-14 h-14 bg-primary rounded-2xl mb-4 shadow-lg shadow-primary/25">
             <img src="/favicon.ico" alt="ExamAI" className="w-8 h-8 object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">יצירת חשבון</h1>
-          <p className="text-muted-foreground mt-1 text-sm">הצטרף ל-ExamAI בחינם</p>
+          <h1 className="text-2xl font-bold text-foreground">{t('auth.signupHeading')}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{t('auth.signupTagline')}</p>
         </div>
 
         {/* Card */}
@@ -85,7 +87,7 @@ const Signup = () => {
 
             {/* Role toggle */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">אני</label>
+              <label className="text-sm font-medium text-foreground">{t('auth.roleLabel')}</label>
               <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-xl">
                 {(['student', 'teacher'] as UserRole[]).map((r) => (
                   <button
@@ -100,7 +102,7 @@ const Signup = () => {
                       }
                     `}
                   >
-                    {r === 'student' ? '🎓 תלמיד' : '📚 מורה'}
+                    {r === 'student' ? `🎓 ${t('auth.roleStudent')}` : `📚 ${t('auth.roleTeacher')}`}
                   </button>
                 ))}
               </div>
@@ -108,12 +110,12 @@ const Signup = () => {
 
             {/* Full name */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">שם מלא</label>
+              <label className="text-sm font-medium text-foreground">{t('auth.fullNameLabel')}</label>
               <input
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="ישראל ישראלי"
+                placeholder={t('auth.namePlaceholder')}
                 required
                 disabled={loading}
                 className="
@@ -127,7 +129,7 @@ const Signup = () => {
 
             {/* Email */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">אימייל</label>
+              <label className="text-sm font-medium text-foreground">{t('auth.emailLabel')}</label>
               <input
                 type="email"
                 value={email}
@@ -147,12 +149,12 @@ const Signup = () => {
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">סיסמה</label>
+              <label className="text-sm font-medium text-foreground">{t('auth.passwordLabel')}</label>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="לפחות 6 תווים"
+                placeholder={t('auth.passwordPlaceholderMin')}
                 required
                 disabled={loading}
                 className="
@@ -167,12 +169,12 @@ const Signup = () => {
 
             {/* Confirm password */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">אימות סיסמה</label>
+              <label className="text-sm font-medium text-foreground">{t('auth.confirmPasswordLabel')}</label>
               <input
                 type="password"
                 value={confirm}
                 onChange={e => setConfirm(e.target.value)}
-                placeholder="הקלד שוב את הסיסמה"
+                placeholder={t('auth.confirmPlaceholder')}
                 required
                 disabled={loading}
                 className="
@@ -209,9 +211,9 @@ const Signup = () => {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  יוצר חשבון...
+                  {t('auth.creatingAccount')}
                 </span>
-              ) : 'צור חשבון'}
+              ) : t('auth.createAccount')}
             </button>
 
           </form>
@@ -219,7 +221,7 @@ const Signup = () => {
           {/* Divider */}
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted-foreground">יש לך כבר חשבון?</span>
+            <span className="text-xs text-muted-foreground">{t('auth.haveAccount')}</span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
@@ -232,7 +234,7 @@ const Signup = () => {
               hover:bg-muted transition-colors
             "
           >
-            התחבר
+            {t('auth.loginButton')}
           </Link>
 
         </div>

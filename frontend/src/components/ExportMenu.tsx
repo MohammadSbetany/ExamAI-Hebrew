@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from '@/lib/i18n';
 import type { Question, GradeResult } from '@/types/questions';
 import { exportBlankDocx, exportGradedDocx } from '@/lib/exportUtils';
 
@@ -18,8 +19,9 @@ const DownloadIcon = () => (
 
 const ExportMenu = ({ questions, gradeResult, variant }: ExportMenuProps) => {
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
-  const label = variant === 'blank' ? 'ייצוא בחינה' : 'הורד דוח ציון';
+  const label = variant === 'blank' ? t('exportMenu.exportExam') : t('exportMenu.downloadReport');
   const buttonColor = variant === 'blank'
     ? 'border-border text-foreground hover:bg-muted'
     : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/20';
@@ -49,7 +51,7 @@ const ExportMenu = ({ questions, gradeResult, variant }: ExportMenuProps) => {
       ) : (
         <DownloadIcon />
       )}
-      {loading ? 'מכין...' : label}
+      {loading ? t('exportMenu.preparing') : label}
     </button>
   );
 };

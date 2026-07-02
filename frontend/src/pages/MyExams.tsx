@@ -4,6 +4,7 @@ import { listExams, deleteExam, updateExam, type ExamRecord } from '@/lib/examsA
 import { gradeLocally } from '@/utils/gradingUtils';
 import ExportMenu from '@/components/ExportMenu';
 import type { Question, GradeResult } from '@/types/questions';
+import { useTranslation } from '@/lib/i18n';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -18,13 +19,13 @@ const pctColor = (pct: number) => {
   return { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300', border: 'border-red-200 dark:border-red-800', ring: 'ring-red-400' };
 };
 
-const typeLabel: Record<string, string> = {
-  open: 'פתוחות', yesno: 'כן/לא', multiple: 'רב ברירה', merged: 'מיזוג',
+const typeLabelKey: Record<string, string> = {
+  open: 'myExams.typeOpen', yesno: 'myExams.typeYesno', multiple: 'myExams.typeMultiple', merged: 'myExams.typeMerged',
 };
 
-const examTypeBadge: Record<string, { label: string; cls: string }> = {
-  generated: { label: '✨ נוצרה', cls: 'bg-primary/10 text-primary' },
-  digitized:  { label: '📄 דיגיטציה', cls: 'bg-purple-100 text-purple-700' },
+const examTypeMeta: Record<string, { labelKey: string; icon: string; cls: string }> = {
+  generated: { labelKey: 'myExams.examTypeGenerated', icon: '✨', cls: 'bg-primary/10 text-primary' },
+  digitized:  { labelKey: 'myExams.examTypeDigitized', icon: '📄', cls: 'bg-purple-100 text-purple-700' },
 };
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -49,19 +50,22 @@ const DownloadIcon = () => (
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
-const EmptyState = () => (
+const EmptyState = () => {
+  const { t } = useTranslation();
+  return (
   <div className="flex flex-col items-center justify-center py-24 text-center">
     <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4">
       <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
       </svg>
     </div>
-    <h3 className="text-lg font-semibold text-foreground mb-2">אין בחינות שמורות עדיין</h3>
+    <h3 className="text-lg font-semibold text-foreground mb-2">{t('myExams.emptyTitle')}</h3>
     <p className="text-muted-foreground text-sm max-w-xs">
-      צור בחינה חדשה או ייבא בחינה קיימת מהדף הראשי — היא תישמר כאן אוטומטית.
+      {t('myExams.emptyDesc')}
     </p>
   </div>
-);
+  );
+};
 
 // ── Exam Detail (solve + grade + export) ─────────────────────────────────────
 
@@ -72,6 +76,7 @@ interface ExamDetailProps {
 }
 
 const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
+  const { t, isRTL } = useTranslation();
   const { user } = useAuth();
   const [answers, setAnswers] = useState<string[]>(exam.answers?.length ? exam.answers : Array(exam.questions.length).fill(''));
   const [gradeResult, setGradeResult] = useState<GradeResult | null>(exam.grade_result);
@@ -104,12 +109,12 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user?.token}` },
         body: JSON.stringify({ questions, answers, question_type: questionType }),
       });
-      if (!r.ok) throw new Error('שגיאה בבדיקת התשובות');
+      if (!r.ok) throw new Error(t('myExams.gradeError'));
       const data: GradeResult = await r.json();
       setGradeResult(data);
       await persistGrade(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'שגיאה בבדיקת התשובות');
+      setError(e instanceof Error ? e.message : t('myExams.gradeError'));
     } finally {
       setIsGrading(false);
     }
@@ -131,12 +136,12 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
   const colors = pct !== null ? pctColor(pct) : null;
 
   return (
-    <div className="max-w-3xl mx-auto" dir="rtl">
+    <div className="max-w-3xl mx-auto" dir={isRTL ? 'rtl' : 'ltr'}>
 
       {/* Top bar */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <button onClick={onBack} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <BackIcon /> חזרה לרשימה
+          <BackIcon /> {t('myExams.backToList')}
         </button>
 
         {/* Export buttons */}
@@ -165,18 +170,18 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
 
         {/* Badges */}
         <div className="flex flex-wrap gap-2 mt-4">
-          <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${examTypeBadge[exam.exam_type]?.cls ?? 'bg-muted text-muted-foreground'}`}>
-            {examTypeBadge[exam.exam_type]?.label ?? exam.exam_type}
+          <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${examTypeMeta[exam.exam_type]?.cls ?? 'bg-muted text-muted-foreground'}`}>
+            {examTypeMeta[exam.exam_type] ? `${examTypeMeta[exam.exam_type].icon} ${t(examTypeMeta[exam.exam_type].labelKey)}` : exam.exam_type}
           </span>
           <span className="text-xs px-2.5 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
-            {typeLabel[questionType] ?? questionType}
+            {t(typeLabelKey[questionType] ?? questionType)}
           </span>
           <span className="text-xs px-2.5 py-1 rounded-lg bg-muted text-muted-foreground font-medium">
-            {questions.length} שאלות
+            {t('myExams.questionsCount', { count: questions.length })}
           </span>
           {gradeResult
-            ? <span className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-medium">✓ נבדק</span>
-            : <span className="text-xs px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-medium">⏳ ממתין לפתרון</span>
+            ? <span className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-medium">✓ {t('myExams.graded')}</span>
+            : <span className="text-xs px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-medium">⏳ {t('myExams.pendingSolve')}</span>
           }
         </div>
       </div>
@@ -234,7 +239,7 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
                   value={answers[i] || ''}
                   onChange={e => handleAnswerChange(i, e.target.value)}
                   disabled={!!gradeResult || isGrading}
-                  placeholder="כתוב את תשובתך כאן..."
+                  placeholder={t('myExams.openAnswerPlaceholder')}
                   className="w-full border border-border rounded-xl p-3 text-sm resize-none h-24 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-70"
                   dir="rtl"
                 />
@@ -266,18 +271,18 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
               {fb && effectiveType === 'open' && (
                 <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
                   <p className="text-sm font-semibold text-foreground">
-                    התשובה הנכונה: <span className="text-green-700 dark:text-green-400 font-normal">{q.answer}</span>
+                    {t('myExams.correctAnswer')} <span className="text-green-700 dark:text-green-400 font-normal">{q.answer}</span>
                   </p>
                   {fb.explanation && <p className="text-xs text-muted-foreground leading-relaxed">{fb.explanation}</p>}
                   {fb.covered_points?.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">נקודות שכוסו:</p>
+                      <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">{t('myExams.coveredPoints')}</p>
                       {fb.covered_points.map((p, j) => <p key={j} className="text-xs text-green-600 dark:text-green-400">✓ {p}</p>)}
                     </div>
                   )}
                   {fb.missed_points?.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">נקודות חסרות:</p>
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">{t('myExams.missedPoints')}</p>
                       {fb.missed_points.map((p, j) => <p key={j} className="text-xs text-red-600 dark:text-red-400">✗ {p}</p>)}
                     </div>
                   )}
@@ -300,13 +305,13 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
           }`}
         >
           {isGrading ? (
-            <><span className="w-5 h-5 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />בודק תשובות...</>
+            <><span className="w-5 h-5 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />{t('myExams.checking')}</>
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
               </svg>
-              בדוק את הפתרון שלי
+              {t('myExams.checkMySolution')}
             </>
           )}
         </button>
@@ -316,8 +321,8 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
       {gradeResult && colors && (
         <div className={`mt-6 p-5 rounded-2xl border-2 ${colors.bg} ${colors.border} text-center`}>
           <p className={`text-3xl font-bold ${colors.text} mb-1`}>{pct}%</p>
-          <p className={`text-sm ${colors.text}`}>{gradeResult.score} / {questions.length} שאלות נכונות</p>
-          {isSaving && <p className="text-xs text-muted-foreground mt-2">שומר תוצאה...</p>}
+          <p className={`text-sm ${colors.text}`}>{t('myExams.correctOf', { score: gradeResult.score, total: questions.length })}</p>
+          {isSaving && <p className="text-xs text-muted-foreground mt-2">{t('myExams.savingResult')}</p>}
         </div>
       )}
     </div>
@@ -334,9 +339,11 @@ interface ExamCardProps {
 }
 
 const ExamCard = ({ exam, onSelect, onDelete, isDeleting }: ExamCardProps) => {
+  const { t } = useTranslation();
   const pct = exam.score !== null && exam.total > 0 ? Math.round((exam.score / exam.total) * 100) : null;
   const colors = pct !== null ? pctColor(pct) : null;
-  const badge = examTypeBadge[exam.exam_type] ?? { label: exam.exam_type, cls: 'bg-muted text-muted-foreground' };
+  const meta = examTypeMeta[exam.exam_type];
+  const badge = meta ? { label: `${meta.icon} ${t(meta.labelKey)}`, cls: meta.cls } : { label: exam.exam_type, cls: 'bg-muted text-muted-foreground' };
 
   return (
     <div onClick={onSelect} className="bg-card border border-border rounded-2xl p-5 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group">
@@ -349,7 +356,7 @@ const ExamCard = ({ exam, onSelect, onDelete, isDeleting }: ExamCardProps) => {
           onClick={e => { e.stopPropagation(); onDelete(); }}
           disabled={isDeleting}
           className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
-          title="מחק"
+          title={t('myExams.delete')}
         >
           {isDeleting
             ? <span className="w-4 h-4 block rounded-full border-2 border-current border-t-transparent animate-spin" />
@@ -359,8 +366,8 @@ const ExamCard = ({ exam, onSelect, onDelete, isDeleting }: ExamCardProps) => {
 
       <div className="flex flex-wrap gap-1.5 mb-4">
         <span className={`text-xs px-2 py-0.5 rounded-lg font-medium ${badge.cls}`}>{badge.label}</span>
-        <span className="text-xs px-2 py-0.5 rounded-lg bg-muted text-muted-foreground font-medium">{typeLabel[exam.question_type] ?? exam.question_type}</span>
-        <span className="text-xs px-2 py-0.5 rounded-lg bg-muted text-muted-foreground font-medium">{exam.total} שאלות</span>
+        <span className="text-xs px-2 py-0.5 rounded-lg bg-muted text-muted-foreground font-medium">{t(typeLabelKey[exam.question_type] ?? exam.question_type)}</span>
+        <span className="text-xs px-2 py-0.5 rounded-lg bg-muted text-muted-foreground font-medium">{t('myExams.questionsCount', { count: exam.total })}</span>
       </div>
 
       {pct !== null && colors ? (
@@ -370,8 +377,8 @@ const ExamCard = ({ exam, onSelect, onDelete, isDeleting }: ExamCardProps) => {
         </div>
       ) : (
         <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-dashed border-border">
-          <span className="text-xs text-muted-foreground">ממתין לפתרון</span>
-          <span className="text-xs font-medium text-primary">לחץ לפתרון ←</span>
+          <span className="text-xs text-muted-foreground">{t('myExams.pendingSolve')}</span>
+          <span className="text-xs font-medium text-primary">{t('myExams.clickToSolve')}</span>
         </div>
       )}
     </div>
@@ -381,6 +388,7 @@ const ExamCard = ({ exam, onSelect, onDelete, isDeleting }: ExamCardProps) => {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const MyExams = () => {
+  const { t, isRTL } = useTranslation();
   const { user } = useAuth();
   const [exams, setExams] = useState<ExamRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -395,20 +403,20 @@ const MyExams = () => {
     setLoading(true);
     setError(null);
     try { setExams(await listExams(user.token)); }
-    catch { setError('שגיאה בטעינת הבחינות'); }
+    catch { setError(t('examsApi.loadError')); }
     finally { setLoading(false); }
   }, [user?.token]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (id: string) => {
-    if (!user?.token || !window.confirm('האם למחוק בחינה זו?')) return;
+    if (!user?.token || !window.confirm(t('myExams.confirmDelete'))) return;
     setDeletingId(id);
     try {
       await deleteExam(user.token, id);
       setExams(prev => prev.filter(e => e.id !== id));
       if (activeExam?.id === id) setActiveExam(null);
-    } catch { setError('שגיאה במחיקת הבחינה'); }
+    } catch { setError(t('examsApi.deleteError')); }
     finally { setDeletingId(null); }
   };
 
@@ -438,11 +446,11 @@ const MyExams = () => {
 
   // ── Gallery view ──
   return (
-    <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
+    <div className="bg-background min-h-screen py-10 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-1">הבחינות שלי</h1>
-          <p className="text-muted-foreground">כל הבחינות שיצרת או ייבאת — לחץ על בחינה לפתרון וציון</p>
+          <h1 className="text-3xl font-bold text-foreground mb-1">{t('myExams.title')}</h1>
+          <p className="text-muted-foreground">{t('myExams.subtitle')}</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -450,14 +458,14 @@ const MyExams = () => {
             <svg className="w-4 h-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="8" strokeWidth="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" strokeWidth="2" strokeLinecap="round"/>
             </svg>
-            <input type="text" placeholder="חפש לפי שם בחינה..." value={search} onChange={e => setSearch(e.target.value)}
+            <input type="text" placeholder={t('myExams.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)}
               className="w-full pr-9 pl-4 py-2.5 rounded-xl border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
           <div className="flex gap-2">
             {(['all', 'graded', 'pending'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 className={`px-4 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${filter === f ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
-                {f === 'all' ? 'הכל' : f === 'graded' ? 'עם ציון' : 'ממתין'}
+                {f === 'all' ? t('myExams.filterAll') : f === 'graded' ? t('myExams.filterGraded') : t('myExams.filterPending')}
               </button>
             ))}
           </div>

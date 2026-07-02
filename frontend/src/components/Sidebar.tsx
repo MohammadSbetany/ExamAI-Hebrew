@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useTranslation } from '@/lib/i18n';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -165,6 +166,7 @@ const SectionLabel = ({ label, collapsed }: { label: string; collapsed: boolean 
 
 const Sidebar = ({ isTeacher }: SidebarProps) => {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const resolvedIsTeacher = isTeacher ?? user?.role === 'teacher';
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -172,11 +174,11 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
 
 
   const studentItems: NavItem[] = [
-    { label: 'לוח בקרה', path: '/dashboard', icon: <IconDashboard /> },
-    { label: 'יצירת בחינה', path: '/', icon: <IconCreate /> },
-    { label: 'הבחינות שלי', path: '/my-exams', icon: <IconExams /> },
-    { label: 'כרטיסיות לימוד', path: '/flashcards', icon: <IconFlashcards /> },
-    { label: 'הכיתות שלי', path: '/my-classes', icon: <IconStudents /> },
+    { label: t('sidebar.dashboard'), path: '/dashboard', icon: <IconDashboard /> },
+    { label: t('sidebar.createExam'), path: '/', icon: <IconCreate /> },
+    { label: t('sidebar.myExams'), path: '/my-exams', icon: <IconExams /> },
+    { label: t('sidebar.flashcards'), path: '/flashcards', icon: <IconFlashcards /> },
+    { label: t('sidebar.myClasses'), path: '/my-classes', icon: <IconStudents /> },
   ];
 
   const mainItems = resolvedIsTeacher
@@ -184,8 +186,8 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
     : studentItems;
 
   const teacherItems: NavItem[] = [
-    { label: 'ניהול כיתות', path: '/students', icon: <IconStudents /> },
-    { label: 'סטטיסטיקות כיתה', path: '/class-stats', icon: <IconStats /> },
+    { label: t('sidebar.studentManagement'), path: '/students', icon: <IconStudents /> },
+    { label: t('sidebar.classStats'), path: '/class-stats', icon: <IconStats /> },
   ];
 
   const renderSidebarContent = (isMobile = false) => {
@@ -212,7 +214,7 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
             <button
               onClick={() => setCollapsed(c => !c)}
               className="hidden md:flex w-7 h-7 rounded-lg items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-              title={isCollapsed ? 'הרחב סרגל צד' : 'כווץ סרגל צד'}
+              title={isCollapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
             >
               <IconChevron open={!isCollapsed} />
             </button>
@@ -221,14 +223,14 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
 
         {/* Nav items — scrollable */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 space-y-0.5">
-          <SectionLabel label="ראשי" collapsed={isCollapsed} />
+          <SectionLabel label={t('sidebar.sectionMain')} collapsed={isCollapsed} />
           {mainItems.map(item => (
             <SidebarNavItem key={item.path} item={item} collapsed={isCollapsed} />
           ))}
 
           {resolvedIsTeacher && (
             <>
-              <SectionLabel label="מורה" collapsed={isCollapsed} />
+              <SectionLabel label={t('sidebar.sectionTeacher')} collapsed={isCollapsed} />
               {teacherItems.map(item => (
                 <SidebarNavItem key={item.path} item={item} collapsed={isCollapsed} />
               ))}
@@ -238,13 +240,13 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
 
         {/* Bottom pinned */}
         <div className="flex-shrink-0 border-t border-border px-2 py-3 space-y-0.5">
-          <SidebarNavItem item={{ label: 'הגדרות', path: '/settings', icon: <IconSettings /> }} collapsed={isCollapsed} />
+          <SidebarNavItem item={{ label: t('sidebar.settings'), path: '/settings', icon: <IconSettings /> }} collapsed={isCollapsed} />
 
           {/* User profile */}
           <div
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mt-1 cursor-pointer hover:bg-accent transition-colors group ${isCollapsed ? 'justify-center' : ''}`}
             onClick={e => { e.stopPropagation(); setShowProfile(p => !p); }}
-            title="פרופיל"
+            title={t('sidebar.profile')}
           >
             <div className="relative flex-shrink-0">
               <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary font-semibold text-sm">
@@ -255,7 +257,7 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{user?.name ?? ''}</p>
-                <p className="text-xs text-muted-foreground truncate">{user?.role === 'teacher' ? 'מורה' : 'תלמיד'}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.role === 'teacher' ? t('sidebar.roleTeacher') : t('sidebar.roleStudent')}</p>
               </div>
             )}
           </div>
@@ -265,12 +267,12 @@ const Sidebar = ({ isTeacher }: SidebarProps) => {
             <div className="mx-2 mb-2 p-3 bg-muted rounded-xl border border-border space-y-2 text-sm" onClick={e => e.stopPropagation()}>
               <p className="font-semibold text-foreground truncate">{user?.name}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-              <p className="text-xs text-muted-foreground">{user?.role === 'teacher' ? 'מורה' : 'תלמיד'}</p>
+              <p className="text-xs text-muted-foreground">{user?.role === 'teacher' ? t('sidebar.roleTeacher') : t('sidebar.roleStudent')}</p>
               <button
                 onClick={logout}
                 className="w-full mt-1 py-1.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-colors"
               >
-                התנתק
+                {t('sidebar.logout')}
               </button>
             </div>
           )}

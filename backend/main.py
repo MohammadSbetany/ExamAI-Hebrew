@@ -20,6 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from firebase_auth import verify_token
 import json
 from engine import generate_questions, grade_answers, extract_text_from_file
+from i18n import translate, get_locale
 from class_manager import (
     create_class, get_teacher_classes, get_class, delete_class,
     regenerate_code, add_student_to_class, remove_student_from_class,
@@ -168,28 +169,28 @@ async def add_student_endpoint(class_id: str, data: dict, user=Depends(verify_to
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/classes/{class_id}/add-student-by-email")
-async def add_student_by_email_endpoint(class_id: str, data: dict, user=Depends(verify_token)):
-    """Add a registered user to a class by their email address."""
+async def add_student_by_email_endpoint(class_id: str, data: dict, user=Depends(verify_token), locale: str = Depends(get_locale)):
+    """Add a registered user to a class by their email address (localized errors)."""
     from firebase_admin import auth as fb_auth, firestore as fs
     cls = get_class(class_id)
     if not cls or cls.get("teacher_uid") != user.get("uid"):
-        raise HTTPException(status_code=403, detail="אין הרשאה")
+        raise HTTPException(status_code=403, detail=translate("errors.permission", locale))
 
     email = (data.get("email") or "").strip().lower()
     if not email:
-        raise HTTPException(status_code=422, detail="כתובת אימייל היא שדה חובה")
+        raise HTTPException(status_code=422, detail=translate("errors.emailRequired", locale))
 
     try:
         student = fb_auth.get_user_by_email(email)
     except fb_auth.UserNotFoundError:
-        raise HTTPException(status_code=404, detail="לא נמצא משתמש רשום עם כתובת אימייל זו")
+        raise HTTPException(status_code=404, detail=translate("errors.emailNotFound", locale))
     except ValueError:
-        raise HTTPException(status_code=422, detail="כתובת אימייל לא תקינה")
+        raise HTTPException(status_code=422, detail=translate("errors.emailInvalid", locale))
 
     if student.uid == user.get("uid"):
-        raise HTTPException(status_code=400, detail="לא ניתן להוסיף את עצמך ככיתה")
+        raise HTTPException(status_code=400, detail=translate("errors.cannotAddSelf", locale))
     if any(s.get("uid") == student.uid for s in cls.get("students", [])):
-        raise HTTPException(status_code=409, detail="התלמיד כבר רשום לכיתה")
+        raise HTTPException(status_code=409, detail=translate("errors.alreadyEnrolled", locale))
 
     # Resolve display name: auth profile → users doc → email prefix
     name = student.display_name

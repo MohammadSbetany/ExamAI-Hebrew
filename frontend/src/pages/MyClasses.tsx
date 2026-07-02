@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import type { Question } from '@/types/questions';
+import { useTranslation } from '@/lib/i18n';
 
 const API = () => import.meta.env.VITE_API_BASE_URL ?? '/backend';
 const authH = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -36,21 +37,23 @@ const PreviousSubmission = ({ exam, submission, onBack }: {
   exam: ClassExam;
   submission: { answers: string[]; submitted_at: string; grade_result: { score: number; feedback: { points: number; explanation: string }[] } | null };
   onBack: () => void;
-}) => (
-  <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
+}) => {
+  const { t, isRTL } = useTranslation();
+  return (
+  <div className="bg-background min-h-screen py-10 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
     <div className="max-w-3xl mx-auto">
       <div className="bg-card border border-border rounded-2xl p-5 mb-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{exam.title}</h1>
-            <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-0.5">✓ הוגשה ב-{fmtDT(submission.submitted_at)}</p>
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-0.5">✓ {t('myClasses.submittedOn', { date: fmtDT(submission.submitted_at) })}</p>
           </div>
-          <button onClick={onBack} className="px-4 py-2 rounded-xl border border-border text-sm hover:bg-muted">חזרה</button>
+          <button onClick={onBack} className="px-4 py-2 rounded-xl border border-border text-sm hover:bg-muted">{t('myClasses.back')}</button>
         </div>
         {submission.grade_result && (
           <div className="mt-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-xl">
             <p className="text-sm font-semibold text-foreground">
-              ציון: <span className="text-primary">{submission.grade_result.score} / {exam.questions.length}</span>
+              {t('myClasses.scoreLabel')} <span className="text-primary">{submission.grade_result.score} / {exam.questions.length}</span>
               <span className="text-muted-foreground mr-2">({Math.round((submission.grade_result.score / exam.questions.length) * 100)}%)</span>
             </p>
           </div>
@@ -73,7 +76,7 @@ const PreviousSubmission = ({ exam, submission, onBack }: {
                   </span>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground mb-1">תשובתך: <span className="text-foreground font-medium">{submission.answers[i] || '—'}</span></p>
+              <p className="text-sm text-muted-foreground mb-1">{t('myClasses.yourAnswer')} <span className="text-foreground font-medium">{submission.answers[i] || '—'}</span></p>
               {fb?.explanation && <p className="text-xs text-muted-foreground italic mt-1">{fb.explanation}</p>}
             </div>
           );
@@ -81,13 +84,15 @@ const PreviousSubmission = ({ exam, submission, onBack }: {
       </div>
     </div>
   </div>
-);
+  );
+};
 
 // ── Exam Taking Screen ────────────────────────────────────────────────────────
 
 const ExamScreen = ({ exam, token, studentName, onDone }: {
   exam: ClassExam; token: string; studentName: string; onDone: () => void;
 }) => {
+  const { t, isRTL } = useTranslation();
   const [answers, setAnswers] = useState<string[]>(Array(exam.questions.length).fill(''));
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -106,11 +111,11 @@ const ExamScreen = ({ exam, token, studentName, onDone }: {
       });
       if (!r.ok) {
         const d = await r.json();
-        throw new Error(d.detail || 'שגיאה בהגשת הבחינה');
+        throw new Error(d.detail || t('myClasses.submitError'));
       }
       setSubmitted(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'שגיאה');
+      setError(e instanceof Error ? e.message : t('myClasses.genericError'));
     } finally {
       setSubmitting(false);
     }
@@ -118,17 +123,17 @@ const ExamScreen = ({ exam, token, studentName, onDone }: {
 
   if (submitted) {
     return (
-      <div className="bg-background min-h-screen flex items-center justify-center p-4" dir="rtl">
+      <div className="bg-background min-h-screen flex items-center justify-center p-4" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="bg-card border border-border rounded-2xl p-10 max-w-md w-full text-center shadow-lg">
           <div className="w-16 h-16 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">הבחינה הוגשה בהצלחה!</h2>
-          <p className="text-muted-foreground mb-6">תשובותיך נשמרו. המורה יבדוק אותן בקרוב.</p>
+          <h2 className="text-2xl font-bold text-foreground mb-2">{t('myClasses.submittedTitle')}</h2>
+          <p className="text-muted-foreground mb-6">{t('myClasses.submittedDesc')}</p>
           <button onClick={onDone} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90">
-            חזרה לכיתה
+            {t('myClasses.backToClass')}
           </button>
         </div>
       </div>
@@ -136,7 +141,7 @@ const ExamScreen = ({ exam, token, studentName, onDone }: {
   }
 
   return (
-    <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
+    <div className="bg-background min-h-screen py-10 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-3xl mx-auto">
 
         {/* Header */}
@@ -144,11 +149,11 @@ const ExamScreen = ({ exam, token, studentName, onDone }: {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h1 className="text-2xl font-bold text-foreground">{exam.title}</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">{exam.questions.length} שאלות</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{t('myClasses.questionsCount', { count: exam.questions.length })}</p>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground">
-                {answers.filter(a => a.trim()).length} / {exam.questions.length} נענו
+                {t('myClasses.answeredOf', { answered: answers.filter(a => a.trim()).length, total: exam.questions.length })}
               </span>
               <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
                 <div className="h-full bg-primary rounded-full transition-all"
@@ -179,7 +184,7 @@ const ExamScreen = ({ exam, token, studentName, onDone }: {
                   <textarea
                     value={answers[i]}
                     onChange={e => setAnswers(prev => { const a = [...prev]; a[i] = e.target.value; return a; })}
-                    placeholder="כתוב את תשובתך כאן..."
+                    placeholder={t('myClasses.openPlaceholder')}
                     rows={4}
                     className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                     dir="rtl"
@@ -222,17 +227,17 @@ const ExamScreen = ({ exam, token, studentName, onDone }: {
               : 'bg-muted text-muted-foreground cursor-not-allowed'
           }`}
         >
-          {submitting ? <><Spinner /> מגיש...</> : (
+          {submitting ? <><Spinner /> {t('myClasses.submitting')}</> : (
             <>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
               </svg>
-              הגש בחינה
+              {t('myClasses.submitExam')}
             </>
           )}
         </button>
         {!allAnswered && (
-          <p className="text-xs text-muted-foreground text-center mt-2">יש לענות על כל השאלות לפני ההגשה</p>
+          <p className="text-xs text-muted-foreground text-center mt-2">{t('myClasses.answerAllFirst')}</p>
         )}
       </div>
     </div>
@@ -245,6 +250,7 @@ const ExamCard = ({ exam, onTake, isSubmitted, submission }: {
   exam: ClassExam; onTake: () => void; isSubmitted: boolean;
   submission?: Record<string, unknown>;
 }) => {
+  const { t } = useTranslation();
   const status = examStatus(exam);
   const isOpen = status === 'open';
   const canView = isOpen || isSubmitted;
@@ -252,13 +258,13 @@ const ExamCard = ({ exam, onTake, isSubmitted, submission }: {
   const statusBadge = (
     <div className="flex gap-1 flex-wrap justify-end">
       {isSubmitted && (
-        <span className="text-xs px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">✓ הוגש</span>
+        <span className="text-xs px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">✓ {t('myClasses.submittedBadge')}</span>
       )}
       {{
-        hidden:    <span className="text-xs px-2 py-0.5 rounded-lg bg-muted text-muted-foreground">מוסתר</span>,
-        scheduled: <span className="text-xs px-2 py-0.5 rounded-lg bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">ממתין לפתיחה</span>,
-        closed:    <span className="text-xs px-2 py-0.5 rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">נסגר</span>,
-        open:      <span className="text-xs px-2 py-0.5 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">פתוח</span>,
+        hidden:    <span className="text-xs px-2 py-0.5 rounded-lg bg-muted text-muted-foreground">{t('myClasses.statusHidden')}</span>,
+        scheduled: <span className="text-xs px-2 py-0.5 rounded-lg bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">{t('myClasses.statusScheduled')}</span>,
+        closed:    <span className="text-xs px-2 py-0.5 rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">{t('myClasses.statusClosed')}</span>,
+        open:      <span className="text-xs px-2 py-0.5 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">{t('myClasses.statusOpen')}</span>,
       }[status]}
     </div>
   );
@@ -268,7 +274,7 @@ const ExamCard = ({ exam, onTake, isSubmitted, submission }: {
       <div className="flex items-start justify-between gap-2 mb-3">
         <div>
           <p className="font-semibold text-foreground text-sm">{exam.title}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{exam.questions?.length ?? 0} שאלות · {fmt(exam.created_at)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('myClasses.questionsCount', { count: exam.questions?.length ?? 0 })} · {fmt(exam.created_at)}</p>
         </div>
         {statusBadge}
       </div>
@@ -282,25 +288,25 @@ const ExamCard = ({ exam, onTake, isSubmitted, submission }: {
           const clr = pct >= 80 ? 'text-green-700 dark:text-green-400' : pct >= 60 ? 'text-yellow-700 dark:text-yellow-400' : 'text-red-700 dark:text-red-400';
           return (
             <p className={`text-xs font-semibold mb-1 ${clr}`}>
-              ציון: {gradeResult.score}/{totalQ} ({pct}%)
+              {t('myClasses.gradeScore', { score: gradeResult.score, total: totalQ, pct })}
             </p>
           );
         }
         return (
-          <p className="text-xs text-muted-foreground mb-1">ציון: ממתין לבדיקה</p>
+          <p className="text-xs text-muted-foreground mb-1">{t('myClasses.gradePending')}</p>
         );
       })()}
 
       {/* Always show times or timeless */}
       <div className="text-xs text-muted-foreground space-y-0.5 mb-3">
         {exam.open_at 
-          ? <p>📅 פתיחה: {fmtDT(exam.open_at)}</p>
+          ? <p>📅 {t('myClasses.openLabel')} {fmtDT(exam.open_at)}</p>
           : null}
         {exam.close_at
-          ? <p>🔒 סגירה: {fmtDT(exam.close_at)}</p>
+          ? <p>🔒 {t('myClasses.closeLabel')} {fmtDT(exam.close_at)}</p>
           : null}
         {!exam.open_at && !exam.close_at && (
-          <p className="text-primary/70 font-medium">⏳ בחינה ללא מגבלת זמן</p>
+          <p className="text-primary/70 font-medium">⏳ {t('myClasses.timeless')}</p>
         )}
       </div>
 
@@ -311,7 +317,7 @@ const ExamCard = ({ exam, onTake, isSubmitted, submission }: {
               ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800'
               : 'bg-primary text-primary-foreground hover:bg-primary/90'
           }`}>
-          {isSubmitted ? '👁 צפה בתשובותיך' : 'פתח בחינה →'}
+          {isSubmitted ? `👁 ${t('myClasses.viewAnswers')}` : t('myClasses.openExam')}
         </button>
       )}
     </div>
@@ -324,6 +330,7 @@ const ClassDetail = ({ cls, token, studentName, onBack, initialExamId, onExamOpe
   cls: StudentClass; token: string; studentName: string; onBack: () => void;
   initialExamId?: string | null; onExamOpened?: () => void;
 }) => {
+  const { t, isRTL } = useTranslation();
   const [exams, setExams] = useState<ClassExam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -336,7 +343,7 @@ const ClassDetail = ({ cls, token, studentName, onBack, initialExamId, onExamOpe
     const load = async () => {
       try {
         const r = await fetch(`${API()}/student/classes/${cls.id}/exams`, { headers: authH(token) });
-        if (!r.ok) throw new Error('שגיאה בטעינת הבחינות');
+        if (!r.ok) throw new Error(t('myClasses.loadExamsError'));
         const d = await r.json();
         const loadedExams = d.exams ?? [];
         setExams(loadedExams);
@@ -346,7 +353,7 @@ const ClassDetail = ({ cls, token, studentName, onBack, initialExamId, onExamOpe
         });
         setSubmittedExams(map);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'שגיאה');
+        setError(e instanceof Error ? e.message : t('myClasses.genericError'));
       } finally {
         setLoading(false);
       }
@@ -415,17 +422,17 @@ const ClassDetail = ({ cls, token, studentName, onBack, initialExamId, onExamOpe
   const other = exams.filter(e => examStatus(e) !== 'open');
 
   return (
-    <div dir="rtl" className="space-y-6">
+    <div dir={isRTL ? 'rtl' : 'ltr'} className="space-y-6">
       <div className="flex items-center gap-3 flex-wrap">
         <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
-          חזרה לכיתות
+          {t('myClasses.backToClasses')}
         </button>
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-foreground">{cls.name}</h2>
-          <p className="text-sm text-muted-foreground">קוד: <span className="font-bold text-primary">{cls.code}</span></p>
+          <p className="text-sm text-muted-foreground">{t('myClasses.codeLabel')} <span className="font-bold text-primary">{cls.code}</span></p>
         </div>
       </div>
 
@@ -436,14 +443,14 @@ const ClassDetail = ({ cls, token, studentName, onBack, initialExamId, onExamOpe
       ) : exams.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <p className="text-4xl mb-3">📝</p>
-          <p className="font-medium">אין בחינות עדיין</p>
-          <p className="text-sm">המורה טרם הוסיף בחינות לכיתה זו</p>
+          <p className="font-medium">{t('myClasses.noExams')}</p>
+          <p className="text-sm">{t('myClasses.noExamsDesc')}</p>
         </div>
       ) : (
         <div className="space-y-5">
           {open.length > 0 && (
             <div>
-              <p className="text-sm font-semibold text-foreground mb-2">✅ בחינות פתוחות ({open.length})</p>
+              <p className="text-sm font-semibold text-foreground mb-2">✅ {t('myClasses.openExamsHeader', { count: open.length })}</p>
               <div className="space-y-3">
                 {open.map(e => <ExamCard key={e.id} exam={e} onTake={() => handleOpenExam(e)} isSubmitted={!!submittedExams[e.id]} submission={submittedExams[e.id]} />)}
               </div>
@@ -451,7 +458,7 @@ const ClassDetail = ({ cls, token, studentName, onBack, initialExamId, onExamOpe
           )}
           {other.length > 0 && (
             <div>
-              <p className="text-sm font-semibold text-muted-foreground mb-2">בחינות נוספות ({other.length})</p>
+              <p className="text-sm font-semibold text-muted-foreground mb-2">{t('myClasses.otherExamsHeader', { count: other.length })}</p>
               <div className="space-y-3">
                {other.map(e => <ExamCard key={e.id} exam={e} onTake={() => handleOpenExam(e)} isSubmitted={!!submittedExams[e.id]} submission={submittedExams[e.id]} />)}
               </div>
@@ -468,6 +475,7 @@ const ClassDetail = ({ cls, token, studentName, onBack, initialExamId, onExamOpe
 const JoinModal = ({ token, userName, onJoined, onClose }: {
   token: string; userName: string; onJoined: (cls: StudentClass) => void; onClose: () => void;
 }) => {
+  const { t, isRTL } = useTranslation();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -482,10 +490,10 @@ const JoinModal = ({ token, userName, onJoined, onClose }: {
         body: JSON.stringify({ code: code.trim().toUpperCase(), name: userName }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || 'שגיאה בהצטרפות');
+      if (!r.ok) throw new Error(d.detail || t('myClasses.joinError'));
       onJoined(d);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'שגיאה בהצטרפות לכיתה');
+      setError(e instanceof Error ? e.message : t('myClasses.joinClassError'));
     } finally {
       setLoading(false);
     }
@@ -493,9 +501,9 @@ const JoinModal = ({ token, userName, onJoined, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()} dir="rtl">
-        <h2 className="text-lg font-bold text-foreground mb-1">הצטרף לכיתה</h2>
-        <p className="text-sm text-muted-foreground mb-5">הזן את קוד הכיתה שקיבלת מהמורה</p>
+      <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()} dir={isRTL ? 'rtl' : 'ltr'}>
+        <h2 className="text-lg font-bold text-foreground mb-1">{t('myClasses.joinTitle')}</h2>
+        <p className="text-sm text-muted-foreground mb-5">{t('myClasses.joinDesc')}</p>
         <input type="text" value={code} onChange={e => setCode(e.target.value.toUpperCase())}
           onKeyDown={e => e.key === 'Enter' && handleJoin()} placeholder="ABC123" maxLength={6}
           className="w-full px-4 py-3 rounded-xl border border-input bg-background text-center text-2xl font-bold tracking-[0.3em] focus:outline-none focus:ring-2 focus:ring-primary/30 mb-3 uppercase" />
@@ -503,9 +511,9 @@ const JoinModal = ({ token, userName, onJoined, onClose }: {
         <div className="flex gap-3">
           <button onClick={handleJoin} disabled={code.length < 6 || loading}
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
-            {loading ? <><Spinner /> מצטרף...</> : 'הצטרף'}
+            {loading ? <><Spinner /> {t('myClasses.joining')}</> : t('myClasses.join')}
           </button>
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">{t('myClasses.cancel')}</button>
         </div>
       </div>
     </div>
@@ -515,6 +523,7 @@ const JoinModal = ({ token, userName, onJoined, onClose }: {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 const MyClasses = () => {
+  const { t, isRTL } = useTranslation();
   const { user } = useAuth();
   const location = useLocation();
   const navState = (location.state ?? null) as { classId?: string; examId?: string } | null;
@@ -530,10 +539,10 @@ const MyClasses = () => {
     setLoading(true); setError(null);
     try {
       const r = await fetch(`${API()}/student/classes`, { headers: authH(user.token) });
-      if (!r.ok) throw new Error('שגיאה');
+      if (!r.ok) throw new Error(t('myClasses.genericError'));
       const d = await r.json();
       setClasses(d.classes ?? []);
-    } catch { setError('שגיאה בטעינת הכיתות'); }
+    } catch { setError(t('share.loadClassesError')); }
     finally { setLoading(false); }
   }, [user?.token]);
 
@@ -551,7 +560,7 @@ const MyClasses = () => {
     return (
       <div className="bg-background min-h-screen py-10 px-4">
         <div className="max-w-3xl mx-auto">
-          <ClassDetail cls={selectedClass} token={user?.token ?? ''} studentName={user?.name ?? 'תלמיד'}
+          <ClassDetail cls={selectedClass} token={user?.token ?? ''} studentName={user?.name ?? t('myClasses.studentFallback')}
             onBack={() => setSelectedClass(null)}
             initialExamId={pendingExamId}
             onExamOpened={() => setPendingExamId(null)} />
@@ -561,10 +570,10 @@ const MyClasses = () => {
   }
 
   return (
-    <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
+    <div className="bg-background min-h-screen py-10 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-3xl mx-auto">
         {showJoin && (
-          <JoinModal token={user?.token ?? ''} userName={user?.name ?? 'תלמיד'}
+          <JoinModal token={user?.token ?? ''} userName={user?.name ?? t('myClasses.studentFallback')}
             onJoined={cls => {
               if (!cls?.id) { setShowJoin(false); load(); return; }
               setClasses(prev => prev.find(c => c.id === cls.id) ? prev : [cls, ...prev]);
@@ -575,12 +584,12 @@ const MyClasses = () => {
 
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-1">הכיתות שלי</h1>
-            <p className="text-muted-foreground">כל הכיתות שאתה רשום בהן</p>
+            <h1 className="text-3xl font-bold text-foreground mb-1">{t('myClasses.title')}</h1>
+            <p className="text-muted-foreground">{t('myClasses.subtitle')}</p>
           </div>
           <button onClick={() => setShowJoin(true)}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 shadow-md shadow-primary/20 transition-colors">
-            + הצטרף לכיתה
+            + {t('myClasses.joinTitle')}
           </button>
         </div>
 
@@ -591,10 +600,10 @@ const MyClasses = () => {
         ) : classes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="text-6xl mb-4">🏫</div>
-            <h3 className="text-xl font-bold text-foreground mb-2">אינך רשום לאף כיתה</h3>
-            <p className="text-muted-foreground max-w-xs mb-6">קבל קוד הצטרפות מהמורה שלך והצטרף לכיתה.</p>
+            <h3 className="text-xl font-bold text-foreground mb-2">{t('myClasses.noClassesTitle')}</h3>
+            <p className="text-muted-foreground max-w-xs mb-6">{t('myClasses.noClassesDesc')}</p>
             <button onClick={() => setShowJoin(true)} className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90">
-              + הצטרף לכיתה ראשונה
+              + {t('myClasses.joinFirst')}
             </button>
           </div>
         ) : (
@@ -605,11 +614,11 @@ const MyClasses = () => {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-bold text-foreground group-hover:text-primary transition-colors">{cls.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">הצטרפת ב {fmt(cls.created_at)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t('myClasses.joinedOn', { date: fmt(cls.created_at) })}</p>
                   </div>
                   <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary font-bold tracking-widest">{cls.code}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">לחץ לצפייה בבחינות ←</p>
+                <p className="text-xs text-muted-foreground">{t('myClasses.clickToView')}</p>
               </div>
             ))}
           </div>

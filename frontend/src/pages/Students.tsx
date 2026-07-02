@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import FileUpload from '@/components/FileUpload';
 import DistributionBar from '@/components/DistributionBar';
 import { rescaleCounts } from '@/utils/distribution';
+import { useTranslation } from '@/lib/i18n';
 import type { Question } from '@/types/questions';
 
 const API = () => import.meta.env.VITE_API_BASE_URL ?? '/backend';
@@ -53,26 +54,31 @@ const Spinner = () => <span className="w-4 h-4 rounded-full border-2 border-curr
 
 // ── Confirm Modal ─────────────────────────────────────────────────────────────
 
-const Confirm = ({ msg, onOk, onCancel }: { msg: string; onOk: () => void; onCancel: () => void }) => (
+const Confirm = ({ msg, onOk, onCancel }: { msg: string; onOk: () => void; onCancel: () => void }) => {
+  const { t, isRTL } = useTranslation();
+  return (
   <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCancel}>
-    <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()} dir="rtl">
+    <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()} dir={isRTL ? 'rtl' : 'ltr'}>
       <p className="text-foreground font-medium mb-5">{msg}</p>
       <div className="flex gap-3">
-        <button onClick={onOk} className="flex-1 py-2 rounded-xl bg-destructive text-white text-sm font-semibold hover:opacity-90">אשר</button>
-        <button onClick={onCancel} className="flex-1 py-2 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
+        <button onClick={onOk} className="flex-1 py-2 rounded-xl bg-destructive text-white text-sm font-semibold hover:opacity-90">{t('students.confirm')}</button>
+        <button onClick={onCancel} className="flex-1 py-2 rounded-xl border border-border text-sm hover:bg-muted">{t('students.cancel')}</button>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 // ── Class Card ────────────────────────────────────────────────────────────────
 
-const ClassCard = ({ cls, onSelect, onDelete }: { cls: ClassItem; onSelect: () => void; onDelete: () => void }) => (
+const ClassCard = ({ cls, onSelect, onDelete }: { cls: ClassItem; onSelect: () => void; onDelete: () => void }) => {
+  const { t } = useTranslation();
+  return (
   <div onClick={onSelect} className="bg-card border border-border rounded-2xl p-5 cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group">
     <div className="flex items-start justify-between mb-3">
       <div>
         <h3 className="font-bold text-foreground group-hover:text-primary transition-colors">{cls.name}</h3>
-        <p className="text-xs text-muted-foreground mt-0.5">נוצרה {fmt(cls.created_at)}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{t('students.createdOn', { date: fmt(cls.created_at) })}</p>
       </div>
       <button onClick={e => { e.stopPropagation(); onDelete(); }} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
         <Icon path="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
@@ -81,15 +87,16 @@ const ClassCard = ({ cls, onSelect, onDelete }: { cls: ClassItem; onSelect: () =
     <div className="flex items-center gap-3">
       <div className="flex-1 py-2 px-3 bg-primary/5 border border-primary/20 rounded-xl text-center">
         <p className="text-lg font-bold text-primary tracking-widest">{cls.code}</p>
-        <p className="text-xs text-muted-foreground">קוד הצטרפות</p>
+        <p className="text-xs text-muted-foreground">{t('students.joinCode')}</p>
       </div>
       <div className="text-center">
         <p className="text-2xl font-bold text-foreground">{cls.students?.length ?? 0}</p>
-        <p className="text-xs text-muted-foreground">תלמידים</p>
+        <p className="text-xs text-muted-foreground">{t('students.students')}</p>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 // ── Forms Editor (distinct questions per form/variant) ────────────────────────
 
@@ -97,6 +104,7 @@ const FormsEditor = ({ initialForms, title, onSave, onClose, saving }: {
   initialForms: Question[][]; title: string;
   onSave: (forms: Question[][]) => void; onClose: () => void; saving?: boolean;
 }) => {
+  const { t, isRTL } = useTranslation();
   const [forms, setForms] = useState<Question[][]>(() => initialForms.map(f => f.map(q => ({ ...q }))));
   const [active, setActive] = useState(0);
   const [newQ, setNewQ] = useState({ question: '', answer: '' });
@@ -116,7 +124,7 @@ const FormsEditor = ({ initialForms, title, onSave, onClose, saving }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl my-8" onClick={e => e.stopPropagation()} dir="rtl">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl my-8" onClick={e => e.stopPropagation()} dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="text-lg font-bold text-foreground">{title}</h2>
           <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground"><Icon path="M18 6 6 18M6 6l12 12" /></button>
@@ -128,7 +136,7 @@ const FormsEditor = ({ initialForms, title, onSave, onClose, saving }: {
             {forms.map((f, i) => (
               <button key={i} onClick={() => setActive(i)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${active === i ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
-                טופס {i + 1} ({f.length})
+                {t('students.formTab', { n: i + 1, count: f.length })}
               </button>
             ))}
           </div>
@@ -136,14 +144,14 @@ const FormsEditor = ({ initialForms, title, onSave, onClose, saving }: {
 
         {/* Questions of the active form */}
         <div className="p-5 space-y-3 max-h-[55vh] overflow-y-auto">
-          {activeForm.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">אין שאלות בטופס זה</p>}
+          {activeForm.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t('students.noQuestionsInForm')}</p>}
           {activeForm.map((q, i) => (
             <div key={i} className="flex items-start gap-3 p-3 bg-muted/40 rounded-xl border border-border">
               <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
               <div className="flex-1 min-w-0 space-y-2">
                 <textarea value={q.question} onChange={e => updateQ(i, { question: e.target.value })} rows={2}
                   className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
-                <input value={q.answer} onChange={e => updateQ(i, { answer: e.target.value })} placeholder="תשובה נכונה"
+                <input value={q.answer} onChange={e => updateQ(i, { answer: e.target.value })} placeholder={t('students.correctAnswer')}
                   className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" />
               </div>
               <button onClick={() => deleteQ(i)} className="text-destructive hover:text-destructive/80 flex-shrink-0">
@@ -155,22 +163,22 @@ const FormsEditor = ({ initialForms, title, onSave, onClose, saving }: {
 
         {/* Add new question to the active form */}
         <div className="p-5 border-t border-border space-y-3">
-          <p className="text-sm font-semibold text-foreground">הוסף שאלה {forms.length > 1 ? `לטופס ${active + 1}` : ''}</p>
+          <p className="text-sm font-semibold text-foreground">{t('students.addQuestion')}{forms.length > 1 ? ` ${t('students.toForm', { n: active + 1 })}` : ''}</p>
           <textarea value={newQ.question} onChange={e => setNewQ(p => ({ ...p, question: e.target.value }))}
-            placeholder="טקסט השאלה" rows={2}
+            placeholder={t('students.questionText')} rows={2}
             className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
           <input value={newQ.answer} onChange={e => setNewQ(p => ({ ...p, answer: e.target.value }))}
-            placeholder="תשובה נכונה"
+            placeholder={t('students.correctAnswer')}
             className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
-          <button onClick={addQ} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90">+ הוסף שאלה</button>
+          <button onClick={addQ} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90">+ {t('students.addQuestion')}</button>
         </div>
 
         <div className="flex gap-3 px-5 pb-5">
           <button onClick={() => onSave(forms)} disabled={saving}
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
-            {saving ? <><Spinner /> שומר...</> : 'שמור שינויים'}
+            {saving ? <><Spinner /> {t('students.saving')}</> : t('students.saveChanges')}
           </button>
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">{t('students.cancel')}</button>
         </div>
       </div>
     </div>
@@ -182,6 +190,7 @@ const FormsEditor = ({ initialForms, title, onSave, onClose, saving }: {
 const OverrideForm = ({ qi, initialPoints, examId, studentUid, token, onDone }: {
   qi: number; initialPoints: string; examId: string; studentUid: string; token: string; onDone: () => void;
 }) => {
+  const { t } = useTranslation();
   const [points, setPoints] = useState(initialPoints);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -201,19 +210,19 @@ const OverrideForm = ({ qi, initialPoints, examId, studentUid, token, onDone }: 
       <div className="flex gap-2">
         <select value={points} onChange={e => setPoints(e.target.value)}
           className="flex-1 px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none">
-          <option value="">בחר ניקוד</option>
-          <option value="1">1 — נכון</option>
-          <option value="0.5">0.5 — חלקי</option>
-          <option value="0">0 — שגוי</option>
+          <option value="">{t('students.selectScore')}</option>
+          <option value="1">{t('students.scoreCorrect')}</option>
+          <option value="0.5">{t('students.scorePartial')}</option>
+          <option value="0">{t('students.scoreWrong')}</option>
         </select>
         <button onClick={submit} disabled={!points || saving}
           className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50">
-          {saving ? <Spinner /> : 'אשר'}
+          {saving ? <Spinner /> : t('students.confirm')}
         </button>
-        <button onClick={onDone} className="px-3 py-1.5 rounded-lg border border-border text-xs">ביטול</button>
+        <button onClick={onDone} className="px-3 py-1.5 rounded-lg border border-border text-xs">{t('students.cancel')}</button>
       </div>
       <input value={note} onChange={e => setNote(e.target.value)}
-        placeholder="הסבר לשינוי (אופציונלי)"
+        placeholder={t('students.overrideNote')}
         className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-xs focus:outline-none" />
     </div>
   );
@@ -224,6 +233,7 @@ const OverrideForm = ({ qi, initialPoints, examId, studentUid, token, onDone }: 
 const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
   exam: ClassExam; submission: Submission; token: string; onClose: () => void; onRefresh: () => void;
 }) => {
+  const { t, isRTL } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [openOverrideIdx, setOpenOverrideIdx] = useState<number | null>(null);
 
@@ -235,7 +245,7 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
     const feedback = variantQs.map((q, i) => {
       const answer = submission.answers[i] || '';
       const correct = answer.trim().toLowerCase() === q.answer.trim().toLowerCase();
-      return { question: q.question, points: correct ? 1 : 0, correct, explanation: correct ? 'תשובה נכונה' : `תשובה שגויה. התשובה הנכונה: ${q.answer}`, covered_points: [], missed_points: [] };
+      return { question: q.question, points: correct ? 1 : 0, correct, explanation: correct ? t('students.correctAnswer') : t('students.wrongAnswerFb', { answer: q.answer }), covered_points: [], missed_points: [] };
     });
     const score = feedback.reduce((s, f) => s + f.points, 0);
     return { score, feedback };
@@ -264,11 +274,11 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl my-8" onClick={e => e.stopPropagation()} dir="rtl">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl my-8" onClick={e => e.stopPropagation()} dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
             <h2 className="text-lg font-bold text-foreground">{submission.student_name}</h2>
-            <p className="text-xs text-muted-foreground">הגיש {fmtDT(submission.submitted_at)}</p>
+            <p className="text-xs text-muted-foreground">{t('students.submittedOn', { date: fmtDT(submission.submitted_at) })}</p>
           </div>
           <div className="flex items-center gap-3">
             {score != null && (
@@ -284,7 +294,7 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
           <div className="p-5 border-b border-border">
             <button onClick={gradeWithAI} disabled={loading}
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
-              {loading ? <><Spinner /> בודק...</> : isLocalGradable ? '⚡ בדיקה מהירה' : '✨ בדיקה אוטומטית על ידי AI'}
+              {loading ? <><Spinner /> {t('students.checking')}</> : isLocalGradable ? `⚡ ${t('students.quickCheck')}` : `✨ ${t('students.aiCheck')}`}
             </button>
           </div>
         )}
@@ -307,8 +317,8 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mb-1">תשובת התלמיד: <span className="text-foreground font-medium">{answer || '—'}</span></p>
-                <p className="text-xs text-muted-foreground mb-1">תשובה נכונה: <span className="text-green-700 dark:text-green-400 font-medium">{q.answer}</span></p>
+                <p className="text-xs text-muted-foreground mb-1">{t('students.studentAnswer')} <span className="text-foreground font-medium">{answer || '—'}</span></p>
+                <p className="text-xs text-muted-foreground mb-1">{t('students.correctAnswerLabel')} <span className="text-green-700 dark:text-green-400 font-medium">{q.answer}</span></p>
                 {f?.explanation && <p className="text-xs text-muted-foreground italic">{f.explanation}</p>}
 
                 {submission.grade_result && (
@@ -324,7 +334,7 @@ const GradingPanel = ({ exam, submission, token, onClose, onRefresh }: {
                   ) : (
                     <button onClick={() => setOpenOverrideIdx(qi)}
                       className="mt-2 text-xs text-muted-foreground hover:text-primary underline">
-                      ✏️ שנה ניקוד
+                      ✏️ {t('students.changeScore')}
                     </button>
                   )
                 )}
@@ -341,6 +351,7 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
   exam: ClassExam; token: string;
   onDone: (updatedExam: ClassExam) => void; onClose: () => void;
 }) => {
+  const { t, isRTL } = useTranslation();
   const [files, setFiles] = useState<File[]>([]);
   const [questionType, setQuestionType] = useState('open');
   const [questionCount, setQuestionCount] = useState(5);
@@ -371,11 +382,11 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
       }));
     }
     if (difficulty === 'merged') {
-      const t = Math.max(1, questionCount);
+      const qTotal = Math.max(1, questionCount);
       formData.append('difficulty_dist', JSON.stringify({
-        easy: Math.round((levelCounts[0] / t) * 100),
-        medium: Math.round((levelCounts[1] / t) * 100),
-        hard: Math.round((levelCounts[2] / t) * 100),
+        easy: Math.round((levelCounts[0] / qTotal) * 100),
+        medium: Math.round((levelCounts[1] / qTotal) * 100),
+        hard: Math.round((levelCounts[2] / qTotal) * 100),
       }));
     }
     return formData;
@@ -389,18 +400,18 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
     try {
       const results: Question[][] = [];
       for (let i = 0; i < numForms; i++) {
-        if (numForms > 1) setProgress(`יוצר טופס ${i + 1}/${numForms}...`);
+        if (numForms > 1) setProgress(t('students.generatingForm', { i: i + 1, n: numForms }));
         const r = await fetch(`${API()}/upload`, { method: 'POST', headers: authH(token), body: buildFormData() });
         if (!r.ok) {
           const err = await r.json().catch(() => ({}));
-          throw new Error(err.detail || 'שגיאה ביצירת השאלות');
+          throw new Error(err.detail || t('students.generateError'));
         }
         const data = await r.json();
         results.push(data.questions ?? []);
       }
       setForms(results);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'שגיאה');
+      setError(e instanceof Error ? e.message : t('students.genericError'));
     } finally {
       setIsLoading(false);
       setProgress(null);
@@ -428,7 +439,7 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
     return (
       <FormsEditor
         initialForms={forms}
-        title={`טפסים שנוצרו — ${exam.title}`}
+        title={t('students.formsCreatedTitle', { title: exam.title })}
         saving={isLoading}
         onSave={saveForms}
         onClose={() => setForms([])}
@@ -438,12 +449,12 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl my-8" onClick={e => e.stopPropagation()} dir="rtl">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-xl my-8" onClick={e => e.stopPropagation()} dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h2 className="text-lg font-bold text-foreground">יצירת שאלות — {exam.title}</h2>
+            <h2 className="text-lg font-bold text-foreground">{t('students.generateTitle', { title: exam.title })}</h2>
             <p className="text-xs text-muted-foreground">
-              {numForms > 1 ? `ה-AI ייצור ${numForms} טפסים שונים מאותו חומר` : 'העלה חומר לימוד וה-AI ייצור שאלות לבחינה'}
+              {numForms > 1 ? t('students.aiWillCreate', { n: numForms }) : t('students.uploadHint')}
             </p>
           </div>
           <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground">
@@ -454,15 +465,15 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
         <div className="p-5 space-y-5">
           {/* File upload (up to 5 files) */}
           <div>
-            <p className="text-sm font-medium text-foreground mb-2">העלאת קבצים (עד 5)</p>
+            <p className="text-sm font-medium text-foreground mb-2">{t('students.uploadFiles')}</p>
             <FileUpload selectedFiles={files} onFilesChange={setFiles} disabled={isLoading} />
           </div>
 
           {/* Question type */}
           <div>
-            <p className="text-sm font-medium text-foreground mb-2">סוג שאלות</p>
+            <p className="text-sm font-medium text-foreground mb-2">{t('students.questionType')}</p>
             <div className="flex gap-2">
-              {[{ v: 'open', l: 'פתוחות' }, { v: 'yesno', l: 'כן/לא' }, { v: 'multiple', l: 'רב ברירה' }, { v: 'merged', l: 'מיזוג' }].map(({ v, l }) => (
+              {[{ v: 'open', l: t('examGenerator.segOpen') }, { v: 'yesno', l: t('examGenerator.segYesno') }, { v: 'multiple', l: t('examGenerator.segMultiple') }, { v: 'merged', l: t('examGenerator.levelMerged') }].map(({ v, l }) => (
                 <button key={v} onClick={() => setQuestionType(v)}
                   className={`flex-1 py-2 rounded-xl border-2 text-xs font-medium transition-all ${questionType === v ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
                   {l}
@@ -471,13 +482,13 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
             </div>
             {questionType === 'merged' && (
               <div className="mt-3 p-3 bg-muted/40 rounded-xl border border-border">
-                <p className="text-xs font-medium text-foreground mb-2">כמה שאלות מכל סוג? (סה״כ {questionCount})</p>
+                <p className="text-xs font-medium text-foreground mb-2">{t('examGenerator.mixedTypeTitle', { count: questionCount })}</p>
                 <DistributionBar
                   total={questionCount}
                   segments={[
-                    { key: 'yesno', label: 'כן/לא', color: 'bg-blue-500' },
-                    { key: 'multiple', label: 'רב ברירה', color: 'bg-violet-500' },
-                    { key: 'open', label: 'פתוחות', color: 'bg-emerald-500' },
+                    { key: 'yesno', label: t('examGenerator.segYesno'), color: 'bg-blue-500' },
+                    { key: 'multiple', label: t('examGenerator.segMultiple'), color: 'bg-violet-500' },
+                    { key: 'open', label: t('examGenerator.segOpen'), color: 'bg-emerald-500' },
                   ]}
                   counts={typeCounts}
                   onChange={setTypeCounts}
@@ -491,7 +502,7 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
           <div className="space-y-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <p className="text-sm font-medium text-foreground">מספר שאלות</p>
+                <p className="text-sm font-medium text-foreground">{t('students.questionCount')}</p>
                 <input
                   type="number" min={1} max={100} value={questionCount}
                   onChange={e => setQuestionCount(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
@@ -505,9 +516,9 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
                 className="w-full accent-primary" />
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground mb-2">רמת קושי</p>
+              <p className="text-sm font-medium text-foreground mb-2">{t('students.difficulty')}</p>
               <div className="flex gap-1">
-                {[{ v: 'easy', l: 'קל' }, { v: 'medium', l: 'בינוני' }, { v: 'hard', l: 'קשה' }, { v: 'merged', l: 'מיזוג' }].map(({ v, l }) => (
+                {[{ v: 'easy', l: t('examGenerator.levelEasy') }, { v: 'medium', l: t('examGenerator.levelMedium') }, { v: 'hard', l: t('examGenerator.levelHard') }, { v: 'merged', l: t('examGenerator.levelMerged') }].map(({ v, l }) => (
                   <button key={v} onClick={() => setDifficulty(v)}
                     className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-all ${difficulty === v ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>
                     {l}
@@ -520,13 +531,13 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
           {/* Mixed difficulty — how many questions of each level */}
           {difficulty === 'merged' && (
             <div className="p-3 bg-muted/40 rounded-xl border border-border">
-              <p className="text-xs font-medium text-foreground mb-2">כמה שאלות בכל רמת קושי? (סה״כ {questionCount})</p>
+              <p className="text-xs font-medium text-foreground mb-2">{t('examGenerator.mixedLevelTitle', { count: questionCount })}</p>
               <DistributionBar
                 total={questionCount}
                 segments={[
-                  { key: 'easy', label: 'קל', color: 'bg-emerald-500' },
-                  { key: 'medium', label: 'בינוני', color: 'bg-amber-500' },
-                  { key: 'hard', label: 'קשה', color: 'bg-rose-500' },
+                  { key: 'easy', label: t('examGenerator.levelEasy'), color: 'bg-emerald-500' },
+                  { key: 'medium', label: t('examGenerator.levelMedium'), color: 'bg-amber-500' },
+                  { key: 'hard', label: t('examGenerator.levelHard'), color: 'bg-rose-500' },
                 ]}
                 counts={levelCounts}
                 onChange={setLevelCounts}
@@ -541,10 +552,10 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
         <div className="flex gap-3 p-5 border-t border-border">
           <button onClick={handleGenerate} disabled={files.length === 0 || isLoading}
             className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
-            {isLoading ? <><Spinner /> {progress ?? 'יוצר שאלות...'}</> : (numForms > 1 ? `✨ צור ${numForms} טפסים` : '✨ צור שאלות')}
+            {isLoading ? <><Spinner /> {progress ?? t('students.generating')}</> : (numForms > 1 ? `✨ ${t('students.createForms', { n: numForms })}` : `✨ ${t('students.createQuestions')}`)}
           </button>
           <button onClick={onClose} className="px-4 py-3 rounded-xl border border-border text-sm hover:bg-muted">
-            ביטול
+            {t('students.cancel')}
           </button>
         </div>
       </div>
@@ -557,6 +568,7 @@ const GenerateExamFlow = ({ exam, token, onDone, onClose }: {
 const ClassDetail = ({ cls, token, onBack, onRefresh }: {
   cls: ClassItem; token: string; onBack: () => void; onRefresh: () => void;
 }) => {
+  const { t, isRTL } = useTranslation();
   const [showGenerateExam, setShowGenerateExam] = useState(false);
   const [generatingExam, setGeneratingExam] = useState<ClassExam | null>(null);
   const [tab, setTab] = useState<'students' | 'exams'>('students');
@@ -611,7 +623,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
 
   const createExam = async () => {
     if (!examTitle.trim()) {
-      setFormError('שם הבחינה הוא שדה חובה');
+      setFormError(t('students.createExamFormError'));
       return;
     }
     setFormError(null);
@@ -628,7 +640,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
     });
     if (!r.ok) {
       const err = await r.json();
-      setFormError(err.detail || 'שגיאה ביצירת הבחינה');
+      setFormError(err.detail || t('students.createExamError'));
       return;
     }
     const exam = await r.json();
@@ -698,24 +710,24 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
         method: 'POST', headers: jsonH(token), body: JSON.stringify({ email }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setAddError(d.detail || 'שגיאה בהוספת התלמיד'); return; }
-      setAddSuccess(`${d.student?.name ?? email} נוסף/ה לכיתה`);
+      if (!r.ok) { setAddError(d.detail || t('students.addStudentError')); return; }
+      setAddSuccess(t('students.studentAdded', { name: d.student?.name ?? email }));
       setAddEmail('');
       onRefresh(); // re-syncs the roster from the server (see load())
     } catch {
-      setAddError('שגיאה בהוספת התלמיד');
+      setAddError(t('students.addStudentError'));
     } finally {
       setAddingStudent(false);
     }
   };
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
       {confirm && <Confirm msg={confirm.msg} onOk={() => { confirm.action(); setConfirm(null); }} onCancel={() => setConfirm(null)} />}
       {editExam && (
         <FormsEditor
           initialForms={examForms(editExam)}
-          title={`עריכת שאלות — ${editExam.title}`}
+          title={t('students.editFormsTitle', { title: editExam.title })}
           saving={savingForms}
           onSave={forms => saveExamForms(editExam, forms)}
           onClose={() => setEditExam(null)}
@@ -749,7 +761,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
       {/* Header */}
       <div className="flex items-center gap-4 flex-wrap">
         <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <Icon path="M15 18l-6-6 6-6" /> חזרה לכיתות
+          <Icon path="M15 18l-6-6 6-6" /> {t('students.backToClasses')}
         </button>
         <div className="flex-1">
           {renamingClass ? (
@@ -761,8 +773,8 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                 autoFocus
                 className="text-xl font-bold border-b-2 border-primary bg-transparent focus:outline-none text-foreground w-48"
               />
-              <button onClick={saveRename} className="text-xs px-2 py-1 rounded-lg bg-primary text-primary-foreground">שמור</button>
-              <button onClick={() => setRenamingClass(false)} className="text-xs px-2 py-1 rounded-lg border border-border">ביטול</button>
+              <button onClick={saveRename} className="text-xs px-2 py-1 rounded-lg bg-primary text-primary-foreground">{t('students.save')}</button>
+              <button onClick={() => setRenamingClass(false)} className="text-xs px-2 py-1 rounded-lg border border-border">{t('students.cancel')}</button>
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
@@ -773,24 +785,24 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
               </button>
             </div>
           )}
-          <p className="text-sm text-muted-foreground">{cls.students?.length ?? 0} תלמידים · נוצרה {fmt(cls.created_at)}</p>
+          <p className="text-sm text-muted-foreground">{t('students.studentsCreatedOn', { count: cls.students?.length ?? 0, date: fmt(cls.created_at) })}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="px-4 py-2 bg-primary/5 border border-primary/20 rounded-xl">
             <span className="text-lg font-bold text-primary tracking-widest">{cls.code}</span>
           </div>
           <button onClick={copyCode} className="px-3 py-2 rounded-xl border border-border text-sm hover:bg-muted transition-colors">
-            {codeCopied ? '✓' : 'העתק'}
+            {codeCopied ? '✓' : t('students.copy')}
           </button>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-2 p-1 bg-muted rounded-xl">
-        {[{ id: 'students', label: `👥 תלמידים (${cls.students?.length ?? 0})` }, { id: 'exams', label: `📝 בחינות` }].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as 'students' | 'exams')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-            {t.label}
+        {[{ id: 'students', label: `👥 ${t('students.tabStudents', { count: cls.students?.length ?? 0 })}` }, { id: 'exams', label: `📝 ${t('students.tabExams')}` }].map(tab => (
+          <button key={tab.id} onClick={() => setTab(tab.id as 'students' | 'exams')}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${tab === tab.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+            {tab.label}
           </button>
         ))}
       </div>
@@ -800,7 +812,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
         <div className="space-y-3">
           {/* Add student by email */}
           <div className="bg-card border border-border rounded-xl p-4">
-            <label className="text-sm font-semibold text-foreground mb-2 block">הוספת תלמיד לפי אימייל</label>
+            <label className="text-sm font-semibold text-foreground mb-2 block">{t('students.addStudentByEmail')}</label>
             <div className="flex gap-2">
               <input
                 type="email"
@@ -817,10 +829,10 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                 className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
               >
                 {addingStudent ? <Spinner /> : <Icon path="M12 5v14M5 12h14" />}
-                הוסף
+                {t('students.add')}
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">המשתמש חייב להיות רשום במערכת עם כתובת אימייל זו.</p>
+            <p className="text-xs text-muted-foreground mt-2">{t('students.addStudentHint')}</p>
             {addError && <p className="text-xs text-destructive mt-2">{addError}</p>}
             {addSuccess && <p className="text-xs text-green-600 dark:text-green-400 mt-2">✓ {addSuccess}</p>}
           </div>
@@ -828,8 +840,8 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
           {cls.students.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <p className="text-4xl mb-3">👥</p>
-              <p className="font-medium">אין תלמידים עדיין</p>
-              <p className="text-sm">שתף את הקוד <strong className="text-primary">{cls.code}</strong> עם התלמידים</p>
+              <p className="font-medium">{t('students.noStudents')}</p>
+              <p className="text-sm">{t('students.shareCodePrefix')} <strong className="text-primary">{cls.code}</strong> {t('students.shareCodeSuffix')}</p>
             </div>
           ) : (
             (cls.students ?? []).map(s => (
@@ -841,14 +853,14 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                   <p className="font-medium text-foreground">{s.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{s.email}</p>
                 </div>
-                <p className="text-xs text-muted-foreground flex-shrink-0">הצטרף {fmt(s.joined_at)}</p>
+                <p className="text-xs text-muted-foreground flex-shrink-0">{t('students.joined', { date: fmt(s.joined_at) })}</p>
                 <button
-                  onClick={() => setConfirm({ msg: `להסיר את "${s.name}" מהכיתה?`, action: async () => {
+                  onClick={() => setConfirm({ msg: t('students.removeStudentConfirm', { name: s.name }), action: async () => {
                     await fetch(`${API()}/classes/${cls.id}/students/${s.uid}`, { method: 'DELETE', headers: authH(token) });
                     onRefresh();
                   }})}
                   className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
-                  title="הסר תלמיד"
+                  title={t('students.removeStudent')}
                 >
                   <Icon path="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
                 </button>
@@ -863,26 +875,26 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
         <div className="space-y-4">
           <button onClick={() => setShowCreateExam(true)}
             className="w-full py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary text-sm font-semibold hover:bg-primary/5 transition-colors flex items-center justify-center gap-2">
-            <Icon path="M12 5v14M5 12h14" /> צור בחינה חדשה לכיתה
+            <Icon path="M12 5v14M5 12h14" /> {t('students.createExamForClass')}
           </button>
 
           {/* Create exam form */}
           {showCreateExam && (
             <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-              <h3 className="font-bold text-foreground">בחינה חדשה</h3>
+              <h3 className="font-bold text-foreground">{t('students.newExam')}</h3>
               <label className="text-xs font-medium text-foreground mb-1 block">
-                שם הבחינה <span className="text-destructive">*</span>
+                {t('students.examName')} <span className="text-destructive">*</span>
               </label>
-              <input value={examTitle} onChange={e => setExamTitle(e.target.value)} placeholder="שם הבחינה"
+              <input value={examTitle} onChange={e => setExamTitle(e.target.value)} placeholder={t('students.examName')}
                 className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">מספר טפסים ({numVariants})</label>
+                <label className="text-xs text-muted-foreground mb-1 block">{t('students.numForms', { count: numVariants })}</label>
                 <div className="flex items-center gap-2">
                   <input type="range" min={1} max={10} value={numVariants}                  onChange={e => setNumVariants(Number(e.target.value))} className="flex-1 accent-primary" />
                   <span className="text-sm font-bold text-foreground w-8 text-center">{numVariants}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {numVariants === 1 ? 'כולם מקבלים את אותו טופס' : `${numVariants} טפסים שונים (שאלות שונות) מחולקים אקראית`}
+                  {numVariants === 1 ? t('students.sameFormForAll') : t('students.differentForms', { count: numVariants })}
                 </p>
               </div>
               <div>
@@ -890,20 +902,20 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                   <input type="checkbox" checked={scheduled}
                     onChange={e => { setScheduled(e.target.checked); if (!e.target.checked) { setOpenAt(''); setCloseAt(''); } }}
                     className="w-4 h-4 accent-primary" />
-                  <span className="text-sm font-medium text-foreground">תזמון בחינה (זמני פתיחה וסגירה)</span>
+                  <span className="text-sm font-medium text-foreground">{t('students.scheduleExam')}</span>
                 </label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {scheduled ? 'קבע מתי הבחינה תיפתח ותיסגר.' : 'ללא תזמון — הבחינה זמינה מיד וללא מגבלת זמן.'}
+                  {scheduled ? t('students.scheduleOn') : t('students.scheduleOff')}
                 </p>
                 {scheduled && (
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">פתיחה</label>
+                      <label className="text-xs text-muted-foreground mb-1 block">{t('students.openAt')}</label>
                       <input type="datetime-local" dir="ltr" value={openAt} onChange={e => setOpenAt(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-left focus:outline-none" />
                     </div>
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">סגירה</label>
+                      <label className="text-xs text-muted-foreground mb-1 block">{t('students.closeAt')}</label>
                       <input type="datetime-local" dir="ltr" value={closeAt} onChange={e => setCloseAt(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-left focus:outline-none" />
                     </div>
@@ -912,20 +924,20 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">הוראות מיוחדות לבחינה (אופציונלי)</label>
+                <label className="text-xs text-muted-foreground mb-1 block">{t('students.examInstructions')}</label>
                 <textarea
                   value={examComment}
                   onChange={e => setExamComment(e.target.value)}
-                  placeholder="לדוגמה: התמקד בנושא רשימות מקושרות. כתוב שאלות ברמת קושי גבוהה."
+                  placeholder={t('students.examInstructionsPlaceholder')}
                   rows={3}
                   className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
-                <p className="text-xs text-muted-foreground mt-1">ניתן לכתוב בעברית או באנגלית. ההוראות חייבות להתייחס לנושא הבחינה בלבד.</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('students.examInstructionsHint')}</p>
               </div>
 
               <div className="flex gap-3">
-                <button onClick={createExam} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90">צור ופתח עריכה</button>
-                <button onClick={() => setShowCreateExam(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
+                <button onClick={createExam} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90">{t('students.createAndEdit')}</button>
+                <button onClick={() => setShowCreateExam(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">{t('students.cancel')}</button>
               </div>
               {formError && <p className="text-xs text-destructive">{formError}</p>}
             </div>
@@ -936,7 +948,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
           ) : exams.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <p className="text-4xl mb-3">📝</p>
-              <p className="font-medium">אין בחינות עדיין</p>
+              <p className="font-medium">{t('students.noExams')}</p>
             </div>
           ) : (
             exams.map(exam => {
@@ -946,30 +958,30 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                   <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
                     <div>
                       <h3 className="font-bold text-foreground">{exam.title}</h3>
-                      <p className="text-xs text-muted-foreground">{exam.questions.length} שאלות · {exam.num_variants} טפסים · נוצרה {fmt(exam.created_at)}</p>
+                      <p className="text-xs text-muted-foreground">{t('students.examMeta', { count: exam.questions.length, variants: exam.num_variants, date: fmt(exam.created_at) })}</p>
                     </div>
                     <div className="flex gap-2 flex-wrap">
                       {exam.questions.length === 0 && (
                         <button onClick={() => setGeneratingExam(exam)}
                           className="px-3 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-medium hover:bg-primary/10 transition-colors">
-                          ✨ צור שאלות עם AI
+                          ✨ {t('students.createWithAI')}
                         </button>
                       )}
                       <button onClick={() => setEditExam(exam)}
                         className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-muted transition-colors">
-                        ✏️ עריכת שאלות
+                        ✏️ {t('students.editQuestions')}
                       </button>
                       <button onClick={() => toggleVisibility(exam)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${exam.visible ? 'border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
-                        {exam.visible ? '👁 גלוי' : '🔒 מוסתר'}
+                        {exam.visible ? `👁 ${t('students.visible')}` : `🔒 ${t('students.hidden')}`}
                       </button>
                       <button onClick={() => { loadSubmissions(exam.id); }}
                         className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-muted transition-colors">
-                        📊 הגשות
+                        📊 {t('students.submissions')}
                       </button>
-                      <button onClick={() => setConfirm({ msg: `למחוק את הבחינה "${exam.title}"?`, action: () => deleteExam(exam.id) })}
+                      <button onClick={() => setConfirm({ msg: t('students.deleteExamConfirm', { title: exam.title }), action: () => deleteExam(exam.id) })}
                         className="px-3 py-1.5 rounded-lg border border-destructive/30 text-destructive text-xs font-medium hover:bg-destructive/10 transition-colors">
-                        מחק
+                        {t('students.delete')}
                       </button>
                     </div>
                   </div>
@@ -977,8 +989,8 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                   {/* Schedule */}
                   {(exam.open_at || exam.close_at) && (
                     <div className="flex gap-4 text-xs text-muted-foreground mb-3">
-                      {exam.open_at && <span>📅 פתיחה: {fmtDT(exam.open_at)}</span>}
-                      {exam.close_at && <span>🔒 סגירה: {fmtDT(exam.close_at)}</span>}
+                      {exam.open_at && <span>📅 {t('students.openLabel')} {fmtDT(exam.open_at)}</span>}
+                      {exam.close_at && <span>🔒 {t('students.closeLabel')} {fmtDT(exam.close_at)}</span>}
                     </div>
                   )}
 
@@ -986,13 +998,13 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                   {subs && visibleSubmissions.has(exam.id) && (
                     <div className="mt-3 pt-3 border-t border-border space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-foreground">הגשות ({subs.length}/{cls.students?.length ?? 0})</p>
+                        <p className="text-xs font-semibold text-foreground">{t('students.submissionsCount', { count: subs.length, total: cls.students?.length ?? 0 })}</p>
                         <button onClick={() => hideSubmissions(exam.id)} className="text-xs text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted transition-colors">
                           <Icon path="M18 6 6 18M6 6l12 12" />
                         </button>
                       </div>
                       {subs.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">אין הגשות עדיין</p>
+                        <p className="text-xs text-muted-foreground">{t('students.noSubmissions')}</p>
                       ) : (
                         subs.map(sub => {
                           const pct = sub.score !== null ? Math.round((sub.score / exam.questions.length) * 100) : null;
@@ -1011,7 +1023,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                                   {sub.score}/{exam.questions.length} ({pct}%)
                                 </span>
                               ) : (
-                                <span className="text-xs px-2 py-1 rounded-lg bg-muted text-muted-foreground flex-shrink-0">לא נבדק</span>
+                                <span className="text-xs px-2 py-1 rounded-lg bg-muted text-muted-foreground flex-shrink-0">{t('students.notGraded')}</span>
                               )}
                               {sub.graded_by && (
                                 <span className="text-xs text-muted-foreground flex-shrink-0">{sub.graded_by === 'ai' ? '✨' : '👤'}</span>
@@ -1036,6 +1048,7 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
 
 const Students = () => {
   const { user } = useAuth();
+  const { t, isRTL } = useTranslation();
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
@@ -1057,7 +1070,7 @@ const Students = () => {
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      if (!r.ok) throw new Error(`שגיאה ${r.status}`);
+      if (!r.ok) throw new Error(t('students.errorStatus', { status: r.status }));
       const d = await r.json();
       // Filter out malformed old documents that lack required fields
       const validClasses = (d.classes ?? []).filter(
@@ -1069,14 +1082,14 @@ const Students = () => {
       setSelectedClass(prev => prev ? (validClasses.find((c: ClassItem) => c.id === prev.id) ?? null) : prev);
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') {
-        setError('הבקשה לקחה יותר מדי זמן. בדוק את החיבור לשרת.');
+        setError(t('students.requestTimeout'));
       } else {
-        setError('שגיאה בטעינת הכיתות');
+        setError(t('share.loadClassesError'));
       }
     } finally {
       setLoading(false);
     }
-  }, [user?.token]);
+  }, [user?.token, t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1103,7 +1116,7 @@ const Students = () => {
 
   if (selectedClass) {
     return (
-      <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
+      <div className="bg-background min-h-screen py-10 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="max-w-5xl mx-auto">
           <ClassDetail
             cls={selectedClass}
@@ -1117,18 +1130,18 @@ const Students = () => {
   }
 
   return (
-    <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
+    <div className="bg-background min-h-screen py-10 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-5xl mx-auto">
         {confirm && <Confirm msg={confirm.msg} onOk={() => { confirm.action(); setConfirm(null); }} onCancel={() => setConfirm(null)} />}
 
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-1">ניהול כיתות ובחינות</h1>
-            <p className="text-muted-foreground">נהל כיתות, הקצה בחינות ובדוק תלמידים</p>
+            <h1 className="text-3xl font-bold text-foreground mb-1">{t('classManagement.title')}</h1>
+            <p className="text-muted-foreground">{t('classManagement.subtitle')}</p>
           </div>
           <button onClick={() => setShowCreate(true)}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-md shadow-primary/20">
-            <Icon path="M12 5v14M5 12h14" /> כיתה חדשה
+            <Icon path="M12 5v14M5 12h14" /> {t('classManagement.createClass')}
           </button>
         </div>
 
@@ -1137,18 +1150,18 @@ const Students = () => {
         {/* Create class form */}
         {showCreate && (
           <div className="bg-card border border-border rounded-2xl p-5 mb-6 space-y-4">
-            <h3 className="font-bold text-foreground">יצירת כיתה חדשה</h3>
+            <h3 className="font-bold text-foreground">{t('students.createClassTitle')}</h3>
             <input value={newClassName} onChange={e => setNewClassName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && createClass()}
-              placeholder="שם הכיתה (למשל: מדעי המחשב — שנה ב׳)"
+              placeholder={t('students.classNamePlaceholder')}
               className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
             <div className="flex gap-3">
               <button onClick={createClass} disabled={creating || !newClassName.trim()}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60">
-                {creating ? <><Spinner /> יוצר...</> : 'צור כיתה'}
+                {creating ? <><Spinner /> {t('students.creating')}</> : t('students.createClass')}
               </button>
               <button onClick={() => { setShowCreate(false); setNewClassName(''); }}
-                className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">{t('students.cancel')}</button>
             </div>
           </div>
         )}
@@ -1158,11 +1171,11 @@ const Students = () => {
         ) : classes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="text-6xl mb-4">🏫</div>
-            <h3 className="text-xl font-bold text-foreground mb-2">אין כיתות עדיין</h3>
-            <p className="text-muted-foreground max-w-xs mb-6">צור כיתה חדשה, שתף את קוד ההצטרפות עם התלמידים, והתחל לנהל בחינות.</p>
+            <h3 className="text-xl font-bold text-foreground mb-2">{t('students.noClasses')}</h3>
+            <p className="text-muted-foreground max-w-xs mb-6">{t('students.noClassesDesc')}</p>
             <button onClick={() => setShowCreate(true)}
               className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90">
-              + צור כיתה ראשונה
+              + {t('students.createFirstClass')}
             </button>
           </div>
         ) : (
@@ -1170,7 +1183,7 @@ const Students = () => {
             {classes.map((cls, index) => (
                 <ClassCard key={cls.id ?? index} cls={cls}
                 onSelect={() => setSelectedClass(cls)}
-                onDelete={() => setConfirm({ msg: `למחוק את הכיתה "${cls.name}"?`, action: () => deleteClass(cls.id) })}
+                onDelete={() => setConfirm({ msg: t('students.deleteClassConfirm', { name: cls.name }), action: () => deleteClass(cls.id) })}
               />
             ))}
           </div>

@@ -1,5 +1,7 @@
 import type { Question, GradeResult } from '@/types/questions';
 
+import i18n from '@/lib/i18n';
+
 const API = () => import.meta.env.VITE_API_BASE_URL ?? '/backend';
 
 interface SaveExamPayload {
@@ -34,21 +36,21 @@ export const saveExam = async (token: string, payload: SaveExamPayload): Promise
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify(payload),
   });
-  if (!r.ok) throw new Error('שגיאה בשמירת הבחינה');
+  if (!r.ok) throw new Error(i18n.t('examsApi.saveError'));
   const data = await r.json();
   return data.exam_id;
 };
 
 export const listExams = async (token: string): Promise<ExamRecord[]> => {
   const r = await fetch(`${API()}/exams`, { headers: authHeader(token) });
-  if (!r.ok) throw new Error('שגיאה בטעינת הבחינות');
+  if (!r.ok) throw new Error(i18n.t('examsApi.loadError'));
   const data = await r.json();
   return data.exams;
 };
 
 export const getExam = async (token: string, examId: string): Promise<ExamRecord> => {
   const r = await fetch(`${API()}/exams/${examId}`, { headers: authHeader(token) });
-  if (!r.ok) throw new Error('הבחינה לא נמצאה');
+  if (!r.ok) throw new Error(i18n.t('examsApi.notFound'));
   return r.json();
 };
 
@@ -57,7 +59,7 @@ export const deleteExam = async (token: string, examId: string): Promise<void> =
     method: 'DELETE',
     headers: authHeader(token),
   });
-  if (!r.ok) throw new Error('שגיאה במחיקת הבחינה');
+  if (!r.ok) throw new Error(i18n.t('examsApi.deleteError'));
 };
 
 export const updateExam = async (
@@ -71,5 +73,5 @@ export const updateExam = async (
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify({ answers, grade_result: gradeResult }),
   });
-  if (!r.ok) throw new Error('שגיאה בשמירת הציון');
+  if (!r.ok) throw new Error(i18n.t('examsApi.gradeSaveError'));
 };
