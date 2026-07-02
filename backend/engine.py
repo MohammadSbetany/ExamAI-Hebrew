@@ -37,25 +37,26 @@ def _split_merged_questions(n: int) -> tuple[int, int, int]:
 # Lazily create the OpenRouter client. Building it at import time (and raising on
 # a missing key) would crash the whole app on startup and take the entire API
 # down (502). Instead, only the endpoints that actually call the LLM fail — with
-# a clear error — if the key is missing.
-_client: OpenAI | None = None
+# a clear error — if the key is missing. `client` stays module-level (None until
+# first use) so tests can still patch `engine.client`.
+client: OpenAI | None = None
 
 
 def _get_client() -> OpenAI:
-    global _client
-    if _client is None:
+    global client
+    if client is None:
         api_key = os.environ.get("OPENROUTER_API_KEY")
         if not api_key:
             raise RuntimeError(
                 "OPENROUTER_API_KEY is not configured on the server. "
                 "Set it in backend/.env or the process environment."
             )
-        _client = OpenAI(
+        client = OpenAI(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
             timeout=90.0,
         )
-    return _client
+    return client
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
     """Extract text from PDF, falling back to OCR for scanned pages."""

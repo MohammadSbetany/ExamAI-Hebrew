@@ -46,7 +46,7 @@
     "errInvalidEmail": "כתובת האימייל אינה תקינה",
     "errTooManyRequests": "יותר מדי ניסיונות. נסה שוב מאוחר יותר",
     "errNetwork": "בעיית חיבור לרשת. בדוק את החיבור לאינטרנט",
-    "errEmailInUse": "כתובת אימייל זו כבר בשימוש",
+    "errEmailInUse": "כתובת האימייל כבר בשימוש",
     "errWeakPassword": "הסיסמה חלשה מדי",
     "errGeneric": "אירעה שגיאה. נסה שוב",
     "signupHeading": "יצירת חשבון",
