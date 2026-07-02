@@ -1,3 +1,10 @@
+# Load backend/.env from an absolute path BEFORE importing any module that reads
+# env vars at import time. Without this, a process started from a different
+# working directory sees no env → engine/firebase crash on import → total 502.
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).with_name(".env"))
+
 from exams_db import save_exam, list_exams, get_exam, delete_exam, update_exam
 from pydantic import BaseModel
 from flashcards import generate_flashcards

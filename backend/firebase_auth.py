@@ -13,14 +13,22 @@ from firebase_admin import credentials, auth
 _initialized = False
 
 def _init_firebase():
+    """Initialize the Firebase Admin SDK once, lazily.
+
+    Called on first token verification (not at import) so that a missing or
+    misplaced credentials file does not crash the whole app on startup — which
+    would take the entire API down with a 502. The credential path is resolved
+    relative to this file when it is not absolute, so it works regardless of the
+    process working directory.
+    """
     global _initialized
     if not _initialized:
-        cred_path = os.environ.get("FIREBASE_CREDENTIALS_PATH", os.path.join(os.path.dirname(__file__), "serviceAccountKey.json"))
+        cred_path = os.environ.get("FIREBASE_CREDENTIALS_PATH") or os.path.join(os.path.dirname(__file__), "serviceAccountKey.json")
+        if not os.path.isabs(cred_path):
+            cred_path = os.path.join(os.path.dirname(__file__), cred_path)
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
         _initialized = True
-
-_init_firebase()
 
 bearer_scheme = HTTPBearer()
 
@@ -30,6 +38,10 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Security(bearer_sch
     Use as: user = Depends(verify_token)
     Returns the decoded token dict with uid, email, etc.
     """
+    try:
+        _init_firebase()
+    except Exception:
+        raise HTTPException(status_code=503, detail="שירות האימות אינו זמין כעת. פנה למנהל המערכת.")
     try:
         token   = credentials.credentials
         decoded = auth.verify_id_token(token)

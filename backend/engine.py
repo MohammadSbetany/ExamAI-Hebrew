@@ -10,7 +10,7 @@ from PIL import Image
 import pytesseract
 import json
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 logger = logging.getLogger("examai.engine")
 
@@ -34,19 +34,28 @@ def _split_merged_questions(n: int) -> tuple[int, int, int]:
         open_n = n - yesno - multiple
     return max(0, yesno), max(0, multiple), max(0, open_n)
 
-_openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
-if not _openrouter_api_key:
-    raise EnvironmentError(
-        "Missing required environment variable: OPENROUTER_API_KEY. "
-        "Ensure it is set in your .env file or environment."
-    )
+# Lazily create the OpenRouter client. Building it at import time (and raising on
+# a missing key) would crash the whole app on startup and take the entire API
+# down (502). Instead, only the endpoints that actually call the LLM fail — with
+# a clear error — if the key is missing.
+_client: OpenAI | None = None
 
-# Setup OpenRouter client
-client = OpenAI(
-    api_key=os.environ.get("OPENROUTER_API_KEY"),
-    base_url="https://openrouter.ai/api/v1",
-    timeout=90.0,
-)
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "OPENROUTER_API_KEY is not configured on the server. "
+                "Set it in backend/.env or the process environment."
+            )
+        _client = OpenAI(
+            api_key=api_key,
+            base_url="https://openrouter.ai/api/v1",
+            timeout=90.0,
+        )
+    return _client
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
     """Extract text from PDF, falling back to OCR for scanned pages."""
@@ -236,7 +245,7 @@ For multiple choice questions: distribute correct answers randomly across all op
     """
 
     # 2. Use the configured OpenRouter/OpenAI chat model
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model="openai/gpt-5.4-mini",
         messages=[
             {"role": "system", "content": "You are an expert educator. You must respond with valid JSON only."},
@@ -302,7 +311,7 @@ def grade_answers(questions: list, answers: list, question_type: str):
     Return ONLY valid JSON.
     """
 
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model="openai/gpt-5.4-mini",
         messages=[
             {"role": "system", "content": "You are an expert educator. You must respond with valid JSON only."},
