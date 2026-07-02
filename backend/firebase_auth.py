@@ -9,28 +9,53 @@ from firebase_admin import credentials, auth
 logger = logging.getLogger("examai.auth")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 🔧 SETUP: provide the Firebase Admin service-account credentials one of three
+# 🔧 SETUP: provide the Firebase Admin service-account credentials one of these
 # ways (checked in this order):
 #   1. FIREBASE_CREDENTIALS_JSON — the whole service-account JSON as a single
 #      env value (best for hosts that manage everything through one env file;
 #      no separate file to place on the server)
-#   2. FIREBASE_CREDENTIALS_PATH — path to the service-account JSON file
-#      (absolute, or relative to the backend/ directory)
-#   3. backend/serviceAccountKey.json — default file location
+#   2. FIREBASE_CREDENTIALS_PATH — path to the service-account JSON file. It is
+#      tried as given (relative to the working directory) AND relative to the
+#      backend/ directory, so it works regardless of where the process starts.
+#   3. serviceAccountKey.json next to this file, or in the working directory.
 # ─────────────────────────────────────────────────────────────────────────────
 
 _initialized = False
 
+
+def _candidate_paths() -> list[str]:
+    """All the places a service-account JSON file might live, in priority order."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    cwd = os.getcwd()
+    configured = os.environ.get("FIREBASE_CREDENTIALS_PATH")
+    paths: list[str] = []
+    if configured:
+        paths.append(configured)                       # as given (relative to CWD, or absolute)
+        if not os.path.isabs(configured):
+            paths.append(os.path.join(here, configured))  # relative to backend/
+            paths.append(os.path.join(cwd, configured))   # explicit CWD join
+    paths.append(os.path.join(here, "serviceAccountKey.json"))  # default next to the code
+    paths.append(os.path.join(cwd, "serviceAccountKey.json"))   # default in the working dir
+    # De-dupe while preserving order
+    seen: set[str] = set()
+    return [p for p in paths if not (p in seen or seen.add(p))]
+
+
 def _load_credentials() -> credentials.Certificate:
-    """Build the Firebase credential from env-var JSON or a JSON file."""
+    """Build the Firebase credential from env-var JSON or the first JSON file found."""
     cred_json = os.environ.get("FIREBASE_CREDENTIALS_JSON")
     if cred_json and cred_json.strip():
         return credentials.Certificate(json.loads(cred_json))
 
-    cred_path = os.environ.get("FIREBASE_CREDENTIALS_PATH") or os.path.join(os.path.dirname(__file__), "serviceAccountKey.json")
-    if not os.path.isabs(cred_path):
-        cred_path = os.path.join(os.path.dirname(__file__), cred_path)
-    return credentials.Certificate(cred_path)
+    for path in _candidate_paths():
+        if path and os.path.exists(path):
+            return credentials.Certificate(path)
+
+    raise FileNotFoundError(
+        "Firebase service-account credentials not found. Set FIREBASE_CREDENTIALS_JSON, "
+        "or provide the JSON file via FIREBASE_CREDENTIALS_PATH / serviceAccountKey.json. "
+        "Looked in: " + ", ".join(_candidate_paths())
+    )
 
 def _init_firebase():
     """Initialize the Firebase Admin SDK once, lazily.
