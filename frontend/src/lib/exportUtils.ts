@@ -4,6 +4,7 @@ import {
 } from 'docx';
 import { saveAs } from 'file-saver';
 import type { Question, GradeResult } from '@/types/questions';
+import i18n from '@/lib/i18n';
 
 const sanitize = (text: string) => (text || '').replace(/\r/g, '');
 
@@ -34,7 +35,7 @@ const hrLine = () =>
 
 export const exportBlankDocx = async (questions: Question[]) => {
   const children: Paragraph[] = [
-    hebrewPara([hebrewRun('בחינה', { bold: true, size: 36, color: 'FFFFFF' })], {
+    hebrewPara([hebrewRun(i18n.t('export.exam'), { bold: true, size: 36, color: 'FFFFFF' })], {
       shading: { type: ShadingType.SOLID, color: '2563EB', fill: '2563EB' },
       spacing: { after: 320 },
     }),
@@ -97,7 +98,7 @@ export const exportGradedDocx = async (questions: Question[], gradeResult: Grade
   const scoreTextColor = pct >= 80 ? '166534' : pct >= 60 ? '854D0E' : 'B91C1C';
 
   const children: Paragraph[] = [
-    hebrewPara([hebrewRun('דוח ציון', { bold: true, size: 36, color: 'FFFFFF' })], {
+    hebrewPara([hebrewRun(i18n.t('export.gradeReport'), { bold: true, size: 36, color: 'FFFFFF' })], {
       shading: { type: ShadingType.SOLID, color: '2563EB', fill: '2563EB' },
       spacing: { after: 80 },
     }),
@@ -105,7 +106,7 @@ export const exportGradedDocx = async (questions: Question[], gradeResult: Grade
       shading: { type: ShadingType.SOLID, color: '2563EB', fill: '2563EB' },
       spacing: { after: 200 },
     }),
-    hebrewPara([hebrewRun(`ציון סופי: ${gradeResult.score} / ${questions.length} (${pct}%)`, { bold: true, size: 28, color: scoreTextColor })], {
+    hebrewPara([hebrewRun(i18n.t('export.finalScore', { score: gradeResult.score, total: questions.length, pct }), { bold: true, size: 28, color: scoreTextColor })], {
       shading: { type: ShadingType.SOLID, color: scoreColor, fill: scoreColor },
       spacing: { before: 120, after: 320 },
     }),
@@ -121,7 +122,7 @@ export const exportGradedDocx = async (questions: Question[], gradeResult: Grade
     const icon = isCorrect ? '✓' : isPartial ? '~' : '✗';
 
     children.push(
-      hebrewPara([hebrewRun(`${icon} שאלה ${i + 1} — ${fb.points}/1`, { bold: true, size: 24, color: textColor })], {
+      hebrewPara([hebrewRun(`${icon} ${i18n.t('export.question')} ${i + 1} — ${fb.points}/1`, { bold: true, size: 24, color: textColor })], {
         shading: { type: ShadingType.SOLID, color: bg, fill: bg },
         spacing: { before: 160, after: 80 },
       }),
@@ -130,7 +131,7 @@ export const exportGradedDocx = async (questions: Question[], gradeResult: Grade
       }),
       hebrewPara(
         [
-          hebrewRun('תשובה נכונה: ', { bold: true, size: 20, color: '166534' }),
+          hebrewRun(i18n.t('export.correctAnswer'), { bold: true, size: 20, color: '166534' }),
           hebrewRun(q.answer, { size: 20, color: '166534' }),
         ],
         { spacing: { after: 60 } }
@@ -146,7 +147,7 @@ export const exportGradedDocx = async (questions: Question[], gradeResult: Grade
 
     if (fb.covered_points?.length > 0) {
       children.push(hebrewPara(
-        [hebrewRun('נקודות שכוסו:', { bold: true, size: 20, color: '166534' })],
+        [hebrewRun(i18n.t('export.coveredPoints'), { bold: true, size: 20, color: '166534' })],
         { spacing: { after: 40 } }
       ));
       fb.covered_points.forEach(p => children.push(hebrewPara(
@@ -157,7 +158,7 @@ export const exportGradedDocx = async (questions: Question[], gradeResult: Grade
 
     if (fb.missed_points?.length > 0) {
       children.push(hebrewPara(
-        [hebrewRun('נקודות חסרות:', { bold: true, size: 20, color: 'B91C1C' })],
+        [hebrewRun(i18n.t('export.missedPoints'), { bold: true, size: 20, color: 'B91C1C' })],
         { spacing: { after: 40 } }
       ));
       fb.missed_points.forEach(p => children.push(hebrewPara(

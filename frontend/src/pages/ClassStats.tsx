@@ -5,6 +5,8 @@ import {
   ResponsiveContainer, Cell, LineChart, Line, Legend,
 } from 'recharts';
 
+import { useTranslation } from '@/lib/i18n';
+
 const API = () => import.meta.env.VITE_API_BASE_URL ?? '/backend';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -64,19 +66,21 @@ interface TooltipProps {
   label?: string;
 }
 const BarTooltip = ({ active, payload, label }: TooltipProps) => {
+  const { t, isRTL } = useTranslation();
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-sm" dir="rtl">
+    <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-sm" dir={isRTL ? 'rtl' : 'ltr'}>
       <p className="font-semibold text-foreground">{label}</p>
-      <p className="text-muted-foreground">{payload[0].value} תלמידים</p>
+      <p className="text-muted-foreground">{t('classStats.studentsCount', { count: payload[0].value })}</p>
     </div>
   );
 };
 const LineTooltip = ({ active, payload, label }: TooltipProps) => {
+  const { isRTL } = useTranslation();
   if (!active || !payload?.length) return null;
   const point = payload[0]?.payload;
   return (
-    <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-sm" dir="rtl">
+    <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-sm" dir={isRTL ? 'rtl' : 'ltr'}>
       <p className="font-semibold text-foreground">{label}</p>
       {point?.exam_title && <p className="text-xs text-muted-foreground mb-1">{point.exam_title}</p>}
       {payload.map((p, i) => (
@@ -92,6 +96,7 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
   classAnalytics: ClassAnalytics;
   onDrillDown: (examId: string) => void;
 }) => {
+  const { t } = useTranslation();
   const { trend, exams_summary, comparative } = classAnalytics;
 
   // Reverse trend for RTL (newest on left in Hebrew reading direction)
@@ -108,10 +113,10 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
       {/* Summary stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'בחינות שהוקצו', value: exams_summary.length },
-          { label: 'בחינות עם ציונים', value: graded.length },
-          { label: 'ממוצע כולל', value: overallAvg !== null ? `${overallAvg}%` : '—' },
-          { label: 'הגשות סה״כ', value: exams_summary.reduce((s, e) => s + e.total_submissions, 0) },
+          { label: t('classStats.statAssigned'), value: exams_summary.length },
+          { label: t('classStats.statGraded'), value: graded.length },
+          { label: t('classStats.statOverallAvg'), value: overallAvg !== null ? `${overallAvg}%` : '—' },
+          { label: t('classStats.statSubmissions'), value: exams_summary.reduce((s, e) => s + e.total_submissions, 0) },
         ].map(({ label, value }) => (
           <div key={label} className="bg-card border border-border rounded-xl p-4 text-center">
             <p className="text-2xl font-bold text-foreground">{value}</p>
@@ -123,8 +128,8 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
       {/* Trend line chart */}
       {trendRTL.length > 1 && (
         <div className="bg-card border border-border rounded-2xl p-5">
-          <h2 className="text-base font-semibold text-foreground mb-1">מגמת ממוצע הכיתה לאורך זמן</h2>
-          <p className="text-xs text-muted-foreground mb-4">מהבחינה האחרונה (שמאל) לראשונה (ימין)</p>
+          <h2 className="text-base font-semibold text-foreground mb-1">{t('classStats.trendTitle')}</h2>
+          <p className="text-xs text-muted-foreground mb-4">{t('classStats.trendSubtitle')}</p>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={trendRTL} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -133,7 +138,7 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
               <Tooltip content={<LineTooltip />} />
               <Legend />
               <Line
-                type="monotone" dataKey="avg" name="ממוצע (%)"
+                type="monotone" dataKey="avg" name={t('classStats.avgLine')}
                 stroke="hsl(var(--primary))" strokeWidth={2.5}
                 dot={{ r: 4, fill: 'hsl(var(--primary))' }}
                 activeDot={{ r: 6 }}
@@ -147,10 +152,10 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
       {comparative && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { icon: '🏆', label: 'הבחינה הטובה ביותר', value: `${comparative.best_exam.avg}% ממוצע`, title: comparative.best_exam.title, color: 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/40' },
-            { icon: '⚠️', label: 'הבחינה הקשה ביותר', value: `${comparative.worst_exam.avg}% ממוצע`, title: comparative.worst_exam.title, color: 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/40' },
-            { icon: '❌', label: 'שיעור כישלון גבוה ביותר', value: `${comparative.highest_failure_exam.rate}% נכשלו`, title: comparative.highest_failure_exam.title, color: 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/40' },
-            { icon: '📊', label: 'פיזור ציונים גבוה ביותר', value: `סטיית תקן ${comparative.highest_std_exam.std}%`, title: comparative.highest_std_exam.title, color: 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40' },
+            { icon: '🏆', label: t('classStats.bestExam'), value: t('classStats.avgValue', { value: comparative.best_exam.avg }), title: comparative.best_exam.title, color: 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/40' },
+            { icon: '⚠️', label: t('classStats.worstExam'), value: t('classStats.avgValue', { value: comparative.worst_exam.avg }), title: comparative.worst_exam.title, color: 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/40' },
+            { icon: '❌', label: t('classStats.highestFailure'), value: t('classStats.failedValue', { value: comparative.highest_failure_exam.rate }), title: comparative.highest_failure_exam.title, color: 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/40' },
+            { icon: '📊', label: t('classStats.highestStd'), value: t('classStats.stdValue', { value: comparative.highest_std_exam.std }), title: comparative.highest_std_exam.title, color: 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40' },
           ].map(({ icon, label, value, title, color }) => (
             <div key={label} className={`p-4 rounded-xl border-2 ${color}`}>
               <p className="text-xs text-muted-foreground mb-1">{icon} {label}</p>
@@ -163,17 +168,17 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
 
       {/* Exam matrix table */}
       <div className="bg-card border border-border rounded-2xl p-5">
-        <h2 className="text-base font-semibold text-foreground mb-4">מטריצת בחינות</h2>
+        <h2 className="text-base font-semibold text-foreground mb-4">{t('classStats.examMatrix')}</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">בחינה</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">תאריך</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">הגשות</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">ממוצע</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">כישלון</th>
-                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">סט״ת</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">{t('classStats.colExam')}</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">{t('classStats.colDate')}</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">{t('classStats.colSubmissions')}</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">{t('classStats.colAvg')}</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">{t('classStats.colFailure')}</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">{t('classStats.colStd')}</th>
                 <th className="py-2 px-3"></th>
               </tr>
             </thead>
@@ -195,7 +200,7 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
                   <td className="py-3 px-3">
                     <button onClick={() => onDrillDown(e.exam_id)}
                       className="text-xs text-primary hover:underline font-medium whitespace-nowrap">
-                      ניתוח מעמיק ←
+                      {t('classStats.deepAnalysis')}
                     </button>
                   </td>
                 </tr>
@@ -203,7 +208,7 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
             </tbody>
           </table>
           {exams_summary.length === 0 && (
-            <p className="text-center text-sm text-muted-foreground py-8">אין בחינות עדיין לכיתה זו</p>
+            <p className="text-center text-sm text-muted-foreground py-8">{t('classStats.noExamsForClass')}</p>
           )}
         </div>
       </div>
@@ -215,6 +220,7 @@ const ClassView = ({ classAnalytics, onDrillDown }: {
 
 const ClassStats = () => {
   const { user } = useAuth();
+  const { t, isRTL } = useTranslation();
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -236,7 +242,7 @@ const ClassStats = () => {
     fetch(`${API()}/classes`, { headers: { Authorization: `Bearer ${user.token}` } })
       .then(r => r.json())
       .then(d => setClasses((d.classes ?? []).filter((c: ClassItem & { teacher_uid?: string }) => c.id && c.name)))
-      .catch(() => setError('שגיאה בטעינת הכיתות'))
+      .catch(() => setError(t('share.loadClassesError')))
       .finally(() => setListsLoading(false));
   }, [user?.token]);
 
@@ -246,7 +252,7 @@ const ClassStats = () => {
     setLoading(true); setClassAnalytics(null); setError(null);
     fetch(`${API()}/teacher/analytics/class/${selectedClassId}`, { headers: { Authorization: `Bearer ${user.token}` } })
       .then(r => r.json()).then(setClassAnalytics)
-      .catch(() => setError('שגיאה בטעינת נתוני הכיתה'))
+      .catch(() => setError(t('classStats.loadClassDataError')))
       .finally(() => setLoading(false));
   }, [selectedClassId, user?.token]);
 
@@ -256,7 +262,7 @@ const ClassStats = () => {
     setLoading(true); setAnalytics(null); setError(null);
     fetch(`${API()}/teacher/analytics/class-exam/${selectedExamId}`, { headers: { Authorization: `Bearer ${user.token}` } })
       .then(r => r.json()).then(setAnalytics)
-      .catch(() => setError('שגיאה בטעינת הנתונים'))
+      .catch(() => setError(t('classStats.loadDataError')))
       .finally(() => setLoading(false));
   }, [selectedExamId, user?.token]);
 
@@ -270,13 +276,13 @@ const ClassStats = () => {
   );
 
   return (
-    <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
+    <div className="bg-background min-h-screen py-10 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-5xl mx-auto">
 
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-1">סטטיסטיקות כיתה</h1>
-          <p className="text-muted-foreground">בחר כיתה לסקירת ביצועים — להעמקה בבחינה ספציפית, היכנס לכיתה ובחר אותה מהמטריצה</p>
+          <h1 className="text-3xl font-bold text-foreground mb-1">{t('classStats.title')}</h1>
+          <p className="text-muted-foreground">{t('classStats.subtitle')}</p>
         </div>
 
         {error && <div className="mb-6 px-4 py-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">{error}</div>}
@@ -284,11 +290,11 @@ const ClassStats = () => {
         {/* Class picker — hidden while drilled into a specific exam */}
         {!selectedExamId && (
           <div className="bg-card border border-border rounded-2xl p-5 mb-6">
-            <p className="text-sm font-semibold text-foreground mb-3">בחר כיתה</p>
+            <p className="text-sm font-semibold text-foreground mb-3">{t('classStats.selectClass')}</p>
             {listsLoading ? (
               <div className="flex justify-center py-4"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
             ) : classes.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">אין כיתות עדיין. צור כיתה בדף ניהול הכיתות.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t('classStats.noClassesHint')}</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {classes.map(cls => (
@@ -308,8 +314,8 @@ const ClassStats = () => {
         {!selectedExamId && !selectedClassId && !listsLoading && classes.length > 0 && (
           <div className="bg-card border border-border rounded-2xl p-12 text-center">
             <div className="text-5xl mb-3">📊</div>
-            <p className="text-lg font-semibold text-foreground mb-1">בחר כיתה כדי להתחיל</p>
-            <p className="text-muted-foreground text-sm max-w-md mx-auto">תראה ממוצעים, מגמות ומטריצת בחינות. לחיצה על בחינה במטריצה תפתח ניתוח מעמיק שלה.</p>
+            <p className="text-lg font-semibold text-foreground mb-1">{t('classStats.chooseToStart')}</p>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">{t('classStats.chooseToStartDesc')}</p>
           </div>
         )}
 
@@ -323,13 +329,13 @@ const ClassStats = () => {
           <>
             <button onClick={backToClass}
               className="mb-4 flex items-center gap-2 text-sm text-primary hover:underline font-medium">
-              ← חזרה לסקירת{selectedClass ? ` ${selectedClass.name}` : ' הכיתה'}
+              ← {t('classStats.backToOverview')}{selectedClass ? ` ${selectedClass.name}` : ` ${t('classStats.classFallback')}`}
             </button>
 
             {analytics.student_count === 0 ? (
               <div className="bg-card border border-border rounded-2xl p-10 text-center">
-                <p className="text-lg font-semibold text-foreground mb-2">אין נתונים עדיין</p>
-                <p className="text-muted-foreground text-sm">הנתונים יופיעו לאחר שתלמידים יגישו את תשובותיהם.</p>
+                <p className="text-lg font-semibold text-foreground mb-2">{t('classStats.noDataYet')}</p>
+                <p className="text-muted-foreground text-sm">{t('classStats.noDataDesc')}</p>
               </div>
             ) : (
               <>
@@ -337,11 +343,11 @@ const ClassStats = () => {
                 {/* Score stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
                   {[
-                    { label: 'תלמידים',   value: analytics.score_stats?.count },
-                    { label: 'ממוצע',     value: `${analytics.score_stats?.mean}%` },
-                    { label: 'חציון',     value: `${analytics.score_stats?.median}%` },
-                    { label: 'סטיית תקן', value: `${analytics.score_stats?.std}%` },
-                    { label: 'טווח',      value: `${analytics.score_stats?.min}%–${analytics.score_stats?.max}%` },
+                    { label: t('classStats.statStudents'),   value: analytics.score_stats?.count },
+                    { label: t('classStats.statMean'),     value: `${analytics.score_stats?.mean}%` },
+                    { label: t('classStats.statMedian'),     value: `${analytics.score_stats?.median}%` },
+                    { label: t('classStats.statStd'), value: `${analytics.score_stats?.std}%` },
+                    { label: t('classStats.statRange'),      value: `${analytics.score_stats?.min}%–${analytics.score_stats?.max}%` },
                   ].map(({ label, value }) => (
                     <div key={label} className="bg-card border border-border rounded-xl p-4 text-center">
                       <p className="text-2xl font-bold text-foreground">{value}</p>
@@ -353,7 +359,7 @@ const ClassStats = () => {
                 <div className="grid grid-cols-1 gap-6 mb-6">
                   {/* Grade distribution */}
                   <div className="bg-card border border-border rounded-2xl p-5">
-                    <h2 className="text-base font-semibold text-foreground mb-4">התפלגות ציונים</h2>
+                    <h2 className="text-base font-semibold text-foreground mb-4">{t('classStats.gradeDistribution')}</h2>
                     <ResponsiveContainer width="100%" height={200}>
                       <BarChart data={analytics.grade_distribution} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -373,7 +379,7 @@ const ClassStats = () => {
 
                 {/* Per-question success rate */}
                 <div className="bg-card border border-border rounded-2xl p-5 mb-6">
-                  <h2 className="text-base font-semibold text-foreground mb-4">אחוז הצלחה לפי שאלה</h2>
+                  <h2 className="text-base font-semibold text-foreground mb-4">{t('classStats.successByQuestion')}</h2>
                   <div className="space-y-3">
                     {analytics.question_stats.map(qs => {
                       const c = successColor(qs.success_rate);
@@ -398,12 +404,12 @@ const ClassStats = () => {
                 {/* Distractor analysis */}
                 {analytics.distractor_analysis?.length > 0 && (
                   <div className="bg-card border border-border rounded-2xl p-5 mb-6">
-                    <h2 className="text-base font-semibold text-foreground mb-4">ניתוח תשובות שגויות (רב-ברירה)</h2>
+                    <h2 className="text-base font-semibold text-foreground mb-4">{t('classStats.distractorAnalysis')}</h2>
                     <div className="space-y-6">
                       {analytics.distractor_analysis.map(da => (
                         <div key={da.index}>
                           <p className="text-sm font-medium text-foreground mb-2">
-                            <span className="text-primary font-bold ml-1">שאלה {da.index + 1}:</span>{da.question}
+                            <span className="text-primary font-bold ml-1">{t('classStats.questionN', { n: da.index + 1 })}</span>{da.question}
                           </p>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {Object.entries(da.options).map(([key, val]) => {
@@ -431,12 +437,12 @@ const ClassStats = () => {
                 {/* Student table */}
                 <div className="bg-card border border-border rounded-2xl p-5">
                   <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-                    <h2 className="text-base font-semibold text-foreground">תלמידים ({analytics.student_count})</h2>
+                    <h2 className="text-base font-semibold text-foreground">{t('classStats.statStudents')} ({analytics.student_count})</h2>
                     <div className="relative">
                       <svg className="w-4 h-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <circle cx="11" cy="11" r="8" strokeWidth="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" strokeWidth="2" strokeLinecap="round"/>
                       </svg>
-                      <input type="text" placeholder="חפש תלמיד..." value={search} onChange={e => setSearch(e.target.value)}
+                      <input type="text" placeholder={t('classStats.searchStudent')} value={search} onChange={e => setSearch(e.target.value)}
                         className="pr-9 pl-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-48" />
                     </div>
                   </div>
@@ -444,10 +450,10 @@ const ClassStats = () => {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">תלמיד</th>
-                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">ציון</th>
-                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">אחוז</th>
-                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">הגשה</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">{t('classStats.colStudent')}</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">{t('classStats.colScore')}</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">{t('classStats.colPct')}</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">{t('classStats.colSubmission')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -461,7 +467,7 @@ const ClassStats = () => {
                         ))}
                       </tbody>
                     </table>
-                    {filteredStudents.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">לא נמצאו תלמידים</p>}
+                    {filteredStudents.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">{t('classStats.noStudentsFound')}</p>}
                   </div>
                 </div>
               </>

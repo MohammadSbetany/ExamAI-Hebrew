@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslation } from '@/lib/i18n';
 import {
   fetchSettings, saveSettings, saveProfile, applyTheme, applyFont, applyDirection,
   defaultSettings, type UserSettings,
@@ -52,6 +53,7 @@ const Select = ({ value, onChange, options }: {
 
 const Settings = () => {
   const { user } = useAuth();
+  const { t, i18n, changeLanguage, isRTL } = useTranslation();
   const isTeacher = user?.role === 'teacher';
 
   const [activeTab, setActiveTab] = useState<Tab>('account');
@@ -76,8 +78,8 @@ const Settings = () => {
   type Tab = 'account' | 'appearance';
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: 'account',    label: 'חשבון', icon: '👤' },
-    { id: 'appearance', label: 'מראה',  icon: '🎨' },
+    { id: 'account',    label: t('settings.tabAccount'), icon: '👤' },
+    { id: 'appearance', label: t('settings.tabAppearance'),  icon: '🎨' },
   ];
 
   useEffect(() => {
@@ -120,8 +122,8 @@ const Settings = () => {
 
   const handleChangePassword = async () => {
     setPasswordError('');
-    if (newPassword.length < 6) { setPasswordError('הסיסמה חייבת להכיל לפחות 6 תווים'); return; }
-    if (newPassword !== confirmPassword) { setPasswordError('הסיסמאות אינן תואמות'); return; }
+    if (newPassword.length < 6) { setPasswordError(t('settings.passwordTooShort')); return; }
+    if (newPassword !== confirmPassword) { setPasswordError(t('settings.passwordMismatch')); return; }
     // Firebase Auth reauthentication + updatePassword
     try {
       const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = await import('firebase/auth');
@@ -135,7 +137,7 @@ const Settings = () => {
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       setTimeout(() => setPasswordSuccess(false), 3000);
     } catch {
-      setPasswordError('הסיסמה הנוכחית שגויה');
+      setPasswordError(t('settings.passwordWrong'));
     }
   };
 
@@ -144,18 +146,18 @@ const Settings = () => {
   }
 
   return (
-    <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
+    <div className="bg-background min-h-screen py-10 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-1">הגדרות</h1>
-            <p className="text-muted-foreground text-sm">נהל את פרופיל המשתמש והעדפותיך</p>
+            <h1 className="text-3xl font-bold text-foreground mb-1">{t('settings.title')}</h1>
+            <p className="text-muted-foreground text-sm">{t('settings.subtitle')}</p>
           </div>
           {saved && (
             <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 rounded-xl text-sm font-medium">
-              <span>✓</span> נשמר
+              <span>✓</span> {t('settings.saved')}
             </div>
           )}
         </div>
@@ -186,71 +188,71 @@ const Settings = () => {
             {/* ── Account tab ── */}
             {activeTab === 'account' && (
               <>
-                <Section title="פרטי פרופיל">
+                <Section title={t('settings.profileDetails')}>
                   <div className="space-y-3">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">שם מלא</label>
-                      <TextInput value={name} onChange={setName} placeholder="ישראל ישראלי" />
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.fullName')}</label>
+                      <TextInput value={name} onChange={setName} placeholder={t('settings.fullNamePlaceholder')} />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">אימייל</label>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.email')}</label>
                       <input value={user?.email ?? ''} disabled
                         className="w-full px-3 py-2 rounded-xl border border-input bg-muted text-sm text-muted-foreground cursor-not-allowed" />
                     </div>
                     {isTeacher ? (
                       <>
                         <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">תואר (ד"ר, פרופ')</label>
-                          <TextInput value={profileFields.title ?? ''} onChange={v => setProfileFields(p => ({ ...p, title: v }))} placeholder={'ד"ר'}/>
+                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.titleField')}</label>
+                          <TextInput value={profileFields.title ?? ''} onChange={v => setProfileFields(p => ({ ...p, title: v }))} placeholder={t('settings.titlePlaceholder')}/>
                         </div>
                       </>
                     ) : (
                       <>
                         <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">מוסד לימודים</label>
-                          <TextInput value={profileFields.institution ?? ''} onChange={v => setProfileFields(p => ({ ...p, institution: v }))} placeholder="אוניברסיטת תל אביב" />
+                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.institution')}</label>
+                          <TextInput value={profileFields.institution ?? ''} onChange={v => setProfileFields(p => ({ ...p, institution: v }))} placeholder={t('settings.institutionPlaceholder')} />
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">תחום לימוד</label>
-                          <TextInput value={profileFields.fieldOfStudy ?? ''} onChange={v => setProfileFields(p => ({ ...p, field_of_study: v }))} placeholder="הנדסת תוכנה" />
+                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.fieldOfStudy')}</label>
+                          <TextInput value={profileFields.fieldOfStudy ?? ''} onChange={v => setProfileFields(p => ({ ...p, field_of_study: v }))} placeholder={t('settings.fieldOfStudyPlaceholder')} />
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">שנת לימוד</label>
+                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.yearOfStudy')}</label>
                           <Select value={profileFields.yearOfStudy ?? ''} onChange={v => setProfileFields(p => ({ ...p, year_of_study: v }))}
-                            options={[{ value: '', label: 'בחר' }, { value: '1', label: 'שנה א׳' }, { value: '2', label: 'שנה ב׳' }, { value: '3', label: 'שנה ג׳' }, { value: '4', label: 'שנה ד׳' }, { value: '5+', label: 'שנה ה׳+' }]} />
+                            options={[{ value: '', label: t('settings.yearSelect') }, { value: '1', label: t('settings.year1') }, { value: '2', label: t('settings.year2') }, { value: '3', label: t('settings.year3') }, { value: '4', label: t('settings.year4') }, { value: '5+', label: t('settings.year5plus') }]} />
                         </div>
                       </>
                     )}
                   </div>
                   <button onClick={handleSaveProfile} disabled={saving}
                     className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-60 transition-colors">
-                    {saving ? 'שומר...' : 'שמור פרופיל'}
+                    {saving ? t('settings.saving') : t('settings.saveProfile')}
                   </button>
                 </Section>
 
-                <Section title="שינוי סיסמה">
+                <Section title={t('settings.changePassword')}>
                   <div className="space-y-3">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">סיסמה נוכחית</label>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.currentPassword')}</label>
                       <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="••••••••" dir="ltr"
                         className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">סיסמה חדשה</label>
-                      <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="לפחות 6 תווים" dir="ltr"
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.newPassword')}</label>
+                      <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder={t('settings.newPasswordPlaceholder')} dir="ltr"
                         className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">אימות סיסמה חדשה</label>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.confirmPassword')}</label>
                       <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" dir="ltr"
                         className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                     </div>
                     {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
-                    {passwordSuccess && <p className="text-xs text-green-600 dark:text-green-400">הסיסמה שונתה בהצלחה!</p>}
+                    {passwordSuccess && <p className="text-xs text-green-600 dark:text-green-400">{t('settings.passwordChanged')}</p>}
                   </div>
                   <button onClick={handleChangePassword}
                     className="w-full py-2.5 rounded-xl border-2 border-border text-foreground text-sm font-medium hover:bg-muted transition-colors">
-                    שנה סיסמה
+                    {t('settings.changePasswordBtn')}
                   </button>
                 </Section>
               </>
@@ -259,12 +261,22 @@ const Settings = () => {
             {/* ── Appearance tab ── */}
             {activeTab === 'appearance' && (
               <>
-                <Section title="ערכת נושא">
-                  <Row label="מצב תצוגה" sub="בחר בין בהיר, כהה, או לפי הגדרות המערכת">
+                <Section title={t('settings.theme')}>
+                  <Row label={t('settings.displayMode')} sub={t('settings.displayModeSub')}>
                     <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-xl">
-                      {[{ value: 'light', label: '☀️ בהיר' }, { value: 'dark', label: '🌙 כהה' }].map(({ value, label }) => (
+                      {[{ value: 'light', label: `☀️ ${t('settings.lightMode')}` }, { value: 'dark', label: `🌙 ${t('settings.darkMode')}` }].map(({ value, label }) => (
                         <button key={value} onClick={() => handleToggle('theme', value)}
                           className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${settings.theme === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </Row>
+                  <Row label={t('settings.language')} sub={t('settings.languageSub')}>
+                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-xl">
+                      {[{ value: 'he', label: 'עברית' }, { value: 'en', label: 'English' }].map(({ value, label }) => (
+                        <button key={value} onClick={() => changeLanguage(value)}
+                          className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${i18n.language === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
                           {label}
                         </button>
                       ))}

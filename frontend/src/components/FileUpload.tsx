@@ -1,4 +1,5 @@
 import { useRef, useState, type MouseEvent, type ChangeEvent, type DragEvent } from 'react';
+import { useTranslation } from '@/lib/i18n';
 
 const MAX_FILES = 5;
 const ALLOWED_TYPES = [
@@ -33,6 +34,7 @@ const ImageIcon = () => (
 );
 
 const FileUpload = ({ onFilesChange, selectedFiles, disabled }: FileUploadProps) => {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -115,10 +117,10 @@ const FileUpload = ({ onFilesChange, selectedFiles, disabled }: FileUploadProps)
           </div>
           <div>
             <p className="font-medium text-foreground text-sm">
-              {canAddMore ? 'גרור קבצים לכאן' : `הגעת למקסימום (${MAX_FILES} קבצים)`}
+              {canAddMore ? t('fileUpload.dropHere') : t('fileUpload.maxReached', { max: MAX_FILES })}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {canAddMore ? `או לחץ לבחירה · עד ${MAX_FILES} קבצים` : 'הסר קובץ כדי להוסיף אחר'}
+              {canAddMore ? t('fileUpload.orClick', { max: MAX_FILES }) : t('fileUpload.removeToAdd')}
             </p>
           </div>
           <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
@@ -131,7 +133,7 @@ const FileUpload = ({ onFilesChange, selectedFiles, disabled }: FileUploadProps)
       {selectedFiles.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            {selectedFiles.length} / {MAX_FILES} קבצים נבחרו
+            {t('fileUpload.selected', { count: selectedFiles.length, max: MAX_FILES })}
           </p>
           <div className="flex flex-wrap gap-2">
             {selectedFiles.map((file, index) => (
@@ -150,7 +152,7 @@ const FileUpload = ({ onFilesChange, selectedFiles, disabled }: FileUploadProps)
                   <button
                     onClick={(e) => removeFile(index, e)}
                     className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0 mr-1"
-                    title="הסר קובץ"
+                    title={t('fileUpload.removeFile')}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <line x1="18" y1="6" x2="6" y2="18" strokeWidth={2} strokeLinecap="round" />

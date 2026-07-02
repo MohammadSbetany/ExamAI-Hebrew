@@ -1,23 +1,24 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslation } from '@/lib/i18n';
 
-// ─── Firebase error → Hebrew message ─────────────────────────────────────────
+// ─── Firebase error code → i18n key ──────────────────────────────────────────
 
-const toHebrewError = (code: string): string => {
+const authErrorKey = (code: string): string => {
   switch (code) {
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
-      return 'אימייל או סיסמה שגויים';
+      return 'auth.errInvalidCredentials';
     case 'auth/invalid-email':
-      return 'כתובת האימייל אינה תקינה';
+      return 'auth.errInvalidEmail';
     case 'auth/too-many-requests':
-      return 'יותר מדי ניסיונות. נסה שוב מאוחר יותר';
+      return 'auth.errTooManyRequests';
     case 'auth/network-request-failed':
-      return 'בעיית חיבור לרשת. בדוק את החיבור לאינטרנט';
+      return 'auth.errNetwork';
     default:
-      return 'אירעה שגיאה. נסה שוב';
+      return 'auth.errGeneric';
   }
 };
 
@@ -26,6 +27,7 @@ const toHebrewError = (code: string): string => {
 const Login = () => {
   const { login }    = useAuth();
   const navigate     = useNavigate();
+  const { t, isRTL } = useTranslation();
 
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -41,14 +43,14 @@ const Login = () => {
       navigate('/dashboard');
     } catch (err) {
       const errorCode = (err as { code?: string })?.code ?? '';
-      setError(toHebrewError(errorCode));
+      setError(t(authErrorKey(errorCode)));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4" dir="rtl">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4" dir={isRTL ? 'rtl' : 'ltr'}>
 
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -63,8 +65,8 @@ const Login = () => {
           <div className="inline-flex items-center justify-center w-14 h-14 bg-primary rounded-2xl mb-4 shadow-lg shadow-primary/25">
             <img src="/favicon.ico" alt="ExamAI" className="w-8 h-8 object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">ברוך הבא ל-ExamAI</h1>
-          <p className="text-muted-foreground mt-1 text-sm">התחבר כדי להמשיך</p>
+          <h1 className="text-2xl font-bold text-foreground">{t('auth.welcome')}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{t('auth.loginSubtitle')}</p>
         </div>
 
         {/* Card */}
@@ -74,7 +76,7 @@ const Login = () => {
 
             {/* Email */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">אימייל</label>
+              <label className="text-sm font-medium text-foreground">{t('auth.emailLabel')}</label>
               <input
                 type="email"
                 value={email}
@@ -94,7 +96,7 @@ const Login = () => {
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">סיסמה</label>
+              <label className="text-sm font-medium text-foreground">{t('auth.passwordLabel')}</label>
               <input
                 type="password"
                 value={password}
@@ -136,9 +138,9 @@ const Login = () => {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  מתחבר...
+                  {t('auth.loggingIn')}
                 </span>
-              ) : 'התחבר'}
+              ) : t('auth.loginButton')}
             </button>
 
           </form>
@@ -146,7 +148,7 @@ const Login = () => {
           {/* Divider */}
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted-foreground">אין לך חשבון?</span>
+            <span className="text-xs text-muted-foreground">{t('auth.noAccount')}</span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
@@ -159,7 +161,7 @@ const Login = () => {
               hover:bg-muted transition-colors
             "
           >
-            הרשם עכשיו
+            {t('auth.signupNow')}
           </Link>
 
         </div>

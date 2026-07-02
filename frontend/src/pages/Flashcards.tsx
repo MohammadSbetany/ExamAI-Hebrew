@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import FileUpload from '@/components/FileUpload';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslation } from '@/lib/i18n';
 
 interface Flashcard {
   front: string;
@@ -42,6 +43,7 @@ interface FlipCardProps {
 }
 
 const FlipCard = ({ card, reversed, index, total }: FlipCardProps) => {
+  const { t } = useTranslation();
   const [flipped, setFlipped] = useState(false);
   const front = reversed ? card.back : card.front;
   const back  = reversed ? card.front : card.back;
@@ -70,12 +72,12 @@ const FlipCard = ({ card, reversed, index, total }: FlipCardProps) => {
             className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-card border-2 border-primary/30 rounded-2xl shadow-lg shadow-primary/10"
           >
             <p className="text-xs font-semibold text-primary/60 uppercase tracking-widest mb-4">
-              {reversed ? 'הגדרה' : 'מושג'}
+              {reversed ? t('flashcards.definition') : t('flashcards.term')}
             </p>
             <p className="text-xl font-bold text-foreground text-center leading-relaxed" dir="rtl">
               {front}
             </p>
-            <p className="text-xs text-muted-foreground mt-6">לחץ להפוך</p>
+            <p className="text-xs text-muted-foreground mt-6">{t('flashcards.clickToFlip')}</p>
           </div>
 
           {/* Back face */}
@@ -88,7 +90,7 @@ const FlipCard = ({ card, reversed, index, total }: FlipCardProps) => {
             className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-primary rounded-2xl shadow-lg shadow-primary/20"
           >
             <p className="text-xs font-semibold text-primary-foreground/60 uppercase tracking-widest mb-4">
-              {reversed ? 'מושג' : 'הגדרה'}
+              {reversed ? t('flashcards.term') : t('flashcards.definition')}
             </p>
             <p className="text-lg text-primary-foreground text-center leading-relaxed" dir="rtl">
               {back}
@@ -114,6 +116,7 @@ const FlipCard = ({ card, reversed, index, total }: FlipCardProps) => {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const Flashcards = () => {
+  const { t, isRTL } = useTranslation();
   const { user } = useAuth();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [cards, setCards] = useState<Flashcard[]>([]);
@@ -142,17 +145,17 @@ const Flashcards = () => {
 
       if (!r.ok) {
         const err = await r.json();
-        throw new Error(err.detail || 'שגיאה ביצירת כרטיסיות');
+        throw new Error(err.detail || t('flashcards.errGenerate'));
       }
 
       const data = await r.json();
       if (data?.error) throw new Error(data.error);
       if (!Array.isArray(data?.cards) || data.cards.length === 0) {
-        throw new Error('לא נמצאו מושגים בחומר. נסה קובץ אחר.');
+        throw new Error(t('flashcards.errNoConcepts'));
       }
       setCards(data.cards);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'שגיאה בלתי צפויה');
+      setError(e instanceof Error ? e.message : t('flashcards.errUnexpected'));
     } finally {
       setIsLoading(false);
     }
@@ -184,33 +187,33 @@ const Flashcards = () => {
   // ── Deck view ──
   if (cards.length > 0) {
     return (
-      <div className="bg-background min-h-screen py-10 px-4" dir="rtl">
+      <div className="bg-background min-h-screen py-10 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="max-w-2xl mx-auto">
 
           {/* Header */}
           <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">כרטיסיות לימוד</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">{cards.length} כרטיסיות נוצרו</p>
+              <h1 className="text-2xl font-bold text-foreground">{t('flashcards.title')}</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">{t('flashcards.created', { count: cards.length })}</p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { setReversed(r => !r); setCurrentIndex(0); }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm font-medium transition-all ${reversed ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}
               >
-                <ReverseIcon /> הפוך סדר
+                <ReverseIcon /> {t('flashcards.flipOrder')}
               </button>
               <button
                 onClick={handleShuffle}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-border text-sm font-medium text-muted-foreground hover:border-primary/50 transition-all"
               >
-                <ShuffleIcon /> ערבב
+                <ShuffleIcon /> {t('flashcards.shuffle')}
               </button>
               <button
                 onClick={handleReset}
                 className="px-3 py-2 rounded-xl border-2 border-border text-sm font-medium text-muted-foreground hover:border-primary/50 transition-all"
               >
-                התחל מחדש
+                {t('common.reset')}
               </button>
             </div>
           </div>
@@ -247,7 +250,7 @@ const Flashcards = () => {
           {/* All cards list */}
           <details className="mt-10">
             <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-4">
-              הצג את כל הכרטיסיות ({cards.length})
+              {t('flashcards.showAll', { count: cards.length })}
             </summary>
             <div className="grid grid-cols-1 gap-3 mt-4">
               {cards.map((card, i) => (
@@ -269,7 +272,7 @@ const Flashcards = () => {
 
   // ── Upload view ──
   return (
-    <div className="bg-background min-h-screen py-12 px-4" dir="rtl">
+    <div className="bg-background min-h-screen py-12 px-4" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-2xl mx-auto">
 
         <header className="text-center mb-10">
@@ -281,9 +284,9 @@ const Flashcards = () => {
               <line x1="10" y1="14" x2="14" y2="14"/>
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-3">כרטיסיות לימוד</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-3">{t('flashcards.title')}</h1>
           <p className="text-muted-foreground text-lg max-w-md mx-auto">
-            העלה חומר לימוד וה-AI יחלץ את המושגים המרכזיים לכרטיסיות לחזרה
+            {t('flashcards.subtitle')}
           </p>
         </header>
 
@@ -314,9 +317,9 @@ const Flashcards = () => {
             {isLoading ? (
               <span className="flex items-center justify-center gap-3">
                 <span className="w-5 h-5 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />
-                יוצר כרטיסיות...
+                {t('flashcards.generating')}
               </span>
-            ) : 'צור כרטיסיות'}
+            ) : t('flashcards.generate')}
           </button>
         </div>
       </div>

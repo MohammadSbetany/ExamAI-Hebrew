@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Question } from '@/types/questions';
+import { useTranslation } from '@/lib/i18n';
 
 const API = () => import.meta.env.VITE_API_BASE_URL ?? '/backend';
 
@@ -22,12 +23,13 @@ const Spinner = () => <span className="w-4 h-4 rounded-full border-2 border-curr
  *   3. deploy as a class_exam
  */
 const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose }: ShareExamModalProps) => {
+  const { t, isRTL } = useTranslation();
   const [step, setStep] = useState<'class' | 'config' | 'done'>('class');
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
 
-  const [title, setTitle] = useState(defaultTitle || 'בחינה');
+  const [title, setTitle] = useState(defaultTitle || t('share.examFallback'));
   const [scheduled, setScheduled] = useState(false);
   const [openAt, setOpenAt] = useState('');
   const [closeAt, setCloseAt] = useState('');
@@ -40,7 +42,7 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
     fetch(`${API()}/classes`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(d => setClasses((d.classes ?? []).filter((c: ClassItem) => c.id && c.name && Array.isArray(c.students)) as ClassItem[]))
-      .catch(() => setError('שגיאה בטעינת הכיתות'))
+      .catch(() => setError(t('share.loadClassesError')))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -55,7 +57,7 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          title: title.trim() || 'בחינה',
+          title: title.trim() || t('share.examFallback'),
           questions,
           question_type: questionType,
           num_variants: 1,
@@ -66,11 +68,11 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
       });
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
-        throw new Error(d.detail || 'שגיאה בשיתוף הבחינה');
+        throw new Error(d.detail || t('share.shareError'));
       }
       setStep('done');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'שגיאה בשיתוף הבחינה');
+      setError(e instanceof Error ? e.message : t('share.shareError'));
     } finally {
       setDeploying(false);
     }
@@ -86,12 +88,12 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl w-full max-w-lg shadow-xl my-8" onClick={e => e.stopPropagation()} dir="rtl">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-lg shadow-xl my-8" onClick={e => e.stopPropagation()} dir={isRTL ? 'rtl' : 'ltr'}>
 
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold text-foreground">שיתוף בחינה עם תלמידים</h2>
+            <h2 className="text-lg font-bold text-foreground">{t('share.title')}</h2>
             {step !== 'done' && (
               <div className="flex items-center gap-1.5">
                 <StepDot active={step === 'class'} done={step === 'config'} label="1" />
@@ -108,14 +110,14 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
         {/* Step 1 — choose class */}
         {step === 'class' && (
           <div className="p-5">
-            <p className="text-sm text-muted-foreground mb-3">בחר את הכיתה שאליה תרצה לשתף את הבחינה ({questions.length} שאלות).</p>
+            <p className="text-sm text-muted-foreground mb-3">{t('share.chooseClass', { count: questions.length })}</p>
             {loading ? (
               <div className="flex justify-center py-8"><Spinner /></div>
             ) : classes.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p className="text-4xl mb-2">🏫</p>
-                <p className="font-medium">אין כיתות עדיין</p>
-                <p className="text-sm">צור כיתה בדף ניהול הכיתות כדי לשתף בחינות.</p>
+                <p className="font-medium">{t('share.noClasses')}</p>
+                <p className="text-sm">{t('share.noClassesHint')}</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-[50vh] overflow-y-auto">
@@ -124,7 +126,7 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
                     className={`w-full text-right p-4 rounded-xl border-2 transition-all flex items-center justify-between ${selectedClassId === cls.id ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}>
                     <div>
                       <p className="font-semibold text-foreground">{cls.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{cls.students?.length ?? 0} תלמידים · קוד {cls.code}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t('share.studentsCode', { count: cls.students?.length ?? 0, code: cls.code })}</p>
                     </div>
                     {selectedClassId === cls.id && (
                       <span className="text-primary"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg></span>
@@ -137,9 +139,9 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
             <div className="flex gap-3 mt-5">
               <button onClick={() => setStep('config')} disabled={!selectedClassId}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50">
-                המשך ←
+                {t('share.continue')}
               </button>
-              <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">ביטול</button>
+              <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">{t('share.cancel')}</button>
             </div>
           </div>
         )}
@@ -148,12 +150,12 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
         {step === 'config' && (
           <div className="p-5 space-y-4">
             <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
-              כיתה נבחרת: <span className="font-semibold text-foreground">{selectedClass?.name}</span>
+              {t('share.selectedClass')} <span className="font-semibold text-foreground">{selectedClass?.name}</span>
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">שם הבחינה</label>
-              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="שם הבחינה"
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('share.examName')}</label>
+              <input value={title} onChange={e => setTitle(e.target.value)} placeholder={t('share.examName')}
                 className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
             </div>
 
@@ -162,20 +164,20 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
                 <input type="checkbox" checked={scheduled}
                   onChange={e => { setScheduled(e.target.checked); if (!e.target.checked) { setOpenAt(''); setCloseAt(''); } }}
                   className="w-4 h-4 accent-primary" />
-                <span className="text-sm font-medium text-foreground">תזמון בחינה (זמני פתיחה וסגירה)</span>
+                <span className="text-sm font-medium text-foreground">{t('share.schedule')}</span>
               </label>
               <p className="text-xs text-muted-foreground mt-1">
-                {scheduled ? 'קבע מתי הבחינה תיפתח ותיסגר.' : 'ללא תזמון — הבחינה זמינה מיד וללא מגבלת זמן.'}
+                {scheduled ? t('share.scheduleOn') : t('share.scheduleOff')}
               </p>
               {scheduled && (
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">פתיחה</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">{t('share.openAt')}</label>
                     <input type="datetime-local" dir="ltr" value={openAt} onChange={e => setOpenAt(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-left focus:outline-none" />
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">סגירה</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">{t('share.closeAt')}</label>
                     <input type="datetime-local" dir="ltr" value={closeAt} onChange={e => setCloseAt(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-left focus:outline-none" />
                   </div>
@@ -184,9 +186,9 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">הוראות לתלמידים (אופציונלי)</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('share.instructions')}</label>
               <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2}
-                placeholder="לדוגמה: מותר להיעזר בסיכומים. בהצלחה!"
+                placeholder={t('share.instructionsPlaceholder')}
                 className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
             </div>
 
@@ -195,9 +197,9 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
             <div className="flex gap-3 pt-1">
               <button onClick={deploy} disabled={deploying}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2">
-                {deploying ? <><Spinner /> משתף...</> : 'שתף עם הכיתה'}
+                {deploying ? <><Spinner /> {t('share.sharing')}</> : t('share.shareWithClass')}
               </button>
-              <button onClick={() => setStep('class')} className="px-5 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">→ חזרה</button>
+              <button onClick={() => setStep('class')} className="px-5 py-2.5 rounded-xl border border-border text-sm hover:bg-muted">{t('share.back')}</button>
             </div>
           </div>
         )}
@@ -208,11 +210,11 @@ const ShareExamModal = ({ questions, questionType, token, defaultTitle, onClose 
             <div className="w-16 h-16 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
             </div>
-            <h3 className="text-xl font-bold text-foreground mb-1">הבחינה שותפה בהצלחה!</h3>
+            <h3 className="text-xl font-bold text-foreground mb-1">{t('share.successTitle')}</h3>
             <p className="text-muted-foreground text-sm mb-6">
-              "{title.trim() || 'בחינה'}" זמינה כעת לתלמידי הכיתה <span className="font-semibold text-foreground">{selectedClass?.name}</span>{scheduled ? '' : ' — מיד וללא מגבלת זמן'}.
+              {t('share.successBody', { title: title.trim() || t('share.examFallback') })} <span className="font-semibold text-foreground">{selectedClass?.name}</span>{scheduled ? '' : t('share.immediateNote')}.
             </p>
-            <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90">סיום</button>
+            <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90">{t('share.done')}</button>
           </div>
         )}
       </div>

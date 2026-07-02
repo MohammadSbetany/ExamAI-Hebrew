@@ -1,5 +1,6 @@
 import type { Question, GradeResult } from '@/types/questions';
 import ExportMenu from '@/components/ExportMenu';
+import { useTranslation } from '@/lib/i18n';
 
 interface QuestionsListProps {
   questions: Question[];
@@ -11,7 +12,9 @@ interface QuestionsListProps {
   gradeResult: GradeResult | null;
 }
 
-const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSubmit, isGrading, gradeResult }: QuestionsListProps) => {  if (questions.length === 0) return null;
+const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSubmit, isGrading, gradeResult }: QuestionsListProps) => {
+  const { t } = useTranslation();
+  if (questions.length === 0) return null;
 
   const allAnswered = answers.length === questions.length && answers.every(a => a.trim() !== '');
 
@@ -26,7 +29,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-foreground">
-            {questions.length === 1 ? 'שאלה אחת נוצרה בהצלחה' : `${questions.length} שאלות נוצרו בהצלחה`}
+            {questions.length === 1 ? t('questionsList.createdOne') : t('questionsList.createdMany', { count: questions.length })}
           </h2>
         </div>
         <div className="flex items-center gap-2">
@@ -41,7 +44,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
       {gradeResult && (
         <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 mb-6">
           <p className="text-xl font-bold text-primary text-center">
-            ציון: {gradeResult.score} / {questions.length} ({Math.round((gradeResult.score / questions.length) * 100)}%)
+            {t('questionsList.score', { score: gradeResult.score, total: questions.length, pct: Math.round((gradeResult.score / questions.length) * 100) })}
           </p>
         </div>
       )}
@@ -105,7 +108,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                           value={answers[index] || ''}
                           onChange={(e) => onAnswerChange(index, e.target.value)}
                           disabled={!!gradeResult || isGrading}
-                          placeholder="כתוב את תשובתך כאן..."
+                          placeholder={t('questionsList.writeAnswer')}
                           className="w-full border border-border rounded-lg p-3 text-sm resize-none h-24 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                           dir="rtl"
                         />
@@ -150,7 +153,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
 
                           {/* Model answer */}
                           <p className="text-sm font-medium text-foreground">
-                            התשובה הנכונה: <span className="text-green-700 dark:text-green-400">{question.answer}</span>
+                            {t('questionsList.correctAnswer')} <span className="text-green-700 dark:text-green-400">{question.answer}</span>
                           </p>
 
                           {/* Explanation */}
@@ -159,7 +162,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                           {/* Covered points */}
                           {feedback.covered_points?.length > 0 && (
                             <div className="mt-1">
-                              <p className="text-xs font-medium text-green-700 dark:text-green-400">נקודות שכוסו בתשובה:</p>
+                              <p className="text-xs font-medium text-green-700 dark:text-green-400">{t('questionsList.coveredPoints')}</p>
                               {feedback.covered_points.map((point: string, i: number) => (
                                 <p key={i} className="text-xs text-green-600 dark:text-green-400">✓ {point}</p>
                               ))}
@@ -169,7 +172,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
                           {/* Missed points */}
                           {feedback.missed_points?.length > 0 && (
                             <div className="mt-1">
-                              <p className="text-xs font-medium text-red-700 dark:text-red-400">נקודות חסרות בתשובה:</p>
+                              <p className="text-xs font-medium text-red-700 dark:text-red-400">{t('questionsList.missedPoints')}</p>
                               {feedback.missed_points.map((point: string, i: number) => (
                                 <p key={i} className="text-xs text-red-600 dark:text-red-400">✗ {point}</p>
                               ))}
@@ -197,7 +200,7 @@ const QuestionsList = ({ questions, questionType, answers, onAnswerChange, onSub
               ? 'bg-primary text-primary-foreground hover:bg-primary/90'
               : 'bg-muted text-muted-foreground cursor-not-allowed'}`}
         >
-          {isGrading ? 'תשובותך נבדקות...' : 'בדוק את תשובותך'}
+          {isGrading ? t('questionsList.checking') : t('questionsList.checkAnswers')}
         </button>
       )}
 
