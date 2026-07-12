@@ -4,6 +4,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
   User,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -27,6 +29,11 @@ interface AuthContextValue {
   loading:  boolean;
   login:    (email: string, password: string) => Promise<void>;
   signup:   (email: string, password: string, name: string, role: UserRole) => Promise<void>;
+  /** Sign in with Google. Resolves with { isNewUser } — true when the account
+   *  has no stored profile yet and a role still needs to be chosen. */
+  loginWithGoogle: () => Promise<{ isNewUser: boolean }>;
+  /** Persist the chosen role for a first-time Google user. */
+  completeGoogleSignup: (role: UserRole) => Promise<void>;
   logout:   () => Promise<void>;
 }
 
@@ -58,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const authUser: AuthUser = {
             uid:   firebaseUser.uid,
             email: firebaseUser.email ?? '',
-            name:  data?.name  ?? firebaseUser.email ?? '',
+            name:  data?.name  ?? firebaseUser.displayName ?? firebaseUser.email ?? '',
             role:  data?.role  ?? 'student',
             token,
           };
@@ -110,6 +117,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // onAuthStateChanged above will update state automatically
   };
 
+  // ── Google sign-in ───────────────────────────────────────────────────────────
+
+  const loginWithGoogle = async (): Promise<{ isNewUser: boolean }> => {
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const cred = await signInWithPopup(auth, provider);
+      // First-time Google users have no profile document yet → the caller shows
+      // a role picker and then calls completeGoogleSignup().
+      const snap = await getDoc(doc(db, 'users', cred.user.uid));
+      return { isNewUser: !snap.exists() };
+    } catch (err) {
+      // onAuthStateChanged won't fire on failure; stop the loading state.
+      setLoading(false);
+      throw err;
+    }
+  };
+
+  const completeGoogleSignup = async (role: UserRole) => {
+    const fbUser = auth.currentUser;
+    if (!fbUser) throw new Error('No authenticated user to complete signup for');
+    await setDoc(doc(db, 'users', fbUser.uid), {
+      name: fbUser.displayName ?? fbUser.email ?? '',
+      role,
+      email: fbUser.email ?? '',
+      createdAt: new Date().toISOString(),
+    });
+    // Reflect the chosen role immediately (auth state itself didn't change, so
+    // onAuthStateChanged won't re-run).
+    setUser(prev => prev ? { ...prev, role, name: fbUser.displayName ?? prev.name } : prev);
+  };
+
   // ── Logout ─────────────────────────────────────────────────────────────────
 
   const logout = async () => {
@@ -119,7 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, loginWithGoogle, completeGoogleSignup, logout }}>
       {children}
     </AuthContext.Provider>
   );
