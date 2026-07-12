@@ -56,7 +56,21 @@
     "confirmPlaceholder": "הקלד שוב את הסיסמה",
     "creatingAccount": "יוצר חשבון...",
     "createAccount": "צור חשבון",
-    "errWeakPassword6": "הסיסמה חלשה מדי — השתמש ב-6 תווים לפחות"
+    "errWeakPassword6": "הסיסמה חלשה מדי — השתמש ב-6 תווים לפחות",
+    "emailRequired": "יש להזין כתובת אימייל",
+    "passwordRequired": "יש להזין סיסמה",
+    "orDivider": "או",
+    "googleButton": "המשך עם Google",
+    "showPassword": "הצג סיסמה",
+    "hidePassword": "הסתר סיסמה",
+    "chooseRoleTitle": "בחר את סוג החשבון",
+    "chooseRoleSubtitle": "כדי להשלים את ההתחברות, בחר אם אתה מורה או תלמיד",
+    "savingRole": "שומר...",
+    "connectingGoogle": "מתחבר ל-Google...",
+    "googleErrPopupClosed": "חלון ההתחברות נסגר לפני השלמת התהליך",
+    "googleErrBlocked": "הדפדפן חסם את חלון ההתחברות. אפשר חלונות קופצים ונסה שוב",
+    "googleErrNotEnabled": "התחברות עם Google אינה מופעלת כרגע. פנה למנהל המערכת",
+    "googleErrAccountExists": "כבר קיים חשבון עם אימייל זה. התחבר עם אימייל וסיסמה"
   },
   "dashboard": {
     "activeExams": "בחינות פעילות",

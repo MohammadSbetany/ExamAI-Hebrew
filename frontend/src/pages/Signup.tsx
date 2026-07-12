@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, UserRole } from '@/context/AuthContext';
 import { useTranslation } from '@/lib/i18n';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 
 // ─── Firebase error code → i18n key ──────────────────────────────────────────
 
@@ -217,6 +218,16 @@ const Signup = () => {
             </button>
 
           </form>
+
+          {/* "or" divider */}
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground">{t('auth.orDivider')}</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {/* Google sign-in */}
+          <GoogleSignInButton disabled={loading} />
 
           {/* Divider */}
           <div className="flex items-center gap-3 my-6">
