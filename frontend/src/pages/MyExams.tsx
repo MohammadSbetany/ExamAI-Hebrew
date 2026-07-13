@@ -136,7 +136,9 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
   // feedback shown below (including 0.5 partial credit), rather than trusting a
   // possibly-stale stored score.
   const displayScore = gradeResult
-    ? gradeResult.feedback.reduce((sum, f) => sum + (f.points ?? 0), 0)
+    ? (gradeResult.feedback.length > 0
+        ? gradeResult.feedback.reduce((sum, f) => sum + (f.points ?? 0), 0)
+        : gradeResult.score)
     : null;
   const pct = displayScore !== null ? Math.round((displayScore / questions.length) * 100) : null;
   const colors = pct !== null ? pctColor(pct) : null;
@@ -348,7 +350,7 @@ const ExamCard = ({ exam, onSelect, onDelete, isDeleting }: ExamCardProps) => {
   const { t } = useTranslation();
   // Prefer the sum of per-question points (consistent with the detail view) over
   // a possibly-stale stored score.
-  const gradedScore = exam.grade_result
+  const gradedScore = exam.grade_result && exam.grade_result.feedback.length > 0
     ? exam.grade_result.feedback.reduce((sum, f) => sum + (f.points ?? 0), 0)
     : exam.score;
   const pct = gradedScore !== null && exam.total > 0 ? Math.round((gradedScore / exam.total) * 100) : null;

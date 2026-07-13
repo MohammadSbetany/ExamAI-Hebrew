@@ -165,6 +165,26 @@ describe('MyExams — gallery view', () => {
     });
   });
 
+  it('sums partial credit from the feedback points (not the stored score)', async () => {
+    listExams.mockResolvedValue([{
+      id: 'exam-2', uid: 'uid-123', title: 'בחינה חלקית',
+      exam_type: 'generated', question_type: 'open',
+      questions: Array(5).fill({ question: 'מה?', answer: 'תשובה' }),
+      answers: Array(5).fill('תשובה'),
+      // Stored score is wrong (2); the points actually sum to 2.5 → 50%.
+      grade_result: { score: 2, feedback: [
+        { points: 1 }, { points: 1 }, { points: 0.5 }, { points: 0 }, { points: 0 },
+      ] },
+      score: 2, total: 5,
+      created_at: '2026-01-01T00:00:00Z', graded_at: '2026-01-02T00:00:00Z'
+    }]);
+    const { default: MyExams } = await import('@/pages/MyExams');
+    render(<MemoryRouter><MyExams /></MemoryRouter>);
+    await waitFor(() => {
+      expect(screen.getByText(/50%/)).toBeInTheDocument();   // 2.5/5, not 40%
+    });
+  });
+
   it('filter buttons render correctly', async () => {
     listExams.mockResolvedValue([]);
     const { default: MyExams } = await import('@/pages/MyExams');
