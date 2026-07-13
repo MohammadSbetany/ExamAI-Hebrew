@@ -61,11 +61,12 @@ export const saveSettings = async (token: string, settings: Partial<UserSettings
 };
 
 export const saveProfile = async (token: string, profile: Record<string, string>): Promise<void> => {
-  await fetch(`${API()}/profile`, {
+  const r = await fetch(`${API()}/profile`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authH(token) },
     body: JSON.stringify(profile),
   });
+  if (!r.ok) throw new Error(`Failed to save profile (${r.status})`);
 };
 
 // ── Theme management ──────────────────────────────────────────────────────────

@@ -34,6 +34,9 @@ interface AuthContextValue {
   loginWithGoogle: () => Promise<{ isNewUser: boolean }>;
   /** Persist the chosen role for a first-time Google user. */
   completeGoogleSignup: (role: UserRole) => Promise<void>;
+  /** Re-read the current user's profile (name/role) from Firestore and update
+   *  the in-memory user — e.g. after saving profile changes. */
+  refreshUser: () => Promise<void>;
   logout:   () => Promise<void>;
 }
 
@@ -135,6 +138,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Re-read the profile document and update the in-memory user without a full
+  // reload (used after the user edits their profile in Settings).
+  const refreshUser = async () => {
+    const fbUser = auth.currentUser;
+    if (!fbUser) return;
+    const token = await fbUser.getIdToken();
+    const snap = await getDoc(doc(db, 'users', fbUser.uid));
+    const data = snap.data();
+    setUser(prev => prev ? {
+      ...prev,
+      name: data?.name ?? fbUser.displayName ?? fbUser.email ?? '',
+      role: (data?.role as UserRole) ?? prev.role,
+      token,
+    } : prev);
+  };
+
   const completeGoogleSignup = async (role: UserRole) => {
     const fbUser = auth.currentUser;
     if (!fbUser) throw new Error('No authenticated user to complete signup for');
@@ -158,7 +177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, loginWithGoogle, completeGoogleSignup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, loginWithGoogle, completeGoogleSignup, refreshUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

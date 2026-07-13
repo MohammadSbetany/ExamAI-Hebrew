@@ -52,7 +52,7 @@ const Select = ({ value, onChange, options }: {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { t, isRTL } = useTranslation();
   const isTeacher = user?.role === 'teacher';
 
@@ -115,9 +115,13 @@ const Settings = () => {
   const handleSaveProfile = async () => {
     if (!user?.token) return;
     setSaving(true);
-    await saveProfile(user.token, { name, ...profileFields });
-    flashSaved();
-    setSaving(false);
+    try {
+      await saveProfile(user.token, { name, ...profileFields });
+      await refreshUser();   // update the in-memory user so the new name shows immediately
+      flashSaved();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleChangePassword = async () => {
