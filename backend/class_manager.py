@@ -364,6 +364,42 @@ def get_class_exam(exam_id: str) -> dict | None:
     return doc.to_dict() if doc.exists else None
 
 
+def rename_student_everywhere(student_uid: str, new_name: str) -> None:
+    """Propagate a student's new display name to the denormalized copies kept
+    elsewhere: the `students` roster of every class they belong to, and the
+    `student_name` on every class-exam submission they made. The canonical name
+    lives on users/{uid}; this keeps the copies in sync so the teacher's class
+    lists and submission views show the current name."""
+    db = _db()
+    class_docs = db.collection("classes").where(
+        filter=firestore.FieldFilter("student_uids", "array_contains", student_uid)
+    ).stream()
+    for cls_doc in class_docs:
+        data = cls_doc.to_dict() or {}
+
+        # 1. Update this student's entry in the class roster.
+        students = data.get("students", []) or []
+        changed = False
+        for s in students:
+            if s.get("uid") == student_uid and s.get("name") != new_name:
+                s["name"] = new_name
+                changed = True
+        if changed:
+            cls_doc.reference.update({"students": students})
+
+        # 2. Update this student's submission name on every exam in the class.
+        class_id = data.get("id", cls_doc.id)
+        exam_docs = db.collection("class_exams").where(
+            filter=firestore.FieldFilter("class_id", "==", class_id)
+        ).stream()
+        for exam_doc in exam_docs:
+            sub_ref = (db.collection("class_results").document(exam_doc.id)
+                         .collection("submissions").document(student_uid))
+            sub = sub_ref.get()
+            if sub.exists and (sub.to_dict() or {}).get("student_name") != new_name:
+                sub_ref.update({"student_name": new_name})
+
+
 def update_exam_questions(teacher_uid: str, exam_id: str, questions: list, question_type: str | None = None) -> None:
     exam = get_class_exam(exam_id)
     if not exam or exam["teacher_uid"] != teacher_uid:

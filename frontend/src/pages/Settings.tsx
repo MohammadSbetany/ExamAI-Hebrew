@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/lib/i18n';
 import {
-  fetchSettings, saveSettings, saveProfile, applyTheme, applyFont, applyDirection,
+  fetchSettings, fetchProfile, saveSettings, saveProfile, applyTheme, applyFont, applyDirection,
   defaultSettings, type UserSettings,
 } from '@/lib/settingsApi';
 
@@ -90,6 +90,19 @@ const Settings = () => {
       applyFont(s.dyslexicFont);
       applyDirection(s.language);
     }).finally(() => setLoading(false));
+    // Load the saved profile fields so they show their current values (name,
+    // title, institution, …) instead of appearing blank.
+    fetchProfile(user.token).then(p => {
+      if (p.name) setName(p.name);
+      setProfileFields({
+        title: p.title ?? '',
+        department: p.department ?? '',
+        institution: p.institution ?? '',
+        field_of_study: p.field_of_study ?? '',
+        year_of_study: p.year_of_study ?? '',
+        office_hours: p.office_hours ?? '',
+      });
+    }).catch(() => { /* keep empty defaults on failure */ });
   }, [user?.token]);
 
   const handleToggle = async (key: keyof UserSettings, value: boolean | string) => {
@@ -218,11 +231,11 @@ const Settings = () => {
                         </div>
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.fieldOfStudy')}</label>
-                          <TextInput value={profileFields.fieldOfStudy ?? ''} onChange={v => setProfileFields(p => ({ ...p, field_of_study: v }))} placeholder={t('settings.fieldOfStudyPlaceholder')} />
+                          <TextInput value={profileFields.field_of_study ?? ''} onChange={v => setProfileFields(p => ({ ...p, field_of_study: v }))} placeholder={t('settings.fieldOfStudyPlaceholder')} />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('settings.yearOfStudy')}</label>
-                          <Select value={profileFields.yearOfStudy ?? ''} onChange={v => setProfileFields(p => ({ ...p, year_of_study: v }))}
+                          <Select value={profileFields.year_of_study ?? ''} onChange={v => setProfileFields(p => ({ ...p, year_of_study: v }))}
                             options={[{ value: '', label: t('settings.yearSelect') }, { value: '1', label: t('settings.year1') }, { value: '2', label: t('settings.year2') }, { value: '3', label: t('settings.year3') }, { value: '4', label: t('settings.year4') }, { value: '5+', label: t('settings.year5plus') }]} />
                         </div>
                       </>

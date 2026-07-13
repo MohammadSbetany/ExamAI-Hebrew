@@ -188,8 +188,8 @@ Each object must include a "type" field set to one of "yesno", "multiple", or "o
 - "multiple": {{"type": "multiple", "question": ..., "options": {{"א": ..., "ב": ..., "ג": ..., "ד": ...}}, "answer": "א"/"ב"/"ג"/"ד"}}
 - "open": {{"type": "open", "question": ..., "answer": ..., "critical_points": [3-5 key points in Hebrew]}}
 
-For yes/no questions: distribute answers randomly between כן and לא — neither should exceed 70%.
-For multiple choice questions: distribute correct answers randomly across all options — no option should exceed 50%."""
+For yes/no questions: distribute answers randomly between כן and לא — neither should exceed 70% of the yes/no questions.
+For multiple choice questions: distribute correct answers randomly across all options — no option should exceed 50% of the multiple choice questions."""
     else:
         instruction = type_instructions[question_type]
 
