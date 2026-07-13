@@ -364,20 +364,27 @@ const ClassDetail = ({ cls, token, studentName, onBack, initialExamId, onExamOpe
   }, [cls.id, token]);
 
   const handleOpenExam = async (exam: ClassExam) => {
-    if (submittedExams[exam.id]) {
-      setActiveExam(exam);
-      setPreviousSubmission(submittedExams[exam.id]);
-      return;
-    }
     setCheckingSubmission(true);
     try {
-      const r = await fetch(`${API()}/student/class-exam/${exam.id}/my-submission`, { headers: authH(token) });
-      const d = await r.json();
-      setActiveExam(exam);
-      setPreviousSubmission(d.submitted ? d.submission : null);
+      // Fetch the student's ASSIGNED variant (this also assigns one on first
+      // open) so the questions shown match what the submission is graded on —
+      // and check for an existing submission — in parallel.
+      const [variantRes, subRes] = await Promise.all([
+        fetch(`${API()}/student/class-exam/${exam.id}`, { headers: authH(token) }),
+        fetch(`${API()}/student/class-exam/${exam.id}/my-submission`, { headers: authH(token) }),
+      ]);
+      const variant = variantRes.ok ? await variantRes.json() : null;
+      const sub = subRes.ok ? await subRes.json() : null;
+      // Prefer the assigned variant's questions; fall back to the exam from the
+      // list (which already carries the student's variant, e.g. once closed).
+      const examForStudent = variant?.questions
+        ? { ...exam, questions: variant.questions, question_type: variant.question_type ?? exam.question_type }
+        : exam;
+      setActiveExam(examForStudent);
+      setPreviousSubmission(sub?.submitted ? sub.submission : (submittedExams[exam.id] ?? null));
     } catch {
       setActiveExam(exam);
-      setPreviousSubmission(null);
+      setPreviousSubmission(submittedExams[exam.id] ?? null);
     } finally {
       setCheckingSubmission(false);
     }

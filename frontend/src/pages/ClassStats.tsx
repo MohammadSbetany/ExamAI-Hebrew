@@ -51,11 +51,6 @@ interface ClassAnalytics {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
-const successColor = (rate: number) => {
-  if (rate >= 75) return { bg: 'bg-green-100', text: 'text-green-700 dark:text-green-400', bar: '#22c55e' };
-  if (rate >= 50) return { bg: 'bg-yellow-100', text: 'text-yellow-700 dark:text-yellow-400', bar: '#eab308' };
-  return { bg: 'bg-red-100', text: 'text-red-700 dark:text-red-400', bar: '#ef4444' };
-};
 const pctColor = (pct: number) => pct >= 80 ? 'text-green-700 dark:text-green-400' : pct >= 60 ? 'text-yellow-700 dark:text-yellow-400' : 'text-red-700 dark:text-red-400';
 
 // ── Tooltips ──────────────────────────────────────────────────────────────────
@@ -376,63 +371,6 @@ const ClassStats = () => {
                     </ResponsiveContainer>
                   </div>
                 </div>
-
-                {/* Per-question success rate */}
-                <div className="bg-card border border-border rounded-2xl p-5 mb-6">
-                  <h2 className="text-base font-semibold text-foreground mb-4">{t('classStats.successByQuestion')}</h2>
-                  <div className="space-y-3">
-                    {analytics.question_stats.map(qs => {
-                      const c = successColor(qs.success_rate);
-                      return (
-                        <div key={qs.index} className="flex items-center gap-3">
-                          <span className="flex-shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">{qs.index + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-foreground truncate mb-1">{qs.question}</p>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${qs.success_rate}%`, backgroundColor: c.bar }} />
-                              </div>
-                              <span className={`text-xs font-bold flex-shrink-0 w-10 text-left ${c.text}`}>{qs.success_rate}%</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Distractor analysis */}
-                {analytics.distractor_analysis?.length > 0 && (
-                  <div className="bg-card border border-border rounded-2xl p-5 mb-6">
-                    <h2 className="text-base font-semibold text-foreground mb-4">{t('classStats.distractorAnalysis')}</h2>
-                    <div className="space-y-6">
-                      {analytics.distractor_analysis.map(da => (
-                        <div key={da.index}>
-                          <p className="text-sm font-medium text-foreground mb-2">
-                            <span className="text-primary font-bold ml-1">{t('classStats.questionN', { n: da.index + 1 })}</span>{da.question}
-                          </p>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            {Object.entries(da.options).map(([key, val]) => {
-                              const count = da.answer_counts[key] ?? 0;
-                              const pct = da.total_answers ? Math.round((count / da.total_answers) * 100) : 0;
-                              const isCorrect = key === da.correct_answer;
-                              return (
-                                <div key={key} className={`p-3 rounded-xl border-2 ${isCorrect ? 'border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950/40' : 'border-border bg-muted/30'}`}>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className={`text-xs font-bold ${isCorrect ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground'}`}>{key}</span>
-                                    {isCorrect && <span className="text-xs text-green-600 dark:text-green-400">✓</span>}
-                                  </div>
-                                  <p className="text-xs text-foreground truncate mb-2">{val as string}</p>
-                                  <p className={`text-sm font-bold ${isCorrect ? 'text-green-700 dark:text-green-400' : count > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>{count} ({pct}%)</p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Student table */}
                 <div className="bg-card border border-border rounded-2xl p-5">

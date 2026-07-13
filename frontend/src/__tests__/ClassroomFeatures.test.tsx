@@ -16,6 +16,7 @@ vi.mock('@/lib/exportUtils', () => ({
 }));
 vi.mock('@/lib/settingsApi', () => ({
   fetchSettings: vi.fn(),
+  fetchProfile: vi.fn(() => Promise.resolve({})),
   saveSettings: vi.fn(),
   saveProfile: vi.fn(),
   applyTheme: vi.fn(),
