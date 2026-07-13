@@ -79,6 +79,38 @@ def _is_student_in_class(class_doc: dict, student_uid: str) -> bool:
     return any(s.get("uid") == student_uid for s in class_doc.get("students", []))
 
 
+def _variant_count(data: dict) -> int:
+    """Number of forms for an exam (real variant count, falling back to num_variants)."""
+    variants = data.get("variants") or {}
+    return max(1, len(variants) if variants else int(data.get("num_variants", 1)))
+
+
+def _pick_form(assignments: dict, num_variants: int) -> int:
+    """Choose the least-used form: unused forms (count 0) are picked first, and
+    ties are broken by the lowest index — so a form is never reused while another
+    form is still unused, and usage stays evenly balanced."""
+    counts = [0] * num_variants
+    for val in (assignments or {}).values():
+        iv = int(val)
+        if 0 <= iv < num_variants:
+            counts[iv] += 1
+    return min(range(num_variants), key=lambda i: (counts[i], i))
+
+
+def _assign_form(data: dict, student_uid: str) -> tuple[int, bool]:
+    """Decide a student's form from the exam's stored data.
+
+    Returns (variant_idx, changed); `changed` is False when the student already
+    holds a valid form (no write needed), otherwise the least-used form is chosen.
+    """
+    num_variants = _variant_count(data)
+    assignments = data.get("assignments") or {}
+    existing = assignments.get(student_uid)
+    if existing is not None and 0 <= int(existing) < num_variants:
+        return int(existing), False
+    return _pick_form(assignments, num_variants), True
+
+
 def _ensure_assignment(exam: dict, student_uid: str) -> int:
     """
     Hand out forms on demand when a student first OPENS the exam: the next student
@@ -94,31 +126,17 @@ def _ensure_assignment(exam: dict, student_uid: str) -> int:
     exam_ref = db.collection("class_exams").document(exam["id"])
 
     @firestore.transactional
-    def _assign(transaction) -> int:
+    def _txn(transaction) -> int:
         snap = exam_ref.get(transaction=transaction)
         data = snap.to_dict() or {}
-        variants = data.get("variants") or {}
-        num_variants = max(1, len(variants) if variants else int(data.get("num_variants", 1)))
-        assignments = dict(data.get("assignments") or {})
-
-        existing = assignments.get(student_uid)
-        if existing is not None and 0 <= int(existing) < num_variants:
-            return int(existing)
-
-        # Count how many students already hold each form, then take the least-used
-        # one (unused forms have count 0 → chosen first; ties broken by lowest index).
-        counts = [0] * num_variants
-        for val in assignments.values():
-            iv = int(val)
-            if 0 <= iv < num_variants:
-                counts[iv] += 1
-        variant_idx = min(range(num_variants), key=lambda i: (counts[i], i))
-
-        assignments[student_uid] = variant_idx
-        transaction.update(exam_ref, {"assignments": assignments})
+        variant_idx, changed = _assign_form(data, student_uid)
+        if changed:
+            assignments = dict(data.get("assignments") or {})
+            assignments[student_uid] = variant_idx
+            transaction.update(exam_ref, {"assignments": assignments})
         return variant_idx
 
-    variant_idx = _assign(db.transaction())
+    variant_idx = _txn(db.transaction())
     exam.setdefault("assignments", {})[student_uid] = variant_idx
     return variant_idx
 

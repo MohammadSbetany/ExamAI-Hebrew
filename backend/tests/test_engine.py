@@ -246,6 +246,43 @@ class TestGradeAnswers:
             ))
         assert result["score"] == 1
 
+    def test_score_is_recomputed_from_points_not_trusting_the_model(self):
+        """The model may return a wrong total; the score must equal the sum of the
+        per-question points (2 full-credit + 3 zero → 2, not the model's 1.5)."""
+        from engine import grade_answers
+        expected = {
+            "score": 1.5,  # deliberately wrong
+            "feedback": [
+                {"question": "q1", "points": 1,   "correct": True,  "covered_points": [], "missed_points": []},
+                {"question": "q2", "points": 1,   "correct": True,  "covered_points": [], "missed_points": []},
+                {"question": "q3", "points": 0,   "correct": False, "covered_points": [], "missed_points": []},
+                {"question": "q4", "points": 0,   "correct": False, "covered_points": [], "missed_points": []},
+                {"question": "q5", "points": 0,   "correct": False, "covered_points": [], "missed_points": []},
+            ],
+        }
+        questions = [{"question": f"q{i}", "answer": "a", "critical_points": ["p"]} for i in range(5)]
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            result = json.loads(grade_answers(questions, ["a"] * 5, "open"))
+        assert result["score"] == 2
+
+    def test_score_recompute_counts_partial_credit(self):
+        """Half-credit (0.5) answers must be included in the recomputed total."""
+        from engine import grade_answers
+        expected = {
+            "score": 99,  # ignored
+            "feedback": [
+                {"question": "q1", "points": 1,   "correct": True,  "covered_points": [], "missed_points": []},
+                {"question": "q2", "points": 0.5, "correct": False, "covered_points": [], "missed_points": []},
+                {"question": "q3", "points": 0,   "correct": False, "covered_points": [], "missed_points": []},
+            ],
+        }
+        questions = [{"question": f"q{i}", "answer": "a", "critical_points": ["p"]} for i in range(3)]
+        with patch("engine.client") as mock_client:
+            mock_client.chat.completions.create.return_value = self._mock_response(expected)
+            result = json.loads(grade_answers(questions, ["a"] * 3, "open"))
+        assert result["score"] == 1.5
+
     def test_grade_yesno_questions(self):
         from engine import grade_answers
         expected = {

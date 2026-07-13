@@ -87,49 +87,78 @@ class TestRoster:
         assert _is_student_in_class({}, "x") is False
 
 
-# ── Cursor-based form assignment ──────────────────────────────────────────────
+# ── On-demand, least-used form assignment ─────────────────────────────────────
 
-class TestEnsureAssignment:
-    def _exam(self, **over):
-        base = {"id": "exam-1", "class_id": "class-1",
-                "variants": {"0": [], "1": []}, "assignments": {}, "num_variants": 2}
-        base.update(over)
-        return base
+class TestPickForm:
+    """The pure form-selection logic: least-used first, no reuse while unused."""
 
-    def test_first_opener_gets_form_0_and_cursor_advances(self):
-        from class_manager import _ensure_assignment
-        exam = self._exam()
-        with patch("class_manager._db"):
-            assert _ensure_assignment(exam, "s1") == 0
-        assert exam["assignments"]["s1"] == 0
-        assert exam["variant_cursor"] == 1
+    def test_empty_gives_form_0(self):
+        from class_manager import _pick_form
+        assert _pick_form({}, 3) == 0
 
-    def test_second_opener_gets_form_1(self):
-        from class_manager import _ensure_assignment
-        exam = self._exam(assignments={"s1": 0}, variant_cursor=1)
-        with patch("class_manager._db"):
-            assert _ensure_assignment(exam, "s2") == 1
+    def test_picks_lowest_unused_form(self):
+        from class_manager import _pick_form
+        assert _pick_form({"a": 0}, 3) == 1          # 1 and 2 unused → lowest = 1
 
-    def test_cursor_wraps_around_when_forms_run_out(self):
-        from class_manager import _ensure_assignment
-        exam = self._exam(assignments={"s1": 0, "s2": 1}, variant_cursor=2)
-        with patch("class_manager._db"):
-            assert _ensure_assignment(exam, "s3") == 0  # 2 % 2
+    def test_never_reuses_while_a_form_is_still_unused(self):
+        from class_manager import _pick_form
+        assert _pick_form({"a": 0, "b": 1}, 3) == 2  # form 2 still unused
 
-    def test_existing_assignment_is_stable_and_does_not_advance(self):
-        from class_manager import _ensure_assignment
-        exam = self._exam(assignments={"s1": 1}, variant_cursor=5)
-        with patch("class_manager._db") as db:
-            assert _ensure_assignment(exam, "s1") == 1
-        db.return_value.collection.return_value.document.return_value.update.assert_not_called()
+    def test_ties_break_by_lowest_index(self):
+        from class_manager import _pick_form
+        assert _pick_form({"a": 0, "b": 1, "c": 2}, 3) == 0  # all used once → 0
 
-    def test_divides_by_actual_form_count_not_stale_field(self):
-        from class_manager import _ensure_assignment
-        # stale num_variants says 1, but 3 real forms exist
-        exam = self._exam(variants={"0": [], "1": [], "2": []}, num_variants=1,
-                          assignments={"s1": 0, "s2": 1}, variant_cursor=2)
-        with patch("class_manager._db"):
-            assert _ensure_assignment(exam, "s3") == 2  # 2 % 3, not 2 % 1
+    def test_picks_the_least_used_when_all_used(self):
+        from class_manager import _pick_form
+        # counts: form0=2, form1=1, form2=2 → least used is form1
+        assert _pick_form({"a": 0, "b": 0, "c": 1, "d": 2, "e": 2}, 3) == 1
+
+    def test_single_form_always_zero(self):
+        from class_manager import _pick_form
+        assert _pick_form({"a": 0, "b": 0}, 1) == 0
+
+    def test_even_distribution_10_forms_10_students(self):
+        from class_manager import _pick_form
+        from collections import Counter
+        assignments = {}
+        for i in range(10):
+            assignments[f"s{i}"] = _pick_form(assignments, 10)
+        assert set(assignments.values()) == set(range(10))          # each form used
+        assert list(Counter(assignments.values()).values()) == [1] * 10  # exactly once
+
+    def test_even_distribution_20_students_10_forms(self):
+        from class_manager import _pick_form
+        from collections import Counter
+        assignments = {}
+        for i in range(20):
+            assignments[f"s{i}"] = _pick_form(assignments, 10)
+        assert all(c == 2 for c in Counter(assignments.values()).values())  # each twice
+
+
+class TestAssignForm:
+    """The (variant_idx, changed) decision from an exam's stored data."""
+
+    def test_existing_valid_assignment_is_stable(self):
+        from class_manager import _assign_form
+        data = {"variants": {"0": [], "1": []}, "assignments": {"s1": 1}}
+        assert _assign_form(data, "s1") == (1, False)
+
+    def test_new_student_gets_least_used_and_is_marked_changed(self):
+        from class_manager import _assign_form
+        data = {"variants": {"0": [], "1": []}, "assignments": {"s1": 0}}
+        assert _assign_form(data, "s2") == (1, True)
+
+    def test_uses_actual_form_count_not_stale_num_variants(self):
+        from class_manager import _assign_form
+        data = {"variants": {"0": [], "1": [], "2": []}, "num_variants": 1,
+                "assignments": {"s1": 0, "s2": 1}}
+        assert _assign_form(data, "s3") == (2, True)
+
+    def test_out_of_range_existing_assignment_is_reassigned(self):
+        from class_manager import _assign_form
+        data = {"variants": {"0": [], "1": []}, "assignments": {"s1": 5}}
+        idx, changed = _assign_form(data, "s1")
+        assert idx == 0 and changed is True
 
 
 # ── Distinct per-form variant storage ─────────────────────────────────────────
