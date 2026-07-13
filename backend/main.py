@@ -395,10 +395,19 @@ async def get_student_class_exams(class_id: str, user=Depends(verify_token)):
     for exam in all_exams:
         submission_doc = db.collection("class_results").document(exam["id"]).collection("submissions").document(uid).get()
         submission = submission_doc.to_dict() if submission_doc.exists else None
+        # Show the student's OWN assigned variant (once assigned) so the questions
+        # they review line up with what they were graded on. Before assignment the
+        # master form is just a preview; the actual variant is assigned when they
+        # open the exam via GET /student/class-exam/{id}.
+        assigned = (exam.get("assignments") or {}).get(uid)
+        if assigned is not None:
+            variant_qs = (exam.get("variants") or {}).get(str(assigned), exam.get("questions", []))
+        else:
+            variant_qs = exam.get("questions", [])
         exams.append({
             "id": exam["id"],
             "title": exam.get("title"),
-            "questions": [_sanitize_question_for_student(q) for q in exam.get("questions", [])],
+            "questions": [_sanitize_question_for_student(q) for q in variant_qs],
             "question_type": exam.get("question_type", "open"),
             "visible": exam.get("visible", True),
             "open_at": exam.get("open_at"),
