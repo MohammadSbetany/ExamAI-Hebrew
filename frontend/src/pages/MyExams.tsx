@@ -132,7 +132,13 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
     }
   };
 
-  const pct = gradeResult ? Math.round((gradeResult.score / questions.length) * 100) : null;
+  // Derive the total from the per-question points so it always matches the
+  // feedback shown below (including 0.5 partial credit), rather than trusting a
+  // possibly-stale stored score.
+  const displayScore = gradeResult
+    ? gradeResult.feedback.reduce((sum, f) => sum + (f.points ?? 0), 0)
+    : null;
+  const pct = displayScore !== null ? Math.round((displayScore / questions.length) * 100) : null;
   const colors = pct !== null ? pctColor(pct) : null;
 
   return (
@@ -163,7 +169,7 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
           {pct !== null && colors && (
             <div className={`px-5 py-3 rounded-xl border ${colors.bg} ${colors.border} text-center min-w-[100px]`}>
               <p className={`text-2xl font-bold ${colors.text}`}>{pct}%</p>
-              <p className={`text-xs ${colors.text}`}>{gradeResult?.score} / {questions.length}</p>
+              <p className={`text-xs ${colors.text}`}>{displayScore} / {questions.length}</p>
             </div>
           )}
         </div>
@@ -321,7 +327,7 @@ const ExamDetail = ({ exam, onBack, onGraded }: ExamDetailProps) => {
       {gradeResult && colors && (
         <div className={`mt-6 p-5 rounded-2xl border-2 ${colors.bg} ${colors.border} text-center`}>
           <p className={`text-3xl font-bold ${colors.text} mb-1`}>{pct}%</p>
-          <p className={`text-sm ${colors.text}`}>{t('myExams.correctOf', { score: gradeResult.score, total: questions.length })}</p>
+          <p className={`text-sm ${colors.text}`}>{t('myExams.correctOf', { score: displayScore, total: questions.length })}</p>
           {isSaving && <p className="text-xs text-muted-foreground mt-2">{t('myExams.savingResult')}</p>}
         </div>
       )}
@@ -340,7 +346,12 @@ interface ExamCardProps {
 
 const ExamCard = ({ exam, onSelect, onDelete, isDeleting }: ExamCardProps) => {
   const { t } = useTranslation();
-  const pct = exam.score !== null && exam.total > 0 ? Math.round((exam.score / exam.total) * 100) : null;
+  // Prefer the sum of per-question points (consistent with the detail view) over
+  // a possibly-stale stored score.
+  const gradedScore = exam.grade_result
+    ? exam.grade_result.feedback.reduce((sum, f) => sum + (f.points ?? 0), 0)
+    : exam.score;
+  const pct = gradedScore !== null && exam.total > 0 ? Math.round((gradedScore / exam.total) * 100) : null;
   const colors = pct !== null ? pctColor(pct) : null;
   const meta = examTypeMeta[exam.exam_type];
   const badge = meta ? { label: `${meta.icon} ${t(meta.labelKey)}`, cls: meta.cls } : { label: exam.exam_type, cls: 'bg-muted text-muted-foreground' };
@@ -372,7 +383,7 @@ const ExamCard = ({ exam, onSelect, onDelete, isDeleting }: ExamCardProps) => {
 
       {pct !== null && colors ? (
         <div className={`flex items-center justify-between px-3 py-2.5 rounded-xl border ${colors.bg} ${colors.border}`}>
-          <span className={`text-sm font-bold ${colors.text}`}>{exam.score} / {exam.total}</span>
+          <span className={`text-sm font-bold ${colors.text}`}>{gradedScore} / {exam.total}</span>
           <span className={`text-sm font-bold ${colors.text}`}>{pct}%</span>
         </div>
       ) : (

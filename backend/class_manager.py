@@ -81,30 +81,45 @@ def _is_student_in_class(class_doc: dict, student_uid: str) -> bool:
 
 def _ensure_assignment(exam: dict, student_uid: str) -> int:
     """
-    Hand out forms with a cursor that advances the moment each new student OPENS
-    the exam (regardless of whether they submit): the 1st student to open gets
-    form 0, the 2nd gets form 1, … and once the forms run out it wraps back to
-    form 0. A student keeps the same form on later visits. Uses the real number
-    of forms (len of variants).
+    Hand out forms on demand when a student first OPENS the exam: the next student
+    always gets the form that has been used the *least* so far — so a form is
+    never given to a second student while another form is still unused, and the
+    forms stay evenly distributed (10 forms / 10 students → one each; 20 students
+    → two each; and so on). A student keeps the same form on later visits.
+
+    Runs inside a Firestore transaction so that many students opening the exam at
+    the same moment cannot be handed the same form.
     """
-    variants = exam.get("variants") or {}
-    num_variants = max(1, len(variants) if variants else int(exam.get("num_variants", 1)))
+    db = _db()
+    exam_ref = db.collection("class_exams").document(exam["id"])
 
-    assignments = exam.get("assignments", {}) or {}
-    existing = assignments.get(student_uid)
-    if existing is not None and 0 <= int(existing) < num_variants:
-        return int(existing)
+    @firestore.transactional
+    def _assign(transaction) -> int:
+        snap = exam_ref.get(transaction=transaction)
+        data = snap.to_dict() or {}
+        variants = data.get("variants") or {}
+        num_variants = max(1, len(variants) if variants else int(data.get("num_variants", 1)))
+        assignments = dict(data.get("assignments") or {})
 
-    # New student opening the exam — take the next form and advance the cursor.
-    cursor = int(exam.get("variant_cursor", len(assignments)))
-    variant_idx = cursor % num_variants
-    assignments[student_uid] = variant_idx
-    _db().collection("class_exams").document(exam["id"]).update({
-        "assignments": assignments,
-        "variant_cursor": cursor + 1,
-    })
-    exam["assignments"] = assignments
-    exam["variant_cursor"] = cursor + 1
+        existing = assignments.get(student_uid)
+        if existing is not None and 0 <= int(existing) < num_variants:
+            return int(existing)
+
+        # Count how many students already hold each form, then take the least-used
+        # one (unused forms have count 0 → chosen first; ties broken by lowest index).
+        counts = [0] * num_variants
+        for val in assignments.values():
+            iv = int(val)
+            if 0 <= iv < num_variants:
+                counts[iv] += 1
+        variant_idx = min(range(num_variants), key=lambda i: (counts[i], i))
+
+        assignments[student_uid] = variant_idx
+        transaction.update(exam_ref, {"assignments": assignments})
+        return variant_idx
+
+    variant_idx = _assign(db.transaction())
+    exam.setdefault("assignments", {})[student_uid] = variant_idx
     return variant_idx
 
 
@@ -279,7 +294,6 @@ def create_class_exam(
         if not is_valid:
             raise ValueError(reason)
 
-    students = cls.get("students", [])
     exam_id = str(uuid.uuid4())
 
     # Clamp variants
@@ -292,13 +306,12 @@ def create_class_exam(
         random.shuffle(shuffled)
         variants[str(vi)] = shuffled
 
-    # Build assignments
-    if not assignments:
-        final_assignments = {}
-        for i, s in enumerate(students):
-            final_assignments[s["uid"]] = i % num_variants
-    else:
-        final_assignments = assignments
+    # Forms are handed out on demand (least-used first) when each student first
+    # OPENS the exam — see _ensure_assignment — so the students who actually take
+    # the exam get distinct forms. Pre-assigning by enrollment order would let the
+    # actual submitters collide on a form while other forms stay unused (e.g. when
+    # more students are enrolled than there are forms).
+    final_assignments = assignments if assignments else {}
 
     data = {
         "id": exam_id,

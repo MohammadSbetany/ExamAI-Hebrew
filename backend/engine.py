@@ -324,4 +324,19 @@ def grade_answers(questions: list, answers: list, question_type: str):
         response_format={"type": "json_object"}
     )
 
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+
+    # LLMs are unreliable at arithmetic: the model is asked for a total "score",
+    # but it sometimes returns a value that doesn't match the per-question points
+    # (e.g. reports 1.5 when the points add up to 2). Recompute the total from the
+    # feedback so the score always matches what's shown per question.
+    try:
+        data = json.loads(content)
+        feedback = data.get("feedback")
+        if isinstance(feedback, list):
+            data["score"] = sum(float(f.get("points", 0) or 0) for f in feedback)
+            content = json.dumps(data, ensure_ascii=False)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+
+    return content

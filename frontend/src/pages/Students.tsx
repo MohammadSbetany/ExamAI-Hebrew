@@ -799,10 +799,10 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
 
       {/* Tabs */}
       <div className="flex gap-2 p-1 bg-muted rounded-xl">
-        {[{ id: 'students', label: `👥 ${t('students.tabStudents', { count: cls.students?.length ?? 0 })}` }, { id: 'exams', label: `📝 ${t('students.tabExams')}` }].map(tab => (
-          <button key={tab.id} onClick={() => setTab(tab.id as 'students' | 'exams')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${tab === tab.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-            {tab.label}
+        {[{ id: 'students', label: `👥 ${t('students.tabStudents', { count: cls.students?.length ?? 0 })}` }, { id: 'exams', label: `📝 ${t('students.tabExams')}` }].map(tb => (
+          <button key={tb.id} onClick={() => setTab(tb.id as 'students' | 'exams')}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${tab === tb.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+            {tb.label}
           </button>
         ))}
       </div>
@@ -1007,7 +1007,12 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                         <p className="text-xs text-muted-foreground">{t('students.noSubmissions')}</p>
                       ) : (
                         subs.map(sub => {
-                          const pct = sub.score !== null ? Math.round((sub.score / exam.questions.length) * 100) : null;
+                          // "Graded" is determined by the grade result, not by `score`
+                          // (an ungraded submission has no score → NaN%). Use the
+                          // graded variant's own question count as the denominator.
+                          const gr = sub.grade_result;
+                          const total = gr?.feedback?.length || exam.questions.length;
+                          const pct = gr && total > 0 ? Math.round((gr.score / total) * 100) : null;
                           return (
                             <div key={sub.student_uid} className="flex items-center gap-3 p-2.5 bg-muted/40 rounded-xl cursor-pointer hover:bg-muted transition-colors"
                               onClick={() => { setGradingExam(exam); setGradingSub(sub); }}>
@@ -1018,9 +1023,9 @@ const ClassDetail = ({ cls, token, onBack, onRefresh }: {
                                 <p className="text-xs font-medium text-foreground">{sub.student_name}</p>
                                 <p className="text-xs text-muted-foreground">{fmtDT(sub.submitted_at)}</p>
                               </div>
-                              {pct !== null ? (
+                              {pct !== null && gr ? (
                                 <span className={`text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0 ${pct >= 80 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : pct >= 60 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'}`}>
-                                  {sub.score}/{exam.questions.length} ({pct}%)
+                                  {gr.score}/{total} ({pct}%)
                                 </span>
                               ) : (
                                 <span className="text-xs px-2 py-1 rounded-lg bg-muted text-muted-foreground flex-shrink-0">{t('students.notGraded')}</span>
