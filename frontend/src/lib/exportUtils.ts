@@ -54,7 +54,7 @@ export const exportBlankDocx = async (questions: Question[]) => {
     ));
 
     if (q.options) {
-      Object.entries(q.options).forEach(([key, val]) =>
+      Object.entries(q.options).sort(([a], [b]) => a.localeCompare(b)).forEach(([key, val]) =>
         children.push(hebrewPara(
           [hebrewRun(`${val}  .${key}`, { size: 22, color: '475569' })],
           { spacing: { after: 60 } }

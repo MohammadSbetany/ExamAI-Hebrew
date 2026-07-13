@@ -60,6 +60,12 @@ export const saveSettings = async (token: string, settings: Partial<UserSettings
   });
 };
 
+export const fetchProfile = async (token: string): Promise<Record<string, string>> => {
+  const r = await fetch(`${API()}/profile`, { headers: authH(token) });
+  if (!r.ok) return {};
+  return r.json();
+};
+
 export const saveProfile = async (token: string, profile: Record<string, string>): Promise<void> => {
   const r = await fetch(`${API()}/profile`, {
     method: 'PATCH',

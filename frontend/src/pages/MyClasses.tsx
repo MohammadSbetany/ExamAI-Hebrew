@@ -204,7 +204,7 @@ const ExamScreen = ({ exam, token, studentName, onDone }: {
 
                 {effectiveType === 'multiple' && (
                   <div className="space-y-2">
-                    {Object.entries(q.options ?? {}).map(([key, val]) => (
+                    {Object.entries(q.options ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => (
                       <button key={key} onClick={() => setAnswers(prev => { const a = [...prev]; a[i] = key; return a; })}
                         className={`w-full text-right px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${answers[i] === key ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}>
                         <span className="font-bold ml-2">{key}.</span> {val}

@@ -751,11 +751,33 @@ async def update_settings(data: dict, user=Depends(verify_token)):
     )
     return {"ok": True}
 
+PROFILE_FIELDS = ("name", "title", "department", "institution", "year_of_study", "field_of_study", "office_hours")
+
+
+@app.get("/profile")
+async def get_profile(user=Depends(verify_token)):
+    from firebase_admin import firestore as fs
+    db = fs.client()
+    doc = db.collection("users").document(user.get("uid")).get()
+    data = doc.to_dict() if doc.exists else {}
+    return {k: data.get(k, "") for k in PROFILE_FIELDS}
+
+
 @app.patch("/profile")
 async def update_profile(data: dict, user=Depends(verify_token)):
     from firebase_admin import firestore as fs
     db = fs.client()
     allowed = {"name", "title", "department", "institution", "year_of_study", "field_of_study", "office_hours"}
     update = {k: v for k, v in data.items() if k in allowed}
-    db.collection("users").document(user.get("uid")).update(update)
+    uid = user.get("uid")
+    db.collection("users").document(uid).update(update)
+
+    # Keep the denormalized copies of the name in sync (class rosters + submissions).
+    if update.get("name"):
+        try:
+            from class_manager import rename_student_everywhere
+            rename_student_everywhere(uid, update["name"])
+        except Exception as exc:  # best-effort — never fail the profile save over this
+            logger.warning("Failed to propagate name change for %s: %s", uid, exc)
+
     return {"ok": True}
